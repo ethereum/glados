@@ -23,11 +23,9 @@ use axum::{
 };
 use clap::Parser;
 
-/// Simple program to greet a person
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-   /// Name of the person to greet
    #[arg(short, long)]
    ipc_path: PathBuf,
 }
@@ -45,7 +43,7 @@ async fn main() {
 
     let shared_state = Arc::new(State {ipc_path: args.ipc_path});
 
-    // setup router and routes
+    // setup router
     let app = Router::new()
         .route("/", get(root))
         .layer(Extension(shared_state));
@@ -68,15 +66,10 @@ async fn root(
     let ipc_path = state.ipc_path.as_os_str().to_os_string().into_string().unwrap();
     let mut client = PortalClient::from_ipc(&state.ipc_path).unwrap();
 
-    let req = client.build_request("web3_clientVersion", &None);
-    let resp = client.make_request(req);
+    let client_version = client.get_client_version();
+    let node_info = client.get_node_info();
 
-    let client_version = match resp {
-        Err(err) => String::from("error"),
-        Ok(value) => serde_json::to_string_pretty(&value).unwrap(),
-    };
-
-    let template = IndexTemplate { ipc_path, client_version };
+    let template = IndexTemplate { ipc_path, client_version, node_info };
     HtmlTemplate(template)
 }
 
@@ -85,6 +78,7 @@ async fn root(
 struct IndexTemplate {
     ipc_path: String,
     client_version: String,
+    node_info: String,
 }
 
 struct HtmlTemplate<T>(T);
@@ -211,5 +205,29 @@ where
 
         // this should only happen when they immediately send EOF
         Err(JsonRpcError::Empty)
+    }
+
+    fn get_client_version(&mut self) -> String {
+        let req = self.build_request("web3_clientVersion", &None);
+        let resp = self.make_request(req);
+
+        let client_version = match resp {
+            Err(err) => format!("error: {}", err),
+            Ok(value) => serde_json::to_string_pretty(&value).unwrap(),
+        };
+
+        client_version
+    }
+
+    fn get_node_info(&mut self) -> String {
+        let req = self.build_request("discv5_nodeInfo", &None);
+        let resp = self.make_request(req);
+
+        let client_version = match resp {
+            Err(err) => format!("error: {}", err),
+            Ok(value) => serde_json::to_string_pretty(&value).unwrap(),
+        };
+
+        client_version
     }
 }
