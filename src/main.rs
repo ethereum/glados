@@ -8,6 +8,7 @@ use std::path::{
     Path,
     PathBuf
 };
+use std::str::FromStr;
 
 use serde_json::value::RawValue;
 use thiserror::Error;
@@ -22,6 +23,9 @@ use axum::{
     routing::get
 };
 use clap::Parser;
+
+use discv5::enr::CombinedKey;
+type Enr = discv5::enr::Enr<CombinedKey>;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -223,11 +227,16 @@ where
         let req = self.build_request("discv5_nodeInfo", &None);
         let resp = self.make_request(req);
 
-        let client_version = match resp {
+        let node_info = match resp {
             Err(err) => format!("error: {}", err),
             Ok(value) => serde_json::to_string_pretty(&value).unwrap(),
         };
 
-        client_version
+        node_info
+    }
+
+    fn get_node_enr(&mut self) -> Enr {
+        let node_info = self.get_node_info();
+        Enr::from_str(node_info.result.enr).unwrap()
     }
 }
