@@ -11,6 +11,8 @@ use std::path::{
 use std::str::FromStr;
 
 use serde_json::value::RawValue;
+use serde::{Deserialize, Serialize};
+
 use thiserror::Error;
 
 use askama::Template;
@@ -167,6 +169,20 @@ pub enum JsonRpcError {
     Empty,
 }
 
+#[derive(Serialize, Deserialize)]
+struct JsonRPCResult {
+    id: u32,
+    jsonrpc: String,
+    result: serde_json::Value,
+}
+
+#[derive(Serialize, Deserialize)]
+struct NodeInfo {
+    enr: String,
+    nodeId: String,
+    ip: String,
+}
+
 // TryClone is used because JSON-RPC responses are not followed by EOF. We must read bytes
 // from the stream until a complete object is detected, and the simplest way of doing that
 // with available APIs is to give ownership of a Read to a serde_json::Deserializer. If we
@@ -194,7 +210,7 @@ where
         result
     }
 
-    fn make_request(&mut self, req: jsonrpc::Request) -> Result<serde_json::Value, JsonRpcError> {
+    fn make_request(&mut self, req: jsonrpc::Request) -> Result<JsonRPCResult, JsonRpcError> {
         let data = serde_json::to_vec(&req).unwrap();
 
         self.stream.write_all(&data).unwrap();
@@ -215,28 +231,26 @@ where
         let req = self.build_request("web3_clientVersion", &None);
         let resp = self.make_request(req);
 
-        let client_version = match resp {
+        match resp {
             Err(err) => format!("error: {}", err),
-            Ok(value) => serde_json::to_string_pretty(&value).unwrap(),
-        };
-
-        client_version
+            Ok(value) => value.result.to_string(),
+        }
     }
 
-    fn get_node_info(&mut self) -> String {
+    fn get_node_info(&mut self) -> NodeInfo {
         let req = self.build_request("discv5_nodeInfo", &None);
         let resp = self.make_request(req);
 
-        let node_info = match resp {
+        let node_info: NodeInfo = match resp {
             Err(err) => format!("error: {}", err),
-            Ok(value) => serde_json::to_string_pretty(&value).unwrap(),
+            Ok(value) => value.result,
         };
 
         node_info
     }
 
-    fn get_node_enr(&mut self) -> Enr {
-        let node_info = self.get_node_info();
-        Enr::from_str(node_info.result.enr).unwrap()
-    }
+    //fn get_node_enr(&mut self) -> Enr {
+    //    let node_info = self.get_node_info();
+    //    Enr::from_str(node_info.result.enr).unwrap()
+    //}
 }
