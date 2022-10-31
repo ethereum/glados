@@ -73,9 +73,9 @@ async fn root(
     let mut client = PortalClient::from_ipc(&state.ipc_path).unwrap();
 
     let client_version = client.get_client_version();
-    let node_info = client.get_node_info();
+    //let node_info = client.get_node_info();
 
-    let template = IndexTemplate { ipc_path, client_version, node_info };
+    let template = IndexTemplate { ipc_path, client_version };
     HtmlTemplate(template)
 }
 
@@ -84,7 +84,7 @@ async fn root(
 struct IndexTemplate {
     ipc_path: String,
     client_version: String,
-    node_info: String,
+    //node_info: NodeInfo,
 }
 
 struct HtmlTemplate<T>(T);
@@ -219,7 +219,7 @@ where
         let clone = self.stream.try_clone().unwrap();
         let deser = serde_json::Deserializer::from_reader(clone);
 
-        if let Some(obj) = deser.into_iter::<serde_json::Value>().next() {
+        if let Some(obj) = deser.into_iter::<JsonRPCResult>().next() {
             return obj.map_err(JsonRpcError::Malformed);
         }
 
@@ -239,14 +239,10 @@ where
 
     fn get_node_info(&mut self) -> NodeInfo {
         let req = self.build_request("discv5_nodeInfo", &None);
-        let resp = self.make_request(req);
+        let resp = self.make_request(req).unwrap();
 
-        let node_info: NodeInfo = match resp {
-            Err(err) => format!("error: {}", err),
-            Ok(value) => value.result,
-        };
-
-        node_info
+        let result: NodeInfo = serde_json::from_value(resp.result).unwrap();
+        return result
     }
 
     //fn get_node_enr(&mut self) -> Enr {
