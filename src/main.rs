@@ -73,9 +73,10 @@ async fn root(
     let mut client = PortalClient::from_ipc(&state.ipc_path).unwrap();
 
     let client_version = client.get_client_version();
-    //let node_info = client.get_node_info();
+    let node_info = client.get_node_info();
+    let node_enr = node_info.enr;
 
-    let template = IndexTemplate { ipc_path, client_version };
+    let template = IndexTemplate { ipc_path, client_version, node_enr };
     HtmlTemplate(template)
 }
 
@@ -84,7 +85,7 @@ async fn root(
 struct IndexTemplate {
     ipc_path: String,
     client_version: String,
-    //node_info: NodeInfo,
+    node_enr: String,
 }
 
 struct HtmlTemplate<T>(T);
