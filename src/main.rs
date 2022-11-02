@@ -74,18 +74,20 @@ async fn root(
 
     let client_version = client.get_client_version();
     let node_info = client.get_node_info();
-    let node_enr = node_info.enr;
+    let routing_table_info = client.get_routing_table_info();
 
-    let template = IndexTemplate { ipc_path, client_version, node_enr };
+    let template = IndexTemplate { ipc_path, client_version, node_info, routing_table_info };
     HtmlTemplate(template)
 }
+
 
 #[derive(Template)]
 #[template(path = "index.html")]
 struct IndexTemplate {
     ipc_path: String,
     client_version: String,
-    node_enr: String,
+    node_info: NodeInfo,
+    routing_table_info: RoutingTableInfo,
 }
 
 struct HtmlTemplate<T>(T);
@@ -184,6 +186,18 @@ struct NodeInfo {
     ip: String,
 }
 
+
+#[derive(Serialize, Deserialize)]
+struct RoutingTableInfoRaw {
+    localKey: String,
+    buckets: Vec<Vec<(String, String, String)>>,
+}
+
+struct RoutingTableInfo {
+    localKey: String,
+    buckets: Vec<Vec<(String, Enr, String)>>,
+}
+
 // TryClone is used because JSON-RPC responses are not followed by EOF. We must read bytes
 // from the stream until a complete object is detected, and the simplest way of doing that
 // with available APIs is to give ownership of a Read to a serde_json::Deserializer. If we
@@ -244,6 +258,17 @@ where
 
         let result: NodeInfo = serde_json::from_value(resp.result).unwrap();
         return result
+    }
+
+    fn get_routing_table_info(&mut self) -> RoutingTableInfo {
+        let req = self.build_request("discv5_routingTableInfo", &None);
+        let resp = self.make_request(req).unwrap();
+
+        let result_raw: RoutingTableInfoRaw = serde_json::from_value(resp.result).unwrap();
+        RoutingTableInfo {
+            localKey: result_raw.localKey,
+            buckets: result_raw.buckets.iter().map(|bucket| bucket.iter().map(|entry| (entry.0.clone(), Enr::from_str(&entry.1).unwrap(), entry.2.clone())).collect()).collect(),
+        }
     }
 
     //fn get_node_enr(&mut self) -> Enr {

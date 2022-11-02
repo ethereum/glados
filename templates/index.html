@@ -1,4 +1,7 @@
 <h1>Glados</h1>
 <p>IPC Path: {{ ipc_path }}</p>
 <p>Client Version: {{ client_version }}</p>
-<p>Node ENR: {{ node_enr }}</p>
+<p>Node ENR: {{ node_info.enr }}</p>
+<p>Node IP: {{ node_info.ip }}</p>
+<h2>Routing Table</h2>
+<p>RoutingTableInfo-LocalKey: {{ routing_table_info.localKey }}</p>
