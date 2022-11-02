@@ -5,3 +5,8 @@
 <p>Node IP: {{ node_info.ip }}</p>
 <h2>Routing Table</h2>
 <p>RoutingTableInfo-LocalKey: {{ routing_table_info.localKey }}</p>
+<ul>
+{% for entry in routing_table_info.buckets %}
+  <li><pre>{{ entry.log_distance }}</pre></li>
+{% endfor %}
+</ul>

@@ -26,6 +26,8 @@ use axum::{
 };
 use clap::Parser;
 
+use ethereum_types::{H256, U256};
+
 use discv5::enr::CombinedKey;
 type Enr = discv5::enr::Enr<CombinedKey>;
 
@@ -190,12 +192,20 @@ struct NodeInfo {
 #[derive(Serialize, Deserialize)]
 struct RoutingTableInfoRaw {
     localKey: String,
-    buckets: Vec<Vec<(String, String, String)>>,
+    buckets: Vec<(String, String, String)>,
+}
+
+struct RoutingTableEntry {
+    node_id: H256,
+    enr: Enr,
+    status: String,
+    distance: U256,
+    log_distance: u16,
 }
 
 struct RoutingTableInfo {
-    localKey: String,
-    buckets: Vec<Vec<(String, Enr, String)>>,
+    localKey: H256,
+    buckets: Vec<RoutingTableEntry>,
 }
 
 // TryClone is used because JSON-RPC responses are not followed by EOF. We must read bytes
@@ -265,9 +275,15 @@ where
         let resp = self.make_request(req).unwrap();
 
         let result_raw: RoutingTableInfoRaw = serde_json::from_value(resp.result).unwrap();
+        let local_node_id = H256::from_str(&result_raw.localKey).unwrap();
         RoutingTableInfo {
-            localKey: result_raw.localKey,
-            buckets: result_raw.buckets.iter().map(|bucket| bucket.iter().map(|entry| (entry.0.clone(), Enr::from_str(&entry.1).unwrap(), entry.2.clone())).collect()).collect(),
+            localKey: H256::from_str(&result_raw.localKey).unwrap(),
+            buckets: result_raw.buckets.iter().map(|entry| parse_routing_table_entry(
+                    &local_node_id,
+                    &entry.0,
+                    &entry.1,
+                    &entry.2,
+            )).collect(),
         }
     }
 
@@ -275,4 +291,34 @@ where
     //    let node_info = self.get_node_info();
     //    Enr::from_str(node_info.result.enr).unwrap()
     //}
+}
+
+fn parse_routing_table_entry(local_node_id: &H256, raw_node_id: &String, encoded_enr: &String, status: &String) -> RoutingTableEntry {
+    let node_id = H256::from_str(&raw_node_id).unwrap();
+    let enr = Enr::from_str(&encoded_enr).unwrap();
+    let distance = distance_xor(node_id.as_fixed_bytes(), local_node_id.as_fixed_bytes());
+    let log_distance = distance_log2(distance);
+    RoutingTableEntry {
+        node_id: node_id,
+        enr: enr,
+        status: status.to_string(),
+        distance: distance,
+        log_distance: log_distance,
+    }
+}
+
+fn distance_xor(x: &[u8; 32], y: &[u8; 32]) -> U256 {
+    let mut z: [u8; 32] = [0; 32];
+    for i in 0..32 {
+        z[i] = x[i] ^ y[i];
+    }
+    U256::from_big_endian(z.as_slice())
+}
+
+fn distance_log2(distance: U256) -> u16 {
+    if distance.is_zero() {
+        0
+    } else {
+        (256 - distance.leading_zeros()).try_into().unwrap()
+    }
 }
