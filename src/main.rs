@@ -13,7 +13,7 @@ use std::str::FromStr;
 use serde_json::value::RawValue;
 use serde::{Deserialize, Serialize};
 
-use sea_orm::{Database, DatabaseConnection, Set, NotSet};
+use sea_orm::{Database, DatabaseConnection, Set, NotSet, ActiveModelTrait};
 use migration::{Migrator, MigratorTrait};
 
 use thiserror::Error;
@@ -43,6 +43,7 @@ use entity::keyvalue::Entity as KeyValue;
 struct Args {
    #[arg(short, long)]
    ipc_path: PathBuf,
+   #[arg(short, long)]
    database_url: String,
 }
 
@@ -95,10 +96,11 @@ async fn root(
     let node_info = client.get_node_info();
     let routing_table_info = client.get_routing_table_info();
 
-    let node = ActiveModel {
-        node_id: Set(node_info.node_id),
-    }
-    node.insert(state.database_connection).await?;
+    let node = ActiveNode {
+        id: Set(node_info.nodeId.as_bytes().to_vec()),
+    };
+    let resp = node.insert(&state.database_connection).await;
+    println!("did insert: {} - {}", node_info.nodeId, resp);
 
     let template = IndexTemplate { ipc_path, client_version, node_info, routing_table_info };
     HtmlTemplate(template)
