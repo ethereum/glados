@@ -13,6 +13,9 @@ use std::str::FromStr;
 use serde_json::value::RawValue;
 use serde::{Deserialize, Serialize};
 
+use sea_orm::{Database, DatabaseConnection, Set, NotSet};
+use migration::{Migrator, MigratorTrait};
+
 use thiserror::Error;
 
 use askama::Template;
@@ -31,15 +34,21 @@ use ethereum_types::{H256, U256};
 use discv5::enr::CombinedKey;
 type Enr = discv5::enr::Enr<CombinedKey>;
 
+use entity::node::{Entity as Node, ActiveModel as ActiveNode};
+use entity::enr::Entity as EnrDB;
+use entity::keyvalue::Entity as KeyValue;
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
    #[arg(short, long)]
    ipc_path: PathBuf,
+   database_url: String,
 }
 
 struct State {
-    ipc_path: PathBuf
+    ipc_path: PathBuf,
+    database_connection: DatabaseConnection,
 }
 
 
@@ -49,7 +58,15 @@ async fn main() {
     // parse command line arguments
     let args = Args::parse();
 
-    let shared_state = Arc::new(State {ipc_path: args.ipc_path});
+    let conn = Database::connect(args.database_url)
+        .await
+        .expect("Database connection failed");
+    Migrator::up(&conn, None).await.unwrap();
+
+    let shared_state = Arc::new(State {
+        ipc_path: args.ipc_path,
+        database_connection: conn,
+    });
 
     // setup router
     let app = Router::new()
@@ -77,6 +94,11 @@ async fn root(
     let client_version = client.get_client_version();
     let node_info = client.get_node_info();
     let routing_table_info = client.get_routing_table_info();
+
+    let node = ActiveModel {
+        node_id: Set(node_info.node_id),
+    }
+    node.insert(state.database_connection).await?;
 
     let template = IndexTemplate { ipc_path, client_version, node_info, routing_table_info };
     HtmlTemplate(template)
@@ -110,6 +132,7 @@ where
         }
     }
 }
+
 
 //
 // JSON RPC Client
