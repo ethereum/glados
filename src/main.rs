@@ -99,8 +99,10 @@ async fn root(
     let node = ActiveNode {
         id: Set(node_info.nodeId.as_bytes().to_vec()),
     };
-    let resp = node.insert(&state.database_connection).await;
-    println!("did insert: {} - {}", node_info.nodeId, resp);
+    match node.insert(&state.database_connection).await {
+        Ok(result) => println!("db success"),
+        Err(err) => println!("db error: {}", err),
+    }
 
     let template = IndexTemplate { ipc_path, client_version, node_info, routing_table_info };
     HtmlTemplate(template)
