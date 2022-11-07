@@ -1,0 +1,13 @@
+[package]
+name = "glados-web"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+glados-core = { path = "../glados-core" }
+entity = { path = "../entity" }
+askama = "0.11.1"
+axum = "0.5.17"
+sea-orm = "0.10.2"

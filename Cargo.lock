@@ -313,9 +313,9 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "axum"
-version = "0.5.16"
+version = "0.5.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9e3356844c4d6a6d6467b8da2cffb4a2820be256f50a3a386c9d152bab31043"
+checksum = "acee9fd5073ab6b045a275b3e709c163dd36c90685219cb21804a147b58dba43"
 dependencies = [
  "async-trait",
  "axum-core",
@@ -344,9 +344,9 @@ dependencies = [
 
 [[package]]
 name = "axum-core"
-version = "0.2.8"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9f0c0a60006f2a293d82d571f635042a72edf927539b7685bd62d361963839b"
+checksum = "37e5939e02c56fecd5c017c37df4238c0a839fa76b7f97acdd7efb804fd181cc"
 dependencies = [
  "async-trait",
  "bytes",
@@ -531,13 +531,13 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.0.17"
+version = "4.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06badb543e734a2d6568e19a40af66ed5364360b9226184926f89d229b4b4267"
+checksum = "91b9970d7505127a162fdaa9b96428d28a479ba78c9ec7550a63a5d9863db682"
 dependencies = [
  "atty",
  "bitflags",
- "clap_derive 4.0.13",
+ "clap_derive 4.0.21",
  "clap_lex 0.3.0",
  "once_cell",
  "strsim",
@@ -559,9 +559,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.0.13"
+version = "4.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c42f169caba89a7d512b5418b09864543eeb4d497416c917d7137863bd2076ad"
+checksum = "0177313f9f02afc995627906bbd8967e2be069f5261954222dac78290c2b9014"
 dependencies = [
  "heck 0.4.0",
  "proc-macro-error",
@@ -834,6 +834,39 @@ dependencies = [
  "libc",
  "redox_users",
  "winapi",
+]
+
+[[package]]
+name = "discv5"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d767c0e59b3e8d65222d95df723cc2ea1da92bb0f27c563607e6f0bde064f255"
+dependencies = [
+ "aes",
+ "aes-gcm",
+ "arrayvec",
+ "delay_map",
+ "enr",
+ "fnv",
+ "futures",
+ "hashlink 0.7.0",
+ "hex",
+ "hkdf",
+ "lazy_static",
+ "lru",
+ "more-asserts",
+ "parking_lot 0.11.2",
+ "rand 0.8.5",
+ "rlp",
+ "smallvec",
+ "socket2",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "uint",
+ "zeroize",
 ]
 
 [[package]]
@@ -1238,10 +1271,13 @@ version = "0.1.0"
 dependencies = [
  "askama",
  "axum",
- "clap 4.0.17",
- "discv5",
+ "clap 4.0.22",
+ "discv5 0.1.0 (git+https://github.com/sigp/discv5.git?branch=master)",
  "entity",
  "ethereum-types",
+ "glados-core",
+ "glados-monitor",
+ "glados-web",
  "jsonrpc",
  "migration",
  "sea-orm",
@@ -1249,6 +1285,34 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "glados-core"
+version = "0.1.0"
+dependencies = [
+ "clap 4.0.22",
+ "discv5 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ethereum-types",
+ "jsonrpc",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "glados-monitor"
+version = "0.1.0"
+
+[[package]]
+name = "glados-web"
+version = "0.1.0"
+dependencies = [
+ "askama",
+ "axum",
+ "entity",
+ "glados-core",
+ "sea-orm",
 ]
 
 [[package]]
@@ -2345,9 +2409,9 @@ checksum = "9c8132065adcfd6e02db789d9285a0deb2f3fcb04002865ab67d5fb103533898"
 
 [[package]]
 name = "sea-orm"
-version = "0.10.1"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c347aacd6bd1b9714fd8b5a6095b7caf4c7d6d3d2fc443c5668512effc52755d"
+checksum = "75f0afff0dd7581c8cc88b35fdd42d207f379ce5cfc5a88e65b5aa95e0ec3d3f"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -2390,9 +2454,9 @@ dependencies = [
 
 [[package]]
 name = "sea-orm-macros"
-version = "0.10.1"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51235dc3e7330b241a3ca2fcd00c315feffb3f9e3da193c18c01aca369be7ec7"
+checksum = "2d1c53d3ed30403f210ef8a67da9d929a4d07a91b6478ae3ab827d2d91b88a84"
 dependencies = [
  "bae",
  "heck 0.3.3",
@@ -2563,9 +2627,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.86"
+version = "1.0.87"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41feea4228a6f1cd09ec7a3593a682276702cd67b5273544757dae23c096f074"
+checksum = "6ce777b7b150d76b9cf60d28b55f5847135a003f7d7350c6be7a773508ce7d45"
 dependencies = [
  "itoa",
  "ryu",
