@@ -1,0 +1,76 @@
+version: 2.1
+orbs:
+  rust: circleci/rust@1.6.0
+  win: circleci/windows@2.2.0
+jobs:
+  lint-build-test:
+        description: |
+            Check linting with Clippy and rustfmt, build the crate, and run tests.
+        resource_class: xlarge
+        executor:
+            name: rust/default
+            tag: 1.62.0
+        environment:
+            RUSTFLAGS: '-D warnings'
+            RUST_LOG: 'debug'
+        steps:
+            - checkout
+            - run:
+                name: Prepare for apt upgrades
+                command: sudo apt update
+            - run:
+                name: Install libssl-dev for openssl-sys
+                command: sudo apt install -y libssl-dev
+            - run:
+                name: Install libclang for rocksdb
+                command: sudo apt install clang
+            - run:
+                name: Install rustfmt
+                command: rustup component add rustfmt
+            - run:
+                name: Run rustfmt
+                command: cargo fmt --all -- --check
+            - run:
+                name: Install Clippy
+                command: rustup component add clippy
+            - run:
+                name: Run Clippy
+                command: cargo clippy --all --all-targets --all-features --no-deps -- --deny warnings
+            - run:
+                name: Build Glados workspace
+                command: cargo build --workspace
+            - run:
+                name: Test Glados workspace
+                command: cargo test --workspace -- --nocapture
+  win-build:
+    description: |
+      Build the crate for windows.
+    executor:
+      name: win/default
+      shell: powershell.exe
+      size: large
+    environment:
+        RUST_LOG: 'debug'
+    steps:
+      - checkout
+      - run:
+          name: Install rustup
+          # todo: Remove --ignore-checksums flag
+          command: choco install rustup.install --ignore-checksums
+      - run:
+          name: Install clang
+          command: choco install llvm
+      - run:
+          name: Add target
+          command: rustup target add x86_64-pc-windows-msvc
+      - run:
+          name: Install target toolchain
+          command: rustup toolchain install stable-x86_64-pc-windows-msvc
+      - run:
+          name: Cargo Test --target x86_64-pc-windows-msvc
+          command: cargo test --workspace --target x86_64-pc-windows-msvc
+workflows:
+  merge-test:
+    jobs:
+      - lint-build-test
+      - win-build
