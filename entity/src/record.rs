@@ -2,7 +2,7 @@ use sea_orm::entity::prelude::*;
 use chrono::{DateTime, Utc};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "enr")]
+#[sea_orm(table_name = "record")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
@@ -22,7 +22,7 @@ impl RelationTrait for Relation {
         match self {
             Self::Node => Entity::belongs_to(super::node::Entity)
                 .from(Column::NodeId)
-                .to(super::node::Column::Id)
+                .to(super::node::Column::NodeId)
                 .into(),
         }
     }

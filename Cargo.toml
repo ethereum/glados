@@ -9,17 +9,17 @@ members = [".", "glados-core", "glados-web", "glados-monitor", "entity", "migrat
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-entity = { path = "entity" }
-migration = { path = "migration" }
 askama = "0.11.1"
 axum = "0.5.16"
 clap = { version = "4.0.17", features = ["derive"] }
 discv5 = { git = "https://github.com/sigp/discv5.git", branch = "master" }
+entity = { path = "entity" }
 ethereum-types = "0.14.0"
 glados-core = { path = "glados-core" }
 glados-monitor = { path = "glados-monitor" }
 glados-web = { path = "glados-web" }
 jsonrpc = "0.13.0"
+migration = { path = "migration" }
 sea-orm = { version = "0.10.1", features = ["sqlx-postgres", "sqlx-sqlite", "runtime-tokio", "macros", "uuid", "runtime-tokio-native-tls"] }
 serde = "1.0.147"
 serde_json = "1.0.86"

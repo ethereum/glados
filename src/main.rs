@@ -38,6 +38,7 @@ async fn main() {
     // setup router
     let app = Router::new()
         .route("/", get(routes::root))
+        .route("/nodes/", get(routes::node_list))
         .layer(Extension(shared_state));
         
 

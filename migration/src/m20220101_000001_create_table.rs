@@ -13,9 +13,27 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(
                         ColumnDef::new(Node::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key()
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .name("idx-node-id")
+                            .col(Node::Id)
+                    )
+                    .col(
+                        ColumnDef::new(Node::NodeId)
                             .binary_len(32)
                             .not_null()
-                            .primary_key()
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .name("idx-node-nodeid")
+                            .col(Node::NodeId)
                     )
                     .to_owned(),
             )
@@ -23,32 +41,32 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Enr::Table)
+                    .table(Record::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(Enr::Id)
+                        ColumnDef::new(Record::Id)
                             .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key()
                     )
                     .col(
-                        ColumnDef::new(Enr::NodeId)
+                        ColumnDef::new(Record::NodeId)
                             .binary_len(32)
                             .not_null()
                     )
                     .col(
-                        ColumnDef::new(Enr::Raw)
+                        ColumnDef::new(Record::Raw)
                             .binary()
                             .not_null()
                     )
                     .col(
-                        ColumnDef::new(Enr::CreatedAt)
+                        ColumnDef::new(Record::CreatedAt)
                             .date_time()
                             .not_null()
                     )
                     .col(
-                        ColumnDef::new(Enr::SequenceNumber)
+                        ColumnDef::new(Record::SequenceNumber)
                             .integer()
                             .not_null()
 
@@ -56,7 +74,7 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_enr_id_node_id")
-                            .from(Enr::Table, Enr::NodeId)
+                            .from(Record::Table, Record::NodeId)
                             .to(Node::Table, Node::Id)
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade)
@@ -77,7 +95,7 @@ impl MigrationTrait for Migration {
                             .primary_key()
                     )
                     .col(
-                        ColumnDef::new(KeyValue::EnrId)
+                        ColumnDef::new(KeyValue::RecordId)
                             .integer()
                             .not_null()
                     )
@@ -94,8 +112,8 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_keyvalue_id_enr_id")
-                            .from(KeyValue::Table, KeyValue::EnrId)
-                            .to(Enr::Table, Enr::Id)
+                            .from(KeyValue::Table, KeyValue::RecordId)
+                            .to(Record::Table, Record::Id)
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade)
                     )
@@ -110,7 +128,7 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(KeyValue::Table).to_owned())
             .await?;
         manager
-            .drop_table(Table::drop().table(Enr::Table).to_owned())
+            .drop_table(Table::drop().table(Record::Table).to_owned())
             .await?;
         manager
             .drop_table(Table::drop().table(Node::Table).to_owned())
@@ -124,10 +142,11 @@ impl MigrationTrait for Migration {
 enum Node {
     Table,
     Id,
+    NodeId,
 }
 
 #[derive(Iden)]
-enum Enr {
+enum Record {
     Table,
     Id,
     NodeId,
@@ -140,7 +159,7 @@ enum Enr {
 enum KeyValue {
     Table,
     Id,
-    EnrId,
+    RecordId,
     Key,
     Value,
 }

@@ -5,30 +5,30 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub enr_id: i32,
+    pub record_id: i32,
     pub key: Vec<u8>,
     pub value: Vec<u8>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter)]
 pub enum Relation {
-    Enr,
+    Record,
 }
 
 impl RelationTrait for Relation {
     fn def(&self) -> RelationDef {
         match self {
-            Self::Enr => Entity::belongs_to(super::enr::Entity)
-                .from(Column::EnrId)
-                .to(super::enr::Column::Id)
+            Self::Record => Entity::belongs_to(super::record::Entity)
+                .from(Column::RecordId)
+                .to(super::record::Column::Id)
                 .into(),
         }
     }
 }
 
-impl Related<super::enr::Entity> for Entity {
+impl Related<super::record::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Enr.def()
+        Relation::Record.def()
     }
 }
 
