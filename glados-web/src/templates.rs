@@ -1,13 +1,12 @@
 use askama::Template;
 use axum::{
-    response::{Html, IntoResponse, Response},
     http::StatusCode,
+    response::{Html, IntoResponse, Response},
 };
 
-use glados_core::jsonrpc::{RoutingTableInfo, NodeInfo};
+use glados_core::jsonrpc::{NodeInfo, RoutingTableInfo};
 
 use entity::node;
-
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -18,16 +17,13 @@ pub struct IndexTemplate {
     pub routing_table_info: RoutingTableInfo,
 }
 
-
 #[derive(Template)]
 #[template(path = "node_list.html")]
 pub struct NodeListTemplate {
     pub nodes: Vec<node::Model>,
 }
 
-
 pub struct HtmlTemplate<T>(pub T);
-
 
 impl<T> IntoResponse for HtmlTemplate<T>
 where

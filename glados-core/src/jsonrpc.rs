@@ -6,8 +6,8 @@ use uds_windows::UnixStream;
 use std::path::Path;
 use std::str::FromStr;
 
-use serde_json::value::RawValue;
 use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
 
 use thiserror::Error;
 
@@ -93,7 +93,6 @@ pub struct NodeInfo {
     pub ip: String,
 }
 
-
 #[derive(Serialize, Deserialize)]
 struct RoutingTableInfoRaw {
     localKey: String,
@@ -172,7 +171,7 @@ where
         let resp = self.make_request(req).unwrap();
 
         let result: NodeInfo = serde_json::from_value(resp.result).unwrap();
-        return result
+        return result;
     }
 
     pub fn get_routing_table_info(&mut self) -> RoutingTableInfo {
@@ -183,12 +182,13 @@ where
         let local_node_id = H256::from_str(&result_raw.localKey).unwrap();
         RoutingTableInfo {
             localKey: H256::from_str(&result_raw.localKey).unwrap(),
-            buckets: result_raw.buckets.iter().map(|entry| parse_routing_table_entry(
-                    &local_node_id,
-                    &entry.0,
-                    &entry.1,
-                    &entry.2,
-            )).collect(),
+            buckets: result_raw
+                .buckets
+                .iter()
+                .map(|entry| {
+                    parse_routing_table_entry(&local_node_id, &entry.0, &entry.1, &entry.2)
+                })
+                .collect(),
         }
     }
 
@@ -198,7 +198,12 @@ where
     //}
 }
 
-fn parse_routing_table_entry(local_node_id: &H256, raw_node_id: &String, encoded_enr: &String, status: &String) -> RoutingTableEntry {
+fn parse_routing_table_entry(
+    local_node_id: &H256,
+    raw_node_id: &String,
+    encoded_enr: &String,
+    status: &String,
+) -> RoutingTableEntry {
     let node_id = H256::from_str(&raw_node_id).unwrap();
     let enr = Enr::from_str(&encoded_enr).unwrap();
     let distance = distance_xor(node_id.as_fixed_bytes(), local_node_id.as_fixed_bytes());

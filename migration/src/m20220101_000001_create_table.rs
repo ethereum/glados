@@ -16,24 +16,15 @@ impl MigrationTrait for Migration {
                             .integer()
                             .not_null()
                             .auto_increment()
-                            .primary_key()
+                            .primary_key(),
                     )
-                    .index(
-                        Index::create()
-                            .unique()
-                            .name("idx-node-id")
-                            .col(Node::Id)
-                    )
-                    .col(
-                        ColumnDef::new(Node::NodeId)
-                            .binary_len(32)
-                            .not_null()
-                    )
+                    .index(Index::create().unique().name("idx-node-id").col(Node::Id))
+                    .col(ColumnDef::new(Node::NodeId).binary_len(32).not_null())
                     .index(
                         Index::create()
                             .unique()
                             .name("idx-node-nodeid")
-                            .col(Node::NodeId)
+                            .col(Node::NodeId),
                     )
                     .to_owned(),
             )
@@ -48,36 +39,19 @@ impl MigrationTrait for Migration {
                             .integer()
                             .not_null()
                             .auto_increment()
-                            .primary_key()
+                            .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(Record::NodeId)
-                            .binary_len(32)
-                            .not_null()
-                    )
-                    .col(
-                        ColumnDef::new(Record::Raw)
-                            .binary()
-                            .not_null()
-                    )
-                    .col(
-                        ColumnDef::new(Record::CreatedAt)
-                            .date_time()
-                            .not_null()
-                    )
-                    .col(
-                        ColumnDef::new(Record::SequenceNumber)
-                            .integer()
-                            .not_null()
-
-                    )
+                    .col(ColumnDef::new(Record::NodeId).binary_len(32).not_null())
+                    .col(ColumnDef::new(Record::Raw).binary().not_null())
+                    .col(ColumnDef::new(Record::CreatedAt).date_time().not_null())
+                    .col(ColumnDef::new(Record::SequenceNumber).integer().not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_enr_id_node_id")
                             .from(Record::Table, Record::NodeId)
                             .to(Node::Table, Node::Id)
                             .on_delete(ForeignKeyAction::Cascade)
-                            .on_update(ForeignKeyAction::Cascade)
+                            .on_update(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
@@ -92,30 +66,18 @@ impl MigrationTrait for Migration {
                             .integer()
                             .auto_increment()
                             .not_null()
-                            .primary_key()
+                            .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(KeyValue::RecordId)
-                            .integer()
-                            .not_null()
-                    )
-                    .col(
-                        ColumnDef::new(KeyValue::Key)
-                            .binary()
-                            .not_null()
-                    )
-                    .col(
-                        ColumnDef::new(KeyValue::Value)
-                            .binary()
-                            .not_null()
-                    )
+                    .col(ColumnDef::new(KeyValue::RecordId).integer().not_null())
+                    .col(ColumnDef::new(KeyValue::Key).binary().not_null())
+                    .col(ColumnDef::new(KeyValue::Value).binary().not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_keyvalue_id_enr_id")
                             .from(KeyValue::Table, KeyValue::RecordId)
                             .to(Record::Table, Record::Id)
                             .on_delete(ForeignKeyAction::Cascade)
-                            .on_update(ForeignKeyAction::Cascade)
+                            .on_update(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )

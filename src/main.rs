@@ -4,21 +4,13 @@ use sea_orm::Database;
 
 use clap::Parser;
 
-use axum::{
-    extract::Extension,
-    Router,
-    routing::get
-};
+use axum::{extract::Extension, routing::get, Router};
 
 use migration::{Migrator, MigratorTrait};
 
 use glados_core::cli::Args;
 
-use glados_web::{
-    state::State,
-    routes,
-};
-
+use glados_web::{routes, state::State};
 
 #[tokio::main]
 async fn main() {
@@ -40,7 +32,6 @@ async fn main() {
         .route("/", get(routes::root))
         .route("/nodes/", get(routes::node_list))
         .layer(Extension(shared_state));
-        
 
     // run it with hyper on localhost:3000
     axum::Server::bind(&"0.0.0.0:3001".parse().unwrap())

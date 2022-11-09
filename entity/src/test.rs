@@ -1,17 +1,8 @@
 #[cfg(test)]
-
 use sea_orm::entity::prelude::*;
 use sea_orm::{
-    Set,
-    NotSet,
-    Database,
-    DbErr,
-    DbConn,
-    ColumnTrait,
-    EntityTrait,
-    QueryFilter,
-    ActiveModelTrait,
-    PaginatorTrait,
+    ActiveModelTrait, ColumnTrait, Database, DbConn, DbErr, EntityTrait, NotSet, PaginatorTrait,
+    QueryFilter, Set,
 };
 
 use migration::{Migrator, MigratorTrait};
@@ -27,15 +18,21 @@ async fn setup_database() -> Result<DbConn, DbErr> {
 
     println!("Setup database schema");
 
-    return Ok(db)
+    return Ok(db);
 }
 
 #[tokio::test]
 async fn test_node_crud() -> Result<(), DbErr> {
     let db = setup_database().await?;
 
-    let node_id_a: Vec<u8> = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
-    let node_id_b: Vec<u8> = vec![31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+    let node_id_a: Vec<u8> = vec![
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31,
+    ];
+    let node_id_b: Vec<u8> = vec![
+        31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9,
+        8, 7, 6, 5, 4, 3, 2, 1, 0,
+    ];
 
     let node_a = node::ActiveModel {
         id: NotSet,
@@ -79,19 +76,26 @@ async fn test_node_crud() -> Result<(), DbErr> {
 async fn crud_record() -> Result<(), DbErr> {
     let db = setup_database().await?;
 
-    use enr::{EnrBuilder, k256};
+    use enr::{k256, EnrBuilder};
     use std::net::Ipv4Addr;
 
-    let raw_signing_key: Vec<u8> = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
+    let raw_signing_key: Vec<u8> = vec![
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31,
+    ];
 
     // generate a random secp256k1 key
     let key = k256::ecdsa::SigningKey::from_bytes(&raw_signing_key).unwrap();
 
-    let ip = Ipv4Addr::new(192,168,0,1);
-    let enr = EnrBuilder::new("v4").ip4(ip).tcp4(8000).build(&key).unwrap();
+    let ip = Ipv4Addr::new(192, 168, 0, 1);
+    let enr = EnrBuilder::new("v4")
+        .ip4(ip)
+        .tcp4(8000)
+        .build(&key)
+        .unwrap();
 
     assert_eq!(enr.ip4(), Some("192.168.0.1".parse().unwrap()));
     assert_eq!(enr.id(), Some("v4".into()));
-    
+
     Ok(())
 }
