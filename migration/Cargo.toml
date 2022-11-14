@@ -3,6 +3,8 @@ name = "migration"
 version = "0.1.0"
 edition = "2021"
 publish = false
+rust-version = "1.64.0"
+authors = ["Piper Merriam <piper@pipermerriam.com>"]
 
 [lib]
 name = "migration"

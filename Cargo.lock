@@ -846,7 +846,7 @@ dependencies = [
  "aes-gcm",
  "arrayvec",
  "delay_map",
- "enr",
+ "enr 0.6.2",
  "fnv",
  "futures",
  "hashlink 0.7.0",
@@ -878,7 +878,7 @@ dependencies = [
  "aes-gcm",
  "arrayvec",
  "delay_map",
- "enr",
+ "enr 0.6.2",
  "fnv",
  "futures",
  "hashlink 0.7.0",
@@ -989,11 +989,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "enr"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "492a7e5fc2504d5fdce8e124d3e263b244a68b283cac67a69eda0cd43e0aebad"
+dependencies = [
+ "base64",
+ "bs58",
+ "bytes",
+ "hex",
+ "k256",
+ "log",
+ "rand 0.8.5",
+ "rlp",
+ "serde",
+ "sha3",
+ "zeroize",
+]
+
+[[package]]
 name = "entity"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "enr 0.7.0",
+ "migration",
  "sea-orm",
+ "tokio",
 ]
 
 [[package]]
@@ -1303,6 +1325,9 @@ dependencies = [
 [[package]]
 name = "glados-monitor"
 version = "0.1.0"
+dependencies = [
+ "glados-core",
+]
 
 [[package]]
 name = "glados-web"

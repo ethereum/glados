@@ -1,6 +1,7 @@
 pub mod node;
 pub use node::*;
-pub mod enr;
-pub use enr::*;
+pub mod record;
+pub use record::*;
 pub mod keyvalue;
 pub use keyvalue::*;
+mod test;

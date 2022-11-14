@@ -6,8 +6,8 @@ use uds_windows::UnixStream;
 use std::path::Path;
 use std::str::FromStr;
 
-use serde_json::value::RawValue;
 use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
 
 use thiserror::Error;
 
@@ -86,6 +86,7 @@ struct JsonRPCResult {
     result: serde_json::Value,
 }
 
+#[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
 pub struct NodeInfo {
     pub enr: String,
@@ -93,7 +94,7 @@ pub struct NodeInfo {
     pub ip: String,
 }
 
-
+#[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
 struct RoutingTableInfoRaw {
     localKey: String,
@@ -108,6 +109,7 @@ pub struct RoutingTableEntry {
     pub log_distance: u16,
 }
 
+#[allow(non_snake_case)]
 pub struct RoutingTableInfo {
     pub localKey: H256,
     pub buckets: Vec<RoutingTableEntry>,
@@ -172,7 +174,7 @@ where
         let resp = self.make_request(req).unwrap();
 
         let result: NodeInfo = serde_json::from_value(resp.result).unwrap();
-        return result
+        result
     }
 
     pub fn get_routing_table_info(&mut self) -> RoutingTableInfo {
@@ -183,12 +185,13 @@ where
         let local_node_id = H256::from_str(&result_raw.localKey).unwrap();
         RoutingTableInfo {
             localKey: H256::from_str(&result_raw.localKey).unwrap(),
-            buckets: result_raw.buckets.iter().map(|entry| parse_routing_table_entry(
-                    &local_node_id,
-                    &entry.0,
-                    &entry.1,
-                    &entry.2,
-            )).collect(),
+            buckets: result_raw
+                .buckets
+                .iter()
+                .map(|entry| {
+                    parse_routing_table_entry(&local_node_id, &entry.0, &entry.1, &entry.2)
+                })
+                .collect(),
         }
     }
 
@@ -198,17 +201,22 @@ where
     //}
 }
 
-fn parse_routing_table_entry(local_node_id: &H256, raw_node_id: &String, encoded_enr: &String, status: &String) -> RoutingTableEntry {
-    let node_id = H256::from_str(&raw_node_id).unwrap();
-    let enr = Enr::from_str(&encoded_enr).unwrap();
+fn parse_routing_table_entry(
+    local_node_id: &H256,
+    raw_node_id: &str,
+    encoded_enr: &str,
+    status: &String,
+) -> RoutingTableEntry {
+    let node_id = H256::from_str(raw_node_id).unwrap();
+    let enr = Enr::from_str(encoded_enr).unwrap();
     let distance = distance_xor(node_id.as_fixed_bytes(), local_node_id.as_fixed_bytes());
     let log_distance = distance_log2(distance);
     RoutingTableEntry {
-        node_id: node_id,
-        enr: enr,
+        node_id,
+        enr,
         status: status.to_string(),
-        distance: distance,
-        log_distance: log_distance,
+        distance,
+        log_distance,
     }
 }
 
