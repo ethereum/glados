@@ -1,5 +1,7 @@
 #![allow(unused_imports)]
 #[cfg(test)]
+use chrono::prelude::*;
+
 use sea_orm::entity::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Database, DbConn, DbErr, EntityTrait, NotSet, PaginatorTrait,
@@ -8,6 +10,9 @@ use sea_orm::{
 
 use migration::{Migrator, MigratorTrait};
 
+use crate::contentaudit;
+use crate::contentid;
+use crate::contentkey;
 use crate::node;
 
 #[allow(dead_code)]
@@ -98,6 +103,73 @@ async fn crud_record() -> Result<(), DbErr> {
 
     assert_eq!(enr.ip4(), Some("192.168.0.1".parse().unwrap()));
     assert_eq!(enr.id(), Some("v4".into()));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_audit_crud() -> Result<(), DbErr> {
+    let db = setup_database().await?;
+
+    let content_id_raw: Vec<u8> = vec![
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31,
+    ];
+
+    let content_id = contentid::ActiveModel {
+        id: NotSet,
+        content_id: Set(content_id_raw.clone()),
+    };
+
+    let content_id = content_id.insert(&db).await?;
+    println!("Inserted: content_id={:?}", content_id);
+
+    let content_id = contentid::Entity::find()
+        .filter(contentid::Column::ContentId.eq(content_id_raw.clone()))
+        .one(&db)
+        .await?
+        .unwrap();
+
+    assert_eq!(content_id.content_id, content_id_raw);
+
+    // setup the content_key
+    let content_key_raw: String =
+        String::from("not-a-real-content-key-but-lets-make-sure-its-more-than-32-chars");
+    let content_key = contentkey::ActiveModel {
+        id: NotSet,
+        content_id: Set(content_id.id),
+        content_key: Set(content_key_raw.clone().as_bytes().to_vec()),
+    };
+
+    let content_key = content_key.insert(&db).await?;
+    println!("Inserted: content_key={:?}", content_key);
+
+    let content_key = contentkey::Entity::find()
+        .filter(contentkey::Column::ContentKey.eq(content_key_raw.clone().as_bytes().to_vec()))
+        .one(&db)
+        .await?
+        .unwrap();
+
+    assert_eq!(content_key.content_key, content_key_raw.as_bytes().to_vec());
+
+    // setup the content_audit
+    let content_audit = contentaudit::ActiveModel {
+        id: NotSet,
+        content_key: Set(content_key.id),
+        created_at: Set(Utc::now()),
+        result: Set(contentaudit::AuditResult::Success),
+    };
+
+    let content_audit = content_audit.insert(&db).await?;
+    println!("Inserted: content_audit={:?}", content_audit);
+
+    let content_audit = contentaudit::Entity::find_by_id(content_audit.id)
+        .one(&db)
+        .await?
+        .unwrap();
+
+    assert_eq!(content_audit.content_key, content_key.id);
+    assert_eq!(content_audit.result, contentaudit::AuditResult::Success);
 
     Ok(())
 }
