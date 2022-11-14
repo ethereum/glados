@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 #[cfg(test)]
 use sea_orm::entity::prelude::*;
 use sea_orm::{
@@ -9,6 +10,7 @@ use migration::{Migrator, MigratorTrait};
 
 use crate::node;
 
+#[allow(dead_code)]
 async fn setup_database() -> Result<DbConn, DbErr> {
     let base_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite::memory:".to_owned());
 
@@ -18,7 +20,7 @@ async fn setup_database() -> Result<DbConn, DbErr> {
 
     println!("Setup database schema");
 
-    return Ok(db);
+    Ok(db)
 }
 
 #[tokio::test]
@@ -74,7 +76,7 @@ async fn test_node_crud() -> Result<(), DbErr> {
 
 #[tokio::test]
 async fn crud_record() -> Result<(), DbErr> {
-    let db = setup_database().await?;
+    let _db = setup_database().await?;
 
     use enr::{k256, EnrBuilder};
     use std::net::Ipv4Addr;

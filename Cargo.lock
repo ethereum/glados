@@ -1325,6 +1325,9 @@ dependencies = [
 [[package]]
 name = "glados-monitor"
 version = "0.1.0"
+dependencies = [
+ "glados-core",
+]
 
 [[package]]
 name = "glados-web"

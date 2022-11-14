@@ -31,7 +31,7 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
         node_id: Set(node_info.nodeId.as_bytes().to_vec()),
     };
     match node.insert(&state.database_connection).await {
-        Ok(result) => println!("db success"),
+        Ok(_result) => println!("db success"),
         Err(err) => println!("db error: {}", err),
     }
 
@@ -51,6 +51,6 @@ pub async fn node_list(Extension(state): Extension<Arc<State>>) -> impl IntoResp
         .all(&state.database_connection)
         .await
         .unwrap();
-    let template = NodeListTemplate { nodes: nodes };
+    let template = NodeListTemplate { nodes };
     HtmlTemplate(template)
 }

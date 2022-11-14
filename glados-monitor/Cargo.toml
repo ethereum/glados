@@ -9,3 +9,4 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+glados-core = { path = "../glados-core" }
