@@ -10,3 +10,6 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 
 [dependencies]
 glados-core = { path = "../glados-core" }
+entity = { path = "../entity" }
+clap = "4.0.24"
+web3 = "0.18.0"
