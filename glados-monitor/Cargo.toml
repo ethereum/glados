@@ -13,3 +13,5 @@ glados-core = { path = "../glados-core" }
 entity = { path = "../entity" }
 clap = "4.0.24"
 web3 = "0.18.0"
+tokio = "1.21.2"
+sea-orm = "0.10.3"
