@@ -54,3 +54,6 @@ pub async fn node_list(Extension(state): Extension<Arc<State>>) -> impl IntoResp
     let template = NodeListTemplate { nodes };
     HtmlTemplate(template)
 }
+
+pub async fn content_id_list(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
+}
