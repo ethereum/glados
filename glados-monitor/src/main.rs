@@ -32,6 +32,7 @@ async fn main() {
     let conn = Database::connect(args.database_url)
         .await
         .expect("Database connection failed");
+
     Migrator::up(&conn, None).await.unwrap();
 
     println!("Setting up web3 connection");
@@ -98,10 +99,6 @@ async fn retrieve_new_blocks(
     conn: DatabaseConnection,
 ) {
     while let Some(block_number_to_retrieve) = rx.recv().await {
-        let block_number_to_retrieve = rx
-            .recv()
-            .await
-            .expect("Failed to retrieve new block number");
         let block = w3
             .eth()
             .block(BlockId::from(block_number_to_retrieve))

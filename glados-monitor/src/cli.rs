@@ -9,6 +9,6 @@ pub struct Args {
     //pub portal_ipc_path: PathBuf,
     #[arg(short, long)]
     pub provider_url: String,
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "sqlite::memory:")]
     pub database_url: String,
 }
