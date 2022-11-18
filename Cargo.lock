@@ -1429,9 +1429,11 @@ dependencies = [
  "clap 4.0.24",
  "discv5 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ethereum-types 0.14.0",
+ "hex",
  "jsonrpc",
  "serde",
  "serde_json",
+ "sha2 0.10.6",
  "thiserror",
 ]
 
@@ -1441,7 +1443,9 @@ version = "0.1.0"
 dependencies = [
  "clap 4.0.24",
  "entity",
+ "ethereum-types 0.14.0",
  "glados-core",
+ "migration",
  "sea-orm",
  "tokio",
  "web3",
