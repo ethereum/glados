@@ -8,7 +8,6 @@ use clap::Parser;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
-use web3;
 use web3::types::BlockId;
 
 use ethereum_types::H256;

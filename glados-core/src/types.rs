@@ -10,7 +10,7 @@ impl BlockHeaderContentKey {
     pub fn encoded(&self) -> Vec<u8> {
         let mut encoded: Vec<u8> = vec![0];
         encoded.extend_from_slice(&self.hash[..]);
-        return encoded;
+        encoded
     }
 
     pub fn content_id(&self) -> H256 {
