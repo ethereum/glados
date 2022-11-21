@@ -24,6 +24,12 @@ impl MigrationTrait for Migration {
                             .binary_len(32)
                             .not_null(),
                     )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .name("idx-contentid-content_id")
+                            .col(ContentId::ContentId),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -42,7 +48,7 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(ContentKey::ContentId).integer().not_null())
-                    .col(ColumnDef::new(ContentKey::ContentKey).binary().not_null())
+                    //.index(Index::create().name("idx-contentkey-content_id").col(ContentKey::ContentId))
                     .foreign_key(
                         ForeignKey::create()
                             .name("FK_conent_key_content_id")
@@ -51,6 +57,8 @@ impl MigrationTrait for Migration {
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade),
                     )
+                    .col(ColumnDef::new(ContentKey::ContentKey).binary().not_null())
+                    //.index(Index::create().unique().name("idx-contentkey-content_key").col(ContentKey::ContentKey))
                     .to_owned(),
             )
             .await?;
@@ -73,9 +81,10 @@ impl MigrationTrait for Migration {
                             .integer()
                             .not_null(),
                     )
+                    //.index(Index::create().name("idx-contentaudit-content_key").col(ContentAudit::ContentKey))
                     .foreign_key(
                         ForeignKey::create()
-                            .name("FK_conent_audit_content_key")
+                            .name("FK_conentaudit_content_key")
                             .from(ContentAudit::Table, ContentAudit::ContentKey)
                             .to(ContentKey::Table, ContentKey::Id)
                             .on_delete(ForeignKeyAction::Cascade)
@@ -86,6 +95,7 @@ impl MigrationTrait for Migration {
                             .date_time()
                             .not_null(),
                     )
+                    //.index(Index::create().name("idx-contentaudit-created_at").col(ContentAudit::CreatedAt))
                     .col(ColumnDef::new(ContentAudit::Result).integer().not_null())
                     .to_owned(),
             )

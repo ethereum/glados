@@ -6,6 +6,7 @@ use axum::{
 
 use glados_core::jsonrpc::{NodeInfo, RoutingTableInfo};
 
+use entity::contentid;
 use entity::node;
 
 #[derive(Template)]
@@ -21,6 +22,12 @@ pub struct IndexTemplate {
 #[template(path = "node_list.html")]
 pub struct NodeListTemplate {
     pub nodes: Vec<node::Model>,
+}
+
+#[derive(Template)]
+#[template(path = "contentid_list.html")]
+pub struct ContentIdListTemplate {
+    pub items: Vec<contentid::Model>,
 }
 
 pub struct HtmlTemplate<T>(pub T);

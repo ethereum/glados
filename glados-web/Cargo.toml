@@ -10,7 +10,11 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 
 [dependencies]
 glados-core = { path = "../glados-core" }
+migration = { path = "../migration" }
 entity = { path = "../entity" }
 askama = "0.11.1"
 axum = "0.5.17"
 sea-orm = "0.10.2"
+ethereum-types = "0.14.0"
+tokio = "1.22.0"
+clap = { version = "4.0.26", features = ["derive"] }

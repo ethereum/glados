@@ -12,7 +12,7 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 glados-core = { path = "../glados-core" }
 migration = { path = "../migration" }
 entity = { path = "../entity" }
-clap = "4.0.24"
+clap = { version = "4.0.24", features = ["derive"] }
 web3 = "0.18.0"
 tokio = "1.21.2"
 sea-orm = "0.10.3"

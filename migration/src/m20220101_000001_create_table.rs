@@ -18,12 +18,11 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .index(Index::create().unique().name("idx-node-id").col(Node::Id))
                     .col(ColumnDef::new(Node::NodeId).binary_len(32).not_null())
                     .index(
                         Index::create()
                             .unique()
-                            .name("idx-node-nodeid")
+                            .name("idx-node-node_id")
                             .col(Node::NodeId),
                     )
                     .to_owned(),
@@ -42,9 +41,16 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(Record::NodeId).binary_len(32).not_null())
+                    //.index(Index::create().name("idx-record-node_id").col(Record::NodeId))
                     .col(ColumnDef::new(Record::Raw).binary().not_null())
                     .col(ColumnDef::new(Record::CreatedAt).date_time().not_null())
                     .col(ColumnDef::new(Record::SequenceNumber).integer().not_null())
+                    .index(
+                        Index::create()
+                            .unique()
+                            .name("idx-record-sequence_number")
+                            .col(Record::SequenceNumber),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_enr_id_node_id")
