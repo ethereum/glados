@@ -6,8 +6,8 @@ use axum::{
 
 use glados_core::jsonrpc::{NodeInfo, RoutingTableInfo};
 
-use entity::node;
 use entity::contentid;
+use entity::node;
 
 #[derive(Template)]
 #[template(path = "index.html")]

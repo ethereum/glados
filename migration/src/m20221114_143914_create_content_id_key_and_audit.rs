@@ -24,7 +24,12 @@ impl MigrationTrait for Migration {
                             .binary_len(32)
                             .not_null(),
                     )
-                    .index(Index::create().unique().name("idx-contentid-content_id").col(ContentId::ContentId))
+                    .index(
+                        Index::create()
+                            .unique()
+                            .name("idx-contentid-content_id")
+                            .col(ContentId::ContentId),
+                    )
                     .to_owned(),
             )
             .await?;

@@ -6,11 +6,7 @@ use clap::Parser;
 
 use migration::{Migrator, MigratorTrait};
 
-use glados_web::{
-    run_glados_web,
-    state::State,
-    cli::Args,
-};
+use glados_web::{cli::Args, run_glados_web, state::State};
 
 #[tokio::main]
 async fn main() {

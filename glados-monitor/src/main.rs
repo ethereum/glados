@@ -4,10 +4,7 @@ use clap::Parser;
 
 use migration::{Migrator, MigratorTrait};
 
-use glados_monitor::{
-    run_glados_monitor,
-    cli::Args,
-};
+use glados_monitor::{cli::Args, run_glados_monitor};
 
 #[tokio::main]
 async fn main() {

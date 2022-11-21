@@ -5,11 +5,11 @@ use sea_orm::{ActiveModelTrait, EntityTrait, NotSet, QueryOrder, QuerySelect, Se
 
 use glados_core::jsonrpc::PortalClient;
 
-use entity::node;
 use entity::contentid;
+use entity::node;
 
 use crate::state::State;
-use crate::templates::{HtmlTemplate, IndexTemplate, NodeListTemplate, ContentIdListTemplate};
+use crate::templates::{ContentIdListTemplate, HtmlTemplate, IndexTemplate, NodeListTemplate};
 
 //
 // Routes
