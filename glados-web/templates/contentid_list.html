@@ -1,0 +1,6 @@
+<h1>Nodes</h1>
+<ul>
+{% for content_id in items %}
+  <li><pre>{{ content_id.id }}</pre> - <pre>{{ content_id.content_id_hash() }}</pre></li>
+{% endfor %}
+</ul>

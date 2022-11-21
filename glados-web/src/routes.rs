@@ -6,9 +6,10 @@ use sea_orm::{ActiveModelTrait, EntityTrait, NotSet, QueryOrder, QuerySelect, Se
 use glados_core::jsonrpc::PortalClient;
 
 use entity::node;
+use entity::contentid;
 
 use crate::state::State;
-use crate::templates::{HtmlTemplate, IndexTemplate, NodeListTemplate};
+use crate::templates::{HtmlTemplate, IndexTemplate, NodeListTemplate, ContentIdListTemplate};
 
 //
 // Routes
@@ -55,5 +56,13 @@ pub async fn node_list(Extension(state): Extension<Arc<State>>) -> impl IntoResp
     HtmlTemplate(template)
 }
 
-pub async fn content_id_list(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
+pub async fn contentid_list(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
+    let items: Vec<contentid::Model> = contentid::Entity::find()
+        .order_by_asc(contentid::Column::ContentId)
+        .limit(50)
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+    let template = ContentIdListTemplate { items };
+    HtmlTemplate(template)
 }

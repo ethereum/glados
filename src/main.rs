@@ -31,6 +31,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(routes::root))
         .route("/nodes/", get(routes::node_list))
+        .route("/contentid/", get(routes::contentid_list))
         .layer(Extension(shared_state));
 
     // run it with hyper on localhost:3000

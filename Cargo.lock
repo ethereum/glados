@@ -1060,6 +1060,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "enr 0.7.0",
+ "ethereum-types 0.14.0",
  "migration",
  "sea-orm",
  "tokio",
@@ -1458,6 +1459,7 @@ dependencies = [
  "askama",
  "axum",
  "entity",
+ "ethereum-types 0.14.0",
  "glados-core",
  "sea-orm",
 ]
