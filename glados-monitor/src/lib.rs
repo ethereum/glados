@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use tracing::{debug, error, info};
+
 use sea_orm::{ActiveModelTrait, DatabaseConnection, NotSet, Set};
 
 use tokio::sync::mpsc;
@@ -22,16 +24,19 @@ pub async fn run_glados_monitor(conn: DatabaseConnection, w3: web3::Web3<web3::t
     tokio::spawn(follow_chain_head(w3.clone(), tx));
     tokio::spawn(retrieve_new_blocks(w3.clone(), rx, conn));
 
+    debug!("setting up CTRL+C listener");
     tokio::signal::ctrl_c()
         .await
         .expect("failed to pause until ctrl-c");
+
+    info!("got CTRL+C. shutting down...");
 }
 
 async fn follow_chain_head(
     w3: web3::Web3<web3::transports::Http>,
     tx: mpsc::Sender<web3::types::U64>,
 ) {
-    println!("Initializing block number...");
+    debug!("initializing head block number");
 
     let start_block_number = w3
         .eth()
@@ -39,7 +44,7 @@ async fn follow_chain_head(
         .await
         .expect("Failed to fetch initial block number");
 
-    println!("Starting Block Number={}", start_block_number);
+    info!(head_block.number=?start_block_number, "following chain head");
 
     tx.send(start_block_number)
         .await
@@ -49,15 +54,20 @@ async fn follow_chain_head(
     let mut block_number = start_block_number;
 
     loop {
-        println!("Sleeping....");
+        debug!("sleeping....");
         sleep(Duration::from_secs(5)).await;
-        println!("Checking for new block...");
+
+        debug!(head.number=?block_number, "checking for new block");
 
         let candidate_block_number = w3.eth().block_number().await.unwrap();
 
         if candidate_block_number > block_number {
+            info!(
+                old_head.number=?block_number,
+                new_head.number=?candidate_block_number,
+                "new head",
+            );
             block_number = candidate_block_number;
-            println!("New block: {}", block_number);
             tx.send(block_number)
                 .await
                 .expect("Failed to send new block number");
@@ -65,7 +75,7 @@ async fn follow_chain_head(
                 break;
             }
         } else {
-            println!("Same block: {}", candidate_block_number);
+            debug!(head.number=?block_number, "head unchanged");
         }
     }
 }
@@ -76,22 +86,34 @@ async fn retrieve_new_blocks(
     conn: DatabaseConnection,
 ) {
     while let Some(block_number_to_retrieve) = rx.recv().await {
+        debug!(block.number=?block_number_to_retrieve, "fetching block");
+
         let block = w3
             .eth()
             .block(BlockId::from(block_number_to_retrieve))
             .await
-            .expect("Failed to retrieve block");
+            .expect("failed to retrieve block");
 
         // If we got a block back
         if let Some(blk) = block {
             // And if that block has a hash
             if let Some(block_hash) = blk.hash {
-                // TODO: convert to log statement
-                println!("Received block: hash={}", block_hash);
+                info!(
+                    block.hash=?block_hash,
+                    block.number=?block_number_to_retrieve,
+                    "received block",
+                );
                 let raw_content_key = BlockHeaderContentKey {
                     hash: H256::from_slice(block_hash.as_bytes()),
                 };
                 let raw_content_id = raw_content_key.content_id();
+
+                debug!(
+                    content.key=hex::encode(raw_content_key.encoded()),
+                    content.id=?raw_content_id,
+                    content.kind="block-header",
+                    "block header content",
+                );
 
                 // TODO: check if record exists
                 let content_id = contentid::ActiveModel {
@@ -100,7 +122,7 @@ async fn retrieve_new_blocks(
                 };
 
                 let content_id = content_id.insert(&conn).await.unwrap();
-                println!("DB content_id.id={}", content_id.id);
+                debug!(content_id.id = content_id.id, "inserted content_id");
 
                 let encoded_content_key = raw_content_key.encoded();
 
@@ -111,12 +133,12 @@ async fn retrieve_new_blocks(
                 };
 
                 let content_key = content_key.insert(&conn).await.unwrap();
-                println!("DB content_key.id={}", content_key.id);
+                debug!(content_key.id = content_key.id, "inserted content_key")
             }
         } else {
-            println!(
-                "Failed to retrieve block: number={}",
-                block_number_to_retrieve
+            error!(
+                block.number=?block_number_to_retrieve,
+                "failure retrieving block",
             );
         }
     }
