@@ -8,7 +8,11 @@ use sea_orm::{
     QueryFilter, Set,
 };
 
+use ethereum_types::H256;
+
 use migration::{Migrator, MigratorTrait};
+
+use glados_core::types::BlockHeaderContentKey;
 
 use crate::contentaudit;
 use crate::contentid;
@@ -19,18 +23,18 @@ use crate::node;
 async fn setup_database() -> Result<DbConn, DbErr> {
     let base_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite::memory:".to_owned());
 
-    let db: DbConn = Database::connect(&base_url).await?;
+    let conn: DbConn = Database::connect(&base_url).await?;
 
-    Migrator::up(&db, None).await.unwrap();
+    Migrator::up(&conn, None).await.unwrap();
 
     println!("Setup database schema");
 
-    Ok(db)
+    Ok(conn)
 }
 
 #[tokio::test]
 async fn test_node_crud() -> Result<(), DbErr> {
-    let db = setup_database().await?;
+    let conn = setup_database().await?;
 
     let node_id_a: Vec<u8> = vec![
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
@@ -50,19 +54,19 @@ async fn test_node_crud() -> Result<(), DbErr> {
         node_id: Set(node_id_b.clone()),
     };
 
-    assert_eq!(node::Entity::find().count(&db).await?, 0);
+    assert_eq!(node::Entity::find().count(&conn).await?, 0);
 
-    let node_a = node_a.insert(&db).await?;
+    let node_a = node_a.insert(&conn).await?;
     println!("Inserted: node_a={:?}", node_a);
 
-    let node_b = node_b.insert(&db).await?;
+    let node_b = node_b.insert(&conn).await?;
     println!("Inserted: node_b={:?}", node_b);
 
-    assert_eq!(node::Entity::find().count(&db).await?, 2);
+    assert_eq!(node::Entity::find().count(&conn).await?, 2);
 
     let node_a = node::Entity::find()
         .filter(node::Column::NodeId.eq(node_id_a.clone()))
-        .one(&db)
+        .one(&conn)
         .await?
         .unwrap();
 
@@ -70,7 +74,7 @@ async fn test_node_crud() -> Result<(), DbErr> {
 
     let node_b = node::Entity::find()
         .filter(node::Column::NodeId.eq(node_id_b.clone()))
-        .one(&db)
+        .one(&conn)
         .await?
         .unwrap();
 
@@ -81,7 +85,7 @@ async fn test_node_crud() -> Result<(), DbErr> {
 
 #[tokio::test]
 async fn crud_record() -> Result<(), DbErr> {
-    let _db = setup_database().await?;
+    let _conn = setup_database().await?;
 
     use enr::{k256, EnrBuilder};
     use std::net::Ipv4Addr;
@@ -108,8 +112,68 @@ async fn crud_record() -> Result<(), DbErr> {
 }
 
 #[tokio::test]
+async fn test_contentid_get_or_create() -> Result<(), DbErr> {
+    let conn = setup_database().await?;
+
+    let content_id_raw: Vec<u8> = vec![
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31,
+    ];
+    let content_id_hash = H256::from_slice(&content_id_raw);
+
+    // ensure our database is empty
+    assert_eq!(contentid::Entity::find().count(&conn).await?, 0);
+
+    let content_id_a = contentid::get_or_create(&content_id_hash, &conn).await;
+
+    // ensure we added a new record to the database.
+    assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
+
+    let content_id_b = contentid::get_or_create(&content_id_hash, &conn).await;
+
+    // ensure that get_or_create found the existing entry.
+    assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
+    assert_eq!(content_id_a.id, content_id_b.id);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_contentkey_get_or_create() -> Result<(), DbErr> {
+    let conn = setup_database().await?;
+
+    let block_header_hash = H256::from_slice(
+        &hex::decode("d1c390624d3bd4e409a61a858e5dcc5517729a9170d014a6c96530d64dd8621d").unwrap(),
+    );
+
+    let header_content_key = BlockHeaderContentKey {
+        hash: block_header_hash,
+    };
+
+    // Ensure our database is empty
+    assert_eq!(contentid::Entity::find().count(&conn).await?, 0);
+    assert_eq!(contentkey::Entity::find().count(&conn).await?, 0);
+
+    let content_key_a = contentkey::get_or_create(&header_content_key, &conn).await;
+
+    // Ensure our database now has entries for both
+    assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
+    assert_eq!(contentkey::Entity::find().count(&conn).await?, 1);
+
+    let content_key_b = contentkey::get_or_create(&header_content_key, &conn).await;
+
+    // Ensure the existing entries were found
+    assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
+    assert_eq!(contentkey::Entity::find().count(&conn).await?, 1);
+    assert_eq!(content_key_a.id, content_key_b.id);
+    assert_eq!(content_key_a.content_id, content_key_b.content_id);
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_audit_crud() -> Result<(), DbErr> {
-    let db = setup_database().await?;
+    let conn = setup_database().await?;
 
     let content_id_raw: Vec<u8> = vec![
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
@@ -121,12 +185,12 @@ async fn test_audit_crud() -> Result<(), DbErr> {
         content_id: Set(content_id_raw.clone()),
     };
 
-    let content_id = content_id.insert(&db).await?;
+    let content_id = content_id.insert(&conn).await?;
     println!("Inserted: content_id={:?}", content_id);
 
     let content_id = contentid::Entity::find()
         .filter(contentid::Column::ContentId.eq(content_id_raw.clone()))
-        .one(&db)
+        .one(&conn)
         .await?
         .unwrap();
 
@@ -141,12 +205,12 @@ async fn test_audit_crud() -> Result<(), DbErr> {
         content_key: Set(content_key_raw.clone().as_bytes().to_vec()),
     };
 
-    let content_key = content_key.insert(&db).await?;
+    let content_key = content_key.insert(&conn).await?;
     println!("Inserted: content_key={:?}", content_key);
 
     let content_key = contentkey::Entity::find()
         .filter(contentkey::Column::ContentKey.eq(content_key_raw.clone().as_bytes().to_vec()))
-        .one(&db)
+        .one(&conn)
         .await?
         .unwrap();
 
@@ -160,11 +224,11 @@ async fn test_audit_crud() -> Result<(), DbErr> {
         result: Set(contentaudit::AuditResult::Success),
     };
 
-    let content_audit = content_audit.insert(&db).await?;
+    let content_audit = content_audit.insert(&conn).await?;
     println!("Inserted: content_audit={:?}", content_audit);
 
     let content_audit = contentaudit::Entity::find_by_id(content_audit.id)
-        .one(&db)
+        .one(&conn)
         .await?
         .unwrap();
 

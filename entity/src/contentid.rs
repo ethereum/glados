@@ -1,4 +1,5 @@
 use sea_orm::entity::prelude::*;
+use sea_orm::{NotSet, Set};
 
 use ethereum_types::H256;
 
@@ -9,6 +10,30 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique, indexed)]
     pub content_id: Vec<u8>,
+}
+
+pub async fn get_or_create(content_id_hash: &H256, conn: &DatabaseConnection) -> Model {
+    // First try to lookup an existing entry.
+    let content_id = Entity::find()
+        .filter(Column::ContentId.eq(content_id_hash.as_bytes()))
+        .one(conn)
+        .await
+        .unwrap(); // TODO: is there a better option than `unwrap` here?
+
+    if let Some(content_id) = content_id {
+        // If there is an existing record, return it
+        content_id
+    } else {
+        // If no record exists, create one and return it
+        let content_id = ActiveModel {
+            id: NotSet,
+            content_id: Set(content_id_hash.as_bytes().to_vec()),
+        };
+        content_id
+            .insert(conn)
+            .await
+            .expect("Error inserting new content_id")
+    }
 }
 
 impl Model {
