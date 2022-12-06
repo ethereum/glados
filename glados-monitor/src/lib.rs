@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use tracing::{debug, error, info};
 
-use sea_orm::{ActiveModelTrait, DatabaseConnection, NotSet, Set};
+use sea_orm::DatabaseConnection;
 
 use tokio::sync::mpsc;
 use tokio::time::sleep;
@@ -13,7 +13,6 @@ use ethereum_types::H256;
 
 use glados_core::types::{BlockHeaderContentKey, ContentKey};
 
-use entity::contentid;
 use entity::contentkey;
 
 pub mod cli;
@@ -106,34 +105,15 @@ async fn retrieve_new_blocks(
                 let raw_content_key = BlockHeaderContentKey {
                     hash: H256::from_slice(block_hash.as_bytes()),
                 };
-                let raw_content_id = raw_content_key.content_id();
 
                 debug!(
-                    content.key=hex::encode(raw_content_key.encode()),
-                    content.id=?raw_content_id,
+                    content.key=raw_content_key.hex_encode(),
+                    content.id=?raw_content_key.content_id(),
                     content.kind="block-header",
                     "block header content",
                 );
 
-                // TODO: check if record exists
-                let content_id = contentid::ActiveModel {
-                    id: NotSet,
-                    content_id: Set(raw_content_id.as_bytes().to_vec()),
-                };
-
-                let content_id = content_id.insert(&conn).await.unwrap();
-                debug!(content_id.id = content_id.id, "inserted content_id");
-
-                let encoded_content_key = raw_content_key.encode();
-
-                let content_key = contentkey::ActiveModel {
-                    id: NotSet,
-                    content_id: Set(content_id.id),
-                    content_key: Set(encoded_content_key),
-                };
-
-                let content_key = content_key.insert(&conn).await.unwrap();
-                debug!(content_key.id = content_key.id, "inserted content_key")
+                contentkey::get_or_create(&raw_content_key, &conn).await;
             }
         } else {
             error!(

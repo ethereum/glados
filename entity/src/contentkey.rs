@@ -28,7 +28,7 @@ pub enum Relation {
     ContentAudit,
 }
 
-pub async fn get_or_create(content_key_raw: &dyn ContentKey, conn: &DatabaseConnection) -> Model {
+pub async fn get_or_create(content_key_raw: &impl ContentKey, conn: &DatabaseConnection) -> Model {
     // First try to lookup an existing entry.
     let content_key = Entity::find()
         .filter(Column::ContentKey.eq(content_key_raw.encode()))
