@@ -115,6 +115,10 @@ pub struct RoutingTableInfo {
     pub buckets: Vec<RoutingTableEntry>,
 }
 
+pub struct Content {
+    pub raw: Vec<u8>,
+}
+
 // TryClone is used because JSON-RPC responses are not followed by EOF. We must read bytes
 // from the stream until a complete object is detected, and the simplest way of doing that
 // with available APIs is to give ownership of a Read to a serde_json::Deserializer. If we
@@ -192,6 +196,16 @@ where
                     parse_routing_table_entry(&local_node_id, &entry.0, &entry.1, &entry.2)
                 })
                 .collect(),
+        }
+    }
+
+    pub fn get_content(content_key: &impl ContentKey) -> Content {
+        let req = self.build_request("portal_historyRecursiveFindContent", [content_key.encode()]);
+        let resp = self.make_request(req);
+
+        match resp {
+            Err(err) => format!("error: {}", err),
+            Ok(value) => value.result.to_string(),
         }
     }
 
