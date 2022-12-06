@@ -9,10 +9,17 @@ pub struct BlockHeaderContentKey {
 pub trait ContentKey {
     fn encode(&self) -> Vec<u8>;
 
+    fn hex_encode(&self) -> String {
+        hex::encode(self.encode())
+    }
+
     fn content_id(&self) -> H256;
 }
 
 impl BlockHeaderContentKey {}
+
+unsafe impl Send for BlockHeaderContentKey {}
+unsafe impl Sync for BlockHeaderContentKey {}
 
 impl ContentKey for BlockHeaderContentKey {
     fn encode(&self) -> Vec<u8> {
@@ -44,6 +51,20 @@ mod tests {
 
         let content_key = BlockHeaderContentKey { hash: block_hash };
         assert_eq!(content_key.hash.as_bytes(), raw_hash);
+    }
+
+    #[test]
+    fn test_block_header_hex_encode() {
+        let raw_hash =
+            hex::decode("d1c390624d3bd4e409a61a858e5dcc5517729a9170d014a6c96530d64dd8621d")
+                .unwrap();
+        let block_hash = H256::from_slice(&raw_hash);
+
+        let content_key = BlockHeaderContentKey { hash: block_hash };
+        assert_eq!(
+            content_key.hex_encode(),
+            "d1c390624d3bd4e409a61a858e5dcc5517729a9170d014a6c96530d64dd8621d"
+        );
     }
 
     #[test]
