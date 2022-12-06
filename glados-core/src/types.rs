@@ -6,16 +6,24 @@ pub struct BlockHeaderContentKey {
     pub hash: H256,
 }
 
-impl BlockHeaderContentKey {
-    pub fn encoded(&self) -> Vec<u8> {
+pub trait ContentKey {
+    fn encode(&self) -> Vec<u8>;
+
+    fn content_id(&self) -> H256;
+}
+
+impl BlockHeaderContentKey {}
+
+impl ContentKey for BlockHeaderContentKey {
+    fn encode(&self) -> Vec<u8> {
         let mut encoded: Vec<u8> = vec![0];
         encoded.extend_from_slice(&self.hash[..]);
         encoded
     }
 
-    pub fn content_id(&self) -> H256 {
+    fn content_id(&self) -> H256 {
         let mut hasher = Sha256::new();
-        hasher.update(self.encoded());
+        hasher.update(self.encode());
         let raw_hash = hasher.finalize();
         H256::from_slice(&raw_hash)
     }
@@ -28,7 +36,7 @@ mod tests {
     use hex;
 
     #[test]
-    fn test_block_header_encoded() {
+    fn test_block_header_encode() {
         let raw_hash =
             hex::decode("d1c390624d3bd4e409a61a858e5dcc5517729a9170d014a6c96530d64dd8621d")
                 .unwrap();
