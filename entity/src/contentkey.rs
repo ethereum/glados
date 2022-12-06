@@ -48,11 +48,10 @@ pub async fn get_or_create(content_key_raw: &dyn ContentKey, conn: &DatabaseConn
             content_id: Set(content_id.id),
             content_key: Set(content_key_raw.encode()),
         };
-        let content_key = content_key
+        content_key
             .insert(conn)
             .await
-            .expect("Error inserting new content key");
-        return content_key;
+            .expect("Error inserting new content key")
     }
 }
 
