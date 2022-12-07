@@ -1389,11 +1389,29 @@ name = "glados"
 version = "0.1.0"
 dependencies = [
  "entity",
+ "glados-audit",
  "glados-core",
  "glados-monitor",
  "glados-web",
  "migration",
  "tokio",
+]
+
+[[package]]
+name = "glados-audit"
+version = "0.1.0"
+dependencies = [
+ "clap 4.0.26",
+ "entity",
+ "env_logger",
+ "ethereum-types 0.14.0",
+ "glados-core",
+ "hex",
+ "migration",
+ "sea-orm",
+ "tokio",
+ "tracing",
+ "web3",
 ]
 
 [[package]]
