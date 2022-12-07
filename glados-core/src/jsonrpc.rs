@@ -7,7 +7,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
-use serde_json::value::RawValue;
+use serde_json::value::{to_raw_value, RawValue};
 
 use thiserror::Error;
 
@@ -15,6 +15,8 @@ use ethereum_types::{H256, U256};
 
 use discv5::enr::CombinedKey;
 type Enr = discv5::enr::Enr<CombinedKey>;
+
+use crate::types::ContentKey;
 
 //
 // JSON RPC Client
@@ -199,14 +201,15 @@ where
         }
     }
 
-    pub fn get_content(content_key: &impl ContentKey) -> Content {
-        let req = self.build_request("portal_historyRecursiveFindContent", [content_key.encode()]);
-        let resp = self.make_request(req);
+    pub fn get_content(&mut self, content_key: &dyn ContentKey) -> Content {
+        let params = Some(vec![to_raw_value(&content_key.hex_encode()).unwrap()]);
+        let req = self.build_request("portal_historyRecursiveFindContent", &params);
+        let resp = self.make_request(req).unwrap();
 
-        match resp {
-            Err(err) => format!("error: {}", err),
-            Ok(value) => value.result.to_string(),
-        }
+        let content_as_hex: String = serde_json::from_value(resp.result).unwrap();
+        let content_raw = hex::decode(&content_as_hex[2..]).unwrap();
+
+        Content { raw: content_raw }
     }
 
     //fn get_node_enr(&mut self) -> Enr {
