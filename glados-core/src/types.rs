@@ -1,3 +1,5 @@
+use std::fmt;
+
 use sha2::{Digest, Sha256};
 
 use ethereum_types::H256;
@@ -14,6 +16,12 @@ pub trait ContentKey {
     }
 
     fn content_id(&self) -> H256;
+}
+
+impl fmt::Display for dyn ContentKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "(key={}, cid={})", self.hex_encode(), self.content_id())
+    }
 }
 
 impl BlockHeaderContentKey {}
