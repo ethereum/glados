@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 use sea_orm::{DatabaseConnection, EntityTrait};
 
@@ -29,32 +29,26 @@ pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
     info!("got CTRL+C. shutting down...");
 }
 
-async fn do_audit_orchestration(
-    tx: mpsc::Sender<&impl ContentKey>,
-    conn: DatabaseConnection,
-) {
+async fn do_audit_orchestration(tx: mpsc::Sender<BlockHeaderContentKey>, conn: DatabaseConnection) {
     debug!("initializing audit process");
 
     loop {
         // Lookup a content key to be audited
         let content_key_db = contentkey::Entity::find().one(&conn).await.unwrap();
         if let Some(content_key_db) = content_key_db {
-            let content_key = BlockHeaderContentKey { hash: H256::from_slice(&content_key_db.content_key) };
+            let content_key = BlockHeaderContentKey {
+                hash: H256::from_slice(&content_key_db.content_key),
+            };
 
             // Send it to the audit process
-            tx.send(&content_key)
-                .await
-                .unwrap();
+            tx.send(content_key).await.unwrap();
         } else {
             debug!("No content found to audit");
         }
     }
 }
 
-async fn perform_content_audits(
-    mut rx: mpsc::Receiver<&impl ContentKey>,
-    ipc_path: PathBuf,
-) {
+async fn perform_content_audits(mut rx: mpsc::Receiver<BlockHeaderContentKey>, ipc_path: PathBuf) {
     let mut client = PortalClient::from_ipc(&ipc_path).unwrap();
 
     while let Some(content_key) = rx.recv().await {
@@ -65,7 +59,7 @@ async fn perform_content_audits(
             content.id=?content_key.content_id(),
             "auditing content",
         );
-        let content = client.get_content(content_key);
+        let _content = client.get_content(&content_key);
         info!("success auditing content");
     }
 }
