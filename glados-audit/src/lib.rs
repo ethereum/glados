@@ -11,7 +11,7 @@ use tokio::time::{interval, Duration};
 use glados_core::jsonrpc::PortalClient;
 use glados_core::types::{BlockHeaderContentKey, ContentKey};
 
-use entity::contentkey;
+use entity::{contentaudit, contentkey};
 
 pub mod cli;
 
@@ -20,8 +20,8 @@ const AUDIT_PERIOD_SECONDS: u64 = 5;
 pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
     let (tx, rx) = mpsc::channel(100);
 
-    tokio::spawn(do_audit_orchestration(tx, conn));
-    tokio::spawn(perform_content_audits(rx, ipc_path));
+    tokio::spawn(do_audit_orchestration(tx, conn.clone()));
+    tokio::spawn(perform_content_audits(rx, ipc_path, conn));
 
     debug!("setting up CTRL+C listener");
     tokio::signal::ctrl_c()
@@ -42,7 +42,8 @@ async fn do_audit_orchestration(
         // Lookup a content key to be audited
         let content_key_db = contentkey::Entity::find().one(&conn).await.unwrap();
         if let Some(content_key_db) = content_key_db {
-            let hash = H256::from_slice(&content_key_db.content_key);
+            // Get the block hash (by removing the first byte from the content key)
+            let hash = H256::from_slice(&content_key_db.content_key[1..33]);
             let content_key = BlockHeaderContentKey { hash };
 
             // // Send it to the audit process
@@ -56,7 +57,11 @@ async fn do_audit_orchestration(
     }
 }
 
-async fn perform_content_audits(mut rx: mpsc::Receiver<BlockHeaderContentKey>, ipc_path: PathBuf) {
+async fn perform_content_audits(
+    mut rx: mpsc::Receiver<BlockHeaderContentKey>,
+    ipc_path: PathBuf,
+    conn: DatabaseConnection,
+) {
     let mut client = PortalClient::from_ipc(&ipc_path).unwrap();
 
     while let Some(content_key) = rx.recv().await {
@@ -67,7 +72,13 @@ async fn perform_content_audits(mut rx: mpsc::Receiver<BlockHeaderContentKey>, i
             content.id=?content_key.content_id(),
             "auditing content",
         );
-        let _content = client.get_content(&content_key);
-        info!("success auditing content");
+        let content = client.get_content(&content_key);
+
+        let raw_data = content.raw;
+
+        let content_key_id = contentkey::get(&content_key, &conn).await.unwrap().id;
+        contentaudit::create(content_key_id, raw_data.len() > 2, &conn).await;
+
+        info!("Successfully audited content");
     }
 }

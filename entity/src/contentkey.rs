@@ -61,6 +61,14 @@ pub async fn get_or_create(content_key_raw: &impl ContentKey, conn: &DatabaseCon
     }
 }
 
+pub async fn get(content_key: &impl ContentKey, conn: &DatabaseConnection) -> Option<Model> {
+    Entity::find()
+        .filter(Column::ContentKey.eq(content_key.encode()))
+        .one(conn)
+        .await
+        .unwrap()
+}
+
 impl Related<super::contentid::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::ContentId.def()
