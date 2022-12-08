@@ -25,6 +25,11 @@ pub struct NodeListTemplate {
 }
 
 #[derive(Template)]
+#[template(path = "content_dashboard.html")]
+pub struct ContentDashboardTemplate {
+}
+
+#[derive(Template)]
 #[template(path = "contentid_list.html")]
 pub struct ContentIdListTemplate {
     pub items: Vec<contentid::Model>,
