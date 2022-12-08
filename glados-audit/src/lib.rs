@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
+use ethereum_types::H256;
 use tracing::{debug, info};
 
 use sea_orm::{DatabaseConnection, EntityTrait};
 
 use tokio::sync::mpsc;
-
-use ethereum_types::H256;
+use tokio::time::{interval, Duration};
 
 use glados_core::jsonrpc::PortalClient;
 use glados_core::types::{BlockHeaderContentKey, ContentKey};
@@ -14,6 +14,8 @@ use glados_core::types::{BlockHeaderContentKey, ContentKey};
 use entity::contentkey;
 
 pub mod cli;
+
+const AUDIT_PERIOD_SECONDS: u64 = 5;
 
 pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
     let (tx, rx) = mpsc::channel(100);
@@ -29,22 +31,28 @@ pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
     info!("got CTRL+C. shutting down...");
 }
 
-async fn do_audit_orchestration(tx: mpsc::Sender<BlockHeaderContentKey>, conn: DatabaseConnection) {
+async fn do_audit_orchestration(
+    tx: mpsc::Sender<BlockHeaderContentKey>,
+    conn: DatabaseConnection,
+) -> ! {
     debug!("initializing audit process");
 
+    let mut interval = interval(Duration::from_secs(AUDIT_PERIOD_SECONDS));
     loop {
         // Lookup a content key to be audited
         let content_key_db = contentkey::Entity::find().one(&conn).await.unwrap();
         if let Some(content_key_db) = content_key_db {
-            let content_key = BlockHeaderContentKey {
-                hash: H256::from_slice(&content_key_db.content_key),
-            };
+            let hash = H256::from_slice(&content_key_db.content_key);
+            let content_key = BlockHeaderContentKey { hash };
 
-            // Send it to the audit process
-            tx.send(content_key).await.unwrap();
+            // // Send it to the audit process
+            tx.send(content_key)
+                .await
+                .expect("Channel closed, perform_content_audits task likely crashed");
         } else {
             debug!("No content found to audit");
         }
+        interval.tick().await;
     }
 }
 

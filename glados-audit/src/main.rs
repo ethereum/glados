@@ -4,16 +4,18 @@ use tracing::{debug, info};
 
 use clap::Parser;
 
+use std::path::PathBuf;
+
 use migration::{Migrator, MigratorTrait};
 
-use glados_monitor::{cli::Args, run_glados_monitor};
+use glados_audit::{cli::Args, run_glados_audit};
 
 #[tokio::main]
 async fn main() {
     // Setup logging
     env_logger::init();
 
-    info!("Starting glados-monitor");
+    info!("Starting glados-audit");
 
     //
     // CLI argument parsing
@@ -38,19 +40,7 @@ async fn main() {
 
     Migrator::up(&conn, None).await.unwrap();
 
-    //
-    // Web3 Connection
-    //
-    debug!("Connecting to web3 provider");
+    let ipc_path: PathBuf = args.ipc_path;
 
-    let transport =
-        web3::transports::Http::new(&args.provider_url).expect("Failed to setup web3 transport");
-    let w3 = web3::Web3::new(transport);
-
-    info!(
-        provider_url = &args.provider_url,
-        "web3 provider connection established"
-    );
-
-    run_glados_monitor(conn, w3).await;
+    run_glados_audit(conn, ipc_path).await;
 }

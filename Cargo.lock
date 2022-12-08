@@ -1422,6 +1422,7 @@ name = "glados-core"
 version = "0.1.0"
 dependencies = [
  "discv5",
+ "env_logger",
  "ethereum-types 0.14.0",
  "hex",
  "jsonrpc",
@@ -1429,6 +1430,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.6",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]

@@ -1,4 +1,4 @@
-use std::fmt;
+pub(crate) use std::fmt;
 
 use sha2::{Digest, Sha256};
 
@@ -8,7 +8,7 @@ pub trait ContentKey: fmt::Display + fmt::Debug {
     fn encode(&self) -> Vec<u8>;
 
     fn hex_encode(&self) -> String {
-        hex::encode(self.encode())
+        format!("0x{}", hex::encode(self.encode()))
     }
 
     fn content_id(&self) -> H256;
