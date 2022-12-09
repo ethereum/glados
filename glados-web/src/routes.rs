@@ -1,6 +1,9 @@
 use std::sync::Arc;
+use std::io;
 
 use axum::{extract::Extension, response::IntoResponse};
+use axum::http::StatusCode;
+
 use sea_orm::{ActiveModelTrait, EntityTrait, NotSet, QueryOrder, QuerySelect, Set};
 
 use glados_core::jsonrpc::PortalClient;
@@ -9,11 +12,15 @@ use entity::contentid;
 use entity::node;
 
 use crate::state::State;
-use crate::templates::{ContentIdListTemplate, HtmlTemplate, IndexTemplate, NodeListTemplate};
+use crate::templates::{ContentIdListTemplate, HtmlTemplate, IndexTemplate, NodeListTemplate, ContentDashboardTemplate};
 
 //
 // Routes
 //
+pub async fn handle_error(_err: io::Error) -> impl IntoResponse {
+    (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong...")
+}
+
 pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
     let ipc_path = state
         .ipc_path
@@ -53,6 +60,11 @@ pub async fn node_list(Extension(state): Extension<Arc<State>>) -> impl IntoResp
         .await
         .unwrap();
     let template = NodeListTemplate { nodes };
+    HtmlTemplate(template)
+}
+
+pub async fn content_dashboard(Extension(_state): Extension<Arc<State>>) -> impl IntoResponse {
+    let template = ContentDashboardTemplate {};
     HtmlTemplate(template)
 }
 
