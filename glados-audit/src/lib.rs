@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use ethereum_types::H256;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
-use sea_orm::{DatabaseConnection, EntityTrait};
+use sea_orm::{DatabaseConnection, EntityTrait, QueryOrder, QuerySelect};
 
 use tokio::sync::mpsc;
 use tokio::time::{interval, Duration};
@@ -15,7 +15,7 @@ use entity::{contentaudit, contentkey};
 
 pub mod cli;
 
-const AUDIT_PERIOD_SECONDS: u64 = 5;
+const AUDIT_PERIOD_SECONDS: u64 = 120;
 
 pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
     let (tx, rx) = mpsc::channel(100);
@@ -39,21 +39,36 @@ async fn do_audit_orchestration(
 
     let mut interval = interval(Duration::from_secs(AUDIT_PERIOD_SECONDS));
     loop {
+        interval.tick().await;
+
         // Lookup a content key to be audited
-        let content_key_db = contentkey::Entity::find().one(&conn).await.unwrap();
-        if let Some(content_key_db) = content_key_db {
+        let content_key_db_entries = match contentkey::Entity::find()
+            .order_by_desc(contentkey::Column::CreatedAt)
+            .limit(10)
+            .all(&conn)
+            .await
+        {
+            Ok(content_key_db_entries) => content_key_db_entries,
+            Err(err) => {
+                error!("DB Error looking up content key: {err}");
+                continue;
+            }
+        };
+        debug!(
+            "Adding {} content keys to the audit queue.",
+            content_key_db_entries.len()
+        );
+        for content_key_db in content_key_db_entries {
+            info!("Content Key: {:?}", content_key_db.content_key);
             // Get the block hash (by removing the first byte from the content key)
             let hash = H256::from_slice(&content_key_db.content_key[1..33]);
             let content_key = BlockHeaderContentKey { hash };
 
-            // // Send it to the audit process
+            // Send it to the audit process
             tx.send(content_key)
                 .await
                 .expect("Channel closed, perform_content_audits task likely crashed");
-        } else {
-            debug!("No content found to audit");
         }
-        interval.tick().await;
     }
 }
 
@@ -65,8 +80,6 @@ async fn perform_content_audits(
     let mut client = PortalClient::from_ipc(&ipc_path).unwrap();
 
     while let Some(content_key) = rx.recv().await {
-        //let content_key_db = contentkey::Entity::find_by_id(content_key_id).one(&conn).await.unwrap();
-
         debug!(
             content.key=?content_key.hex_encode(),
             content.id=?content_key.content_id(),
@@ -79,6 +92,6 @@ async fn perform_content_audits(
         let content_key_id = contentkey::get(&content_key, &conn).await.unwrap().id;
         contentaudit::create(content_key_id, raw_data.len() > 2, &conn).await;
 
-        info!("Successfully audited content");
+        info!("Successfully audited content.");
     }
 }
