@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}{{ title }} - My Site{% endblock %}</title>
+    <title>{% block title %}{{ title }}{% endblock %}</title>
     <script src="/static/js/bootstrap.min.js"></script>
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
     {% block head %}{% endblock %}
@@ -11,7 +11,9 @@
   {% block body %}
   <body>
     <div id="content">
-      {% block content %}{% endblock %}
+      <div id="container">
+        {% block content %}{% endblock %}
+      </div>
     </div>
   </body>
   {% endblock %}
