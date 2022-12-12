@@ -1,21 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Content ID: {{ content_id.as_hex() }}{% endblock %}
+{% block title %}Content Keys{% endblock %}
 
 {% block content %}
   <div class="row">
-    <h1>Content ID: {{ content_id.as_hex() }}</h1>
+    <h1>Content Keys</h1>
   </div>
   <div class="row">
     <div class="col">
-      <ul>
-        <li>Database ID: {{ content_id.id }}</li>
-        <li>ID: {{ content_id.as_hex() }}</li>
-        <li>Last audited: TODO</li>
-      </ul>
-    </div>
-    <div class="col">
-      <h3>Content Keys</h3>
       <ul>
         {% for content_key in contentkey_list %}
           <li><a href="/content/key/{{content_key.as_hex() }}">{{ content_key.as_hex() }}</a></li>

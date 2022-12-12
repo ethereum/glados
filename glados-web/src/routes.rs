@@ -8,19 +8,22 @@ use axum::{
 };
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, NotSet, QueryFilter, QueryOrder, QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, NotSet, QueryFilter, QueryOrder,
+    QuerySelect, Set,
 };
 
 use glados_core::jsonrpc::PortalClient;
 
 use entity::contentaudit;
 use entity::contentid;
+use entity::contentkey;
 use entity::node;
 
 use crate::state::State;
 use crate::templates::{
-    ContentDashboardTemplate, ContentIdDetailTemplate, ContentIdListTemplate, HtmlTemplate,
-    IndexTemplate, NodeListTemplate,
+    ContentDashboardTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
+    ContentKeyDetailTemplate, ContentKeyListTemplate, HtmlTemplate, IndexTemplate,
+    NodeListTemplate,
 };
 
 //
@@ -115,6 +118,51 @@ pub async fn contentid_detail(
         .unwrap()
         .expect("No content found");
 
-    let template = ContentIdDetailTemplate { content_id };
+    let contentkey_list = content_id
+        .find_related(contentkey::Entity)
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+
+    let template = ContentIdDetailTemplate {
+        content_id,
+        contentkey_list,
+    };
+    HtmlTemplate(template)
+}
+
+pub async fn contentkey_list(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
+    let contentkey_list: Vec<contentkey::Model> = contentkey::Entity::find()
+        .order_by_desc(contentkey::Column::Id)
+        .limit(50)
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+    let template = ContentKeyListTemplate { contentkey_list };
+    HtmlTemplate(template)
+}
+
+pub async fn contentkey_detail(
+    Path(content_key_hex): Path<String>,
+    Extension(state): Extension<Arc<State>>,
+) -> impl IntoResponse {
+    let content_key_raw = hex::decode(&content_key_hex[2..]).unwrap();
+    let content_key = contentkey::Entity::find()
+        .filter(contentkey::Column::ContentKey.eq(content_key_raw))
+        .one(&state.database_connection)
+        .await
+        .unwrap()
+        .expect("No content found");
+
+    let contentaudit_list = content_key
+        .find_related(contentaudit::Entity)
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+
+    let template = ContentKeyDetailTemplate {
+        content_key,
+        contentaudit_list,
+    };
     HtmlTemplate(template)
 }

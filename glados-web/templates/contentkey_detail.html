@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Content Key: {{ content_key.as_hex() }}{% endblock %}
+
+{% block content %}
+  <div class="row">
+    <h1>Content Key: {{ content_key.as_hex() }}</h1>
+  </div>
+  <div class="row">
+    <div class="col">
+      <ul>
+        <li>Database ID: {{ content_key.id }}</li>
+        <li>Key: {{ content_key.as_hex() }}</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>Content Audits</h3>
+      <ul>
+        {% for content_audit in contentaudit_list %}
+          <li>Audit#: {{ content_audit.id }} <span class="badge text-bg-{% if content_audit.is_success() %}success{% else %}danger{% endif %}">TODO</span></li>
+        {% else %}
+          <li>No audits</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

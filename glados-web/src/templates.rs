@@ -8,6 +8,7 @@ use glados_core::jsonrpc::{NodeInfo, RoutingTableInfo};
 
 use entity::contentaudit;
 use entity::contentid;
+use entity::contentkey;
 use entity::node;
 
 #[derive(Template)]
@@ -42,6 +43,20 @@ pub struct ContentIdListTemplate {
 #[template(path = "contentid_detail.html")]
 pub struct ContentIdDetailTemplate {
     pub content_id: contentid::Model,
+    pub contentkey_list: Vec<contentkey::Model>,
+}
+
+#[derive(Template)]
+#[template(path = "contentkey_list.html")]
+pub struct ContentKeyListTemplate {
+    pub contentkey_list: Vec<contentkey::Model>,
+}
+
+#[derive(Template)]
+#[template(path = "contentkey_detail.html")]
+pub struct ContentKeyDetailTemplate {
+    pub content_key: contentkey::Model,
+    pub contentaudit_list: Vec<contentaudit::Model>,
 }
 
 pub struct HtmlTemplate<T>(pub T);
