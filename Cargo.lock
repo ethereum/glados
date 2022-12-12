@@ -1440,6 +1440,7 @@ dependencies = [
  "entity",
  "ethereum-types 0.14.0",
  "glados-core",
+ "hex",
  "migration",
  "sea-orm",
  "tokio",

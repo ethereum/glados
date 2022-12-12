@@ -4,14 +4,14 @@
 
 {% block content %}
   <div class="row">
-    <h1>Content Dashboard <span class="badge bg-secondary">New</span></h1>
+    <h1>Content Dashboard</h1>
   </div>
   <div class="row">
     <div class="col">
       <h2>Recent Content</h2>
       <ul>
         {% for contentid in contentid_list %}
-          <li>{{ contentid.as_hash() }}</li>
+          <li><a href="/content/id/{{contentid.as_hex() }}">{{ contentid.as_hash() }}</a></li>
         {% else %}
           <li>No content found</li>
         {% endfor %}
@@ -29,6 +29,4 @@
     </div>
   </div>
 </div>
-
-<p>TODO: show some health stuff</p>
 {% endblock %}

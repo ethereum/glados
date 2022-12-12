@@ -35,7 +35,13 @@ pub struct ContentDashboardTemplate {
 #[derive(Template)]
 #[template(path = "contentid_list.html")]
 pub struct ContentIdListTemplate {
-    pub items: Vec<contentid::Model>,
+    pub contentid_list: Vec<contentid::Model>,
+}
+
+#[derive(Template)]
+#[template(path = "contentid_detail.html")]
+pub struct ContentIdDetailTemplate {
+    pub content_id: contentid::Model,
 }
 
 pub struct HtmlTemplate<T>(pub T);

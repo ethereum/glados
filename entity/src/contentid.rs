@@ -16,6 +16,10 @@ impl Model {
     pub fn as_hash(&self) -> H256 {
         H256::from_slice(&self.content_id)
     }
+
+    pub fn as_hex(&self) -> String {
+        format!("{:#x}", self.as_hash())
+    }
 }
 
 pub async fn get_or_create(content_id_hash: &H256, conn: &DatabaseConnection) -> Model {
