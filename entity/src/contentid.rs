@@ -12,6 +12,12 @@ pub struct Model {
     pub content_id: Vec<u8>,
 }
 
+impl Model {
+    pub fn as_hash(&self) -> H256 {
+        H256::from_slice(&self.content_id)
+    }
+}
+
 pub async fn get_or_create(content_id_hash: &H256, conn: &DatabaseConnection) -> Model {
     // First try to lookup an existing entry.
     let content_id = Entity::find()

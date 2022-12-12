@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Content Dashboard{% endblock %}
+
+{% block content %}
+  <div class="row">
+    <h1>Content Dashboard <span class="badge bg-secondary">New</span></h1>
+  </div>
+  <div class="row">
+    <div class="col">
+      <h2>Recent Content</h2>
+      <ul>
+        {% for contentid in contentid_list %}
+          <li>{{ contentid.as_hash() }}</li>
+        {% else %}
+          <li>No content found</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="col">
+      <h2>Recent Audits</h2>
+      <ul>
+        {% for contentaudit in contentaudit_list %}
+          <li>Key={{ contentaudit.content_key }} <span class="badge text-bg-{% if contentaudit.is_success() %}success{% else %}danger{% endif %}">TODO</span></li>
+        {% else %}
+          <li>No audits found</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<p>TODO: show some health stuff</p>
+{% endblock %}
