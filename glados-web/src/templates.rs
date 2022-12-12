@@ -6,6 +6,7 @@ use axum::{
 
 use glados_core::jsonrpc::{NodeInfo, RoutingTableInfo};
 
+use entity::contentaudit;
 use entity::contentid;
 use entity::node;
 
@@ -27,6 +28,8 @@ pub struct NodeListTemplate {
 #[derive(Template)]
 #[template(path = "content_dashboard.html")]
 pub struct ContentDashboardTemplate {
+    pub contentid_list: Vec<contentid::Model>,
+    pub contentaudit_list: Vec<contentaudit::Model>,
 }
 
 #[derive(Template)]

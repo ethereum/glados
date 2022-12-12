@@ -1,19 +1,28 @@
-use std::sync::Arc;
 use std::path::Path;
+use std::sync::Arc;
 
-use axum::{extract::Extension, routing::{get, get_service}, Router};
+use axum::{
+    extract::Extension,
+    routing::{get, get_service},
+    Router,
+};
 
 use tower_http::services::ServeDir;
 
+pub mod cli;
 pub mod routes;
 pub mod state;
-pub mod cli;
 pub mod templates;
 
 use crate::state::State;
 
 pub async fn run_glados_web(config: Arc<State>) {
-    let assets_path = Path::new(std::file!()).parent().unwrap().parent().unwrap().join("assets");
+    let assets_path = Path::new(std::file!())
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("assets");
     let serve_dir = get_service(ServeDir::new(assets_path)).handle_error(routes::handle_error);
 
     // setup router

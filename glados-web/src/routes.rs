@@ -1,18 +1,21 @@
-use std::sync::Arc;
 use std::io;
+use std::sync::Arc;
 
-use axum::{extract::Extension, response::IntoResponse};
 use axum::http::StatusCode;
+use axum::{extract::Extension, response::IntoResponse};
 
 use sea_orm::{ActiveModelTrait, EntityTrait, NotSet, QueryOrder, QuerySelect, Set};
 
 use glados_core::jsonrpc::PortalClient;
 
+use entity::contentaudit;
 use entity::contentid;
 use entity::node;
 
 use crate::state::State;
-use crate::templates::{ContentIdListTemplate, HtmlTemplate, IndexTemplate, NodeListTemplate, ContentDashboardTemplate};
+use crate::templates::{
+    ContentDashboardTemplate, ContentIdListTemplate, HtmlTemplate, IndexTemplate, NodeListTemplate,
+};
 
 //
 // Routes
@@ -63,8 +66,23 @@ pub async fn node_list(Extension(state): Extension<Arc<State>>) -> impl IntoResp
     HtmlTemplate(template)
 }
 
-pub async fn content_dashboard(Extension(_state): Extension<Arc<State>>) -> impl IntoResponse {
-    let template = ContentDashboardTemplate {};
+pub async fn content_dashboard(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
+    let contentid_list = contentid::Entity::find()
+        .order_by_desc(contentid::Column::ContentId)
+        .limit(10)
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+    let contentaudit_list = contentaudit::Entity::find()
+        .order_by_desc(contentaudit::Column::CreatedAt)
+        .limit(10)
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+    let template = ContentDashboardTemplate {
+        contentid_list,
+        contentaudit_list,
+    };
     HtmlTemplate(template)
 }
 

@@ -19,6 +19,12 @@ pub struct Model {
     pub result: AuditResult,
 }
 
+impl Model {
+    pub fn is_success(&self) -> bool {
+        self.result == AuditResult::Success
+    }
+}
+
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
