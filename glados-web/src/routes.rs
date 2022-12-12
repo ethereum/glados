@@ -2,9 +2,14 @@ use std::io;
 use std::sync::Arc;
 
 use axum::http::StatusCode;
-use axum::{extract::Extension, response::IntoResponse};
+use axum::{
+    extract::{Extension, Path},
+    response::IntoResponse,
+};
 
-use sea_orm::{ActiveModelTrait, EntityTrait, NotSet, QueryOrder, QuerySelect, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, NotSet, QueryFilter, QueryOrder, QuerySelect, Set,
+};
 
 use glados_core::jsonrpc::PortalClient;
 
@@ -14,7 +19,8 @@ use entity::node;
 
 use crate::state::State;
 use crate::templates::{
-    ContentDashboardTemplate, ContentIdListTemplate, HtmlTemplate, IndexTemplate, NodeListTemplate,
+    ContentDashboardTemplate, ContentIdDetailTemplate, ContentIdListTemplate, HtmlTemplate,
+    IndexTemplate, NodeListTemplate,
 };
 
 //
@@ -87,12 +93,28 @@ pub async fn content_dashboard(Extension(state): Extension<Arc<State>>) -> impl 
 }
 
 pub async fn contentid_list(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
-    let items: Vec<contentid::Model> = contentid::Entity::find()
+    let contentid_list: Vec<contentid::Model> = contentid::Entity::find()
         .order_by_asc(contentid::Column::ContentId)
         .limit(50)
         .all(&state.database_connection)
         .await
         .unwrap();
-    let template = ContentIdListTemplate { items };
+    let template = ContentIdListTemplate { contentid_list };
+    HtmlTemplate(template)
+}
+
+pub async fn contentid_detail(
+    Path(content_id_hex): Path<String>,
+    Extension(state): Extension<Arc<State>>,
+) -> impl IntoResponse {
+    let content_id_raw = hex::decode(&content_id_hex[2..]).unwrap();
+    let content_id = contentid::Entity::find()
+        .filter(contentid::Column::ContentId.eq(content_id_raw))
+        .one(&state.database_connection)
+        .await
+        .unwrap()
+        .expect("No content found");
+
+    let template = ContentIdDetailTemplate { content_id };
     HtmlTemplate(template)
 }

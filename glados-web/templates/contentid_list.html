@@ -1,6 +1,21 @@
-<h1>Nodes</h1>
-<ul>
-{% for content_id in items %}
-  <li><pre>{{ content_id.id }}</pre> - <pre>{{ content_id.content_id_hash() }}</pre></li>
-{% endfor %}
-</ul>
+{% extends "base.html" %}
+
+{% block title %}Content Dashboard{% endblock %}
+
+{% block content %}
+  <div class="row">
+    <h1>Content IDs</h1>
+  </div>
+  <div class="row">
+    <div class="col">
+      <ul>
+        {% for content_id in contentid_list %}
+          <li><a href="/content/id/{{content_id.as_hex() }}">{{ content_id.as_hash() }}</a></li>
+        {% else %}
+          <li>No content found</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

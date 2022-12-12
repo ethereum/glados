@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Content ID: {{ content_id.as_hex() }}{% endblock %}
+
+{% block content %}
+  <div class="row">
+    <h1>Content ID: {{ content_id.as_hex() }}</h1>
+  </div>
+  <div class="row">
+    <div class="col">
+      <ul>
+        <li>Database ID: {{ content_id.id }}</li>
+        <li>ID: {{ content_id.as_hex() }}</li>
+        <li>Last audited: TODO</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

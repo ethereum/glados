@@ -128,6 +128,26 @@ async fn test_contentid_as_hash() -> Result<(), DbErr> {
 }
 
 #[tokio::test]
+async fn test_contentid_as_hex() -> Result<(), DbErr> {
+    let conn = setup_database().await?;
+
+    let content_id_raw: Vec<u8> = vec![
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31,
+    ];
+    let content_id_hash = H256::from_slice(&content_id_raw);
+    let content_id = contentid::get_or_create(&content_id_hash, &conn).await;
+
+    // ensure our database is empty
+    assert_eq!(
+        content_id.as_hex(),
+        "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_contentid_get_or_create() -> Result<(), DbErr> {
     let conn = setup_database().await?;
 
