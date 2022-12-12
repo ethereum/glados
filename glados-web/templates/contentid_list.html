@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Content Dashboard{% endblock %}
+{% block title %}Content IDs{% endblock %}
 
 {% block content %}
   <div class="row">
@@ -12,7 +12,7 @@
         {% for content_id in contentid_list %}
           <li><a href="/content/id/{{content_id.as_hex() }}">{{ content_id.as_hash() }}</a></li>
         {% else %}
-          <li>No content found</li>
+          <li>No content ids found</li>
         {% endfor %}
       </ul>
     </div>

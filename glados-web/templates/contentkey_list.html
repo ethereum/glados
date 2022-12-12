@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Content Keys{% endblock %}
+
+{% block content %}
+  <div class="row">
+    <h1>Content Keys</h1>
+  </div>
+  <div class="row">
+    <div class="col">
+      <ul>
+        {% for content_key in contentkey_list %}
+          <li><a href="/content/key/{{content_key.as_hex() }}">{{ content_key.as_hex() }}</a></li>
+        {% else %}
+          <li>No content keys found</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

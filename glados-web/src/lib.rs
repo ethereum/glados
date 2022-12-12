@@ -32,6 +32,11 @@ pub async fn run_glados_web(config: Arc<State>) {
         .route("/content/", get(routes::content_dashboard))
         .route("/content/id/", get(routes::contentid_list))
         .route("/content/id/:content_id_hex", get(routes::contentid_detail))
+        .route("/content/key/", get(routes::contentkey_list))
+        .route(
+            "/content/key/:content_key_hex",
+            get(routes::contentkey_detail),
+        )
         .nest_service("/static/", serve_dir.clone())
         .fallback_service(serve_dir)
         .layer(Extension(config));
