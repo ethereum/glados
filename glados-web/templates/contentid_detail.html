@@ -14,6 +14,16 @@
         <li>Last audited: TODO</li>
       </ul>
     </div>
+    <div class="col">
+      <h3>Content Keys</h3>
+      <ul>
+        {% for content_key in contentkey_list %}
+          <li><a href="/content/key/{{content_key.as_hex() }}">{{ content_key.as_hex() }}</a></li>
+        {% else %}
+          <li>No content keys found</li>
+        {% endfor %}
+      </ul>
+    </div>
   </div>
 </div>
 {% endblock %}

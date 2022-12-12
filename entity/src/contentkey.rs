@@ -16,6 +16,12 @@ pub struct Model {
     pub content_key: Vec<u8>,
 }
 
+impl Model {
+    pub fn as_hex(&self) -> String {
+        format!("0x{}", hex::encode(&self.content_key))
+    }
+}
+
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(

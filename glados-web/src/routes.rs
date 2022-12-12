@@ -8,13 +8,15 @@ use axum::{
 };
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, NotSet, QueryFilter, QueryOrder, QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, NotSet, QueryFilter, QueryOrder,
+    QuerySelect, Set,
 };
 
 use glados_core::jsonrpc::PortalClient;
 
 use entity::contentaudit;
 use entity::contentid;
+use entity::contentkey;
 use entity::node;
 
 use crate::state::State;
@@ -115,6 +117,15 @@ pub async fn contentid_detail(
         .unwrap()
         .expect("No content found");
 
-    let template = ContentIdDetailTemplate { content_id };
+    let contentkey_list = content_id
+        .find_related(contentkey::Entity)
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+
+    let template = ContentIdDetailTemplate {
+        content_id,
+        contentkey_list,
+    };
     HtmlTemplate(template)
 }
