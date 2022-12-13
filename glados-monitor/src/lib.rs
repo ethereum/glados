@@ -70,9 +70,6 @@ async fn follow_chain_head(
             tx.send(block_number)
                 .await
                 .expect("Failed to send new block number");
-            if block_number > start_block_number + 2 {
-                break;
-            }
         } else {
             debug!(head.number=?block_number, "head unchanged");
         }
