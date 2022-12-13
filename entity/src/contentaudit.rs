@@ -64,12 +64,11 @@ pub async fn create(
 }
 
 pub async fn get_audits(content_key: &impl ContentKey, conn: &DatabaseConnection) -> Vec<Model> {
-    let audits = Entity::find()
+    Entity::find()
         .filter(Column::ContentKey.eq(content_key.encode()))
         .all(conn)
         .await
-        .unwrap();
-    audits
+        .unwrap()
 }
 
 impl Related<super::contentkey::Entity> for Entity {
