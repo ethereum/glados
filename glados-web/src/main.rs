@@ -19,7 +19,6 @@ async fn main() {
     Migrator::up(&conn, None).await.unwrap();
 
     let config = Arc::new(State {
-        ipc_path: args.ipc_path,
         database_connection: conn,
     });
 

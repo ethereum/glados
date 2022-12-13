@@ -1,6 +1,21 @@
-<h1>Nodes</h1>
-<ul>
-{% for node in nodes %}
-  <li><pre>{{ node.id }}</pre></li>
-{% endfor %}
-</ul>
+{% extends "base.html" %}
+
+{% block title %}Nodes{% endblock %}
+
+{% block content %}
+  <div class="row">
+    <h1>Nodes</h1>
+  </div>
+  <div class="row">
+    <div class="col">
+      <ul>
+      {% for node in nodes %}
+        <li><pre>{{ node.id }}</pre></li>
+      {% else %}
+        <li>No nodes found in database</li>
+      {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -4,8 +4,6 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 
-use glados_core::jsonrpc::{NodeInfo, RoutingTableInfo};
-
 use entity::contentaudit;
 use entity::contentid;
 use entity::contentkey;
@@ -13,12 +11,7 @@ use entity::node;
 
 #[derive(Template)]
 #[template(path = "index.html")]
-pub struct IndexTemplate {
-    pub ipc_path: String,
-    pub client_version: String,
-    pub node_info: NodeInfo,
-    pub routing_table_info: RoutingTableInfo,
-}
+pub struct IndexTemplate {}
 
 #[derive(Template)]
 #[template(path = "node_list.html")]
