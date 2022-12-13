@@ -22,7 +22,7 @@ impl MigrationTrait for Migration {
                     .index(
                         Index::create()
                             .unique()
-                            .name("idx-node-node_id")
+                            .name("idx_node-node_id")
                             .col(Node::NodeId),
                     )
                     .to_owned(),
@@ -40,7 +40,7 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Record::NodeId).binary_len(32).not_null())
+                    .col(ColumnDef::new(Record::NodeId).integer().not_null())
                     //.index(Index::create().name("idx-record-node_id").col(Record::NodeId))
                     .col(ColumnDef::new(Record::Raw).binary().not_null())
                     .col(ColumnDef::new(Record::CreatedAt).date_time().not_null())
@@ -53,7 +53,7 @@ impl MigrationTrait for Migration {
                     )
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk_enr_id_node_id")
+                            .name("fk-enr_id-node_id")
                             .from(Record::Table, Record::NodeId)
                             .to(Node::Table, Node::Id)
                             .on_delete(ForeignKeyAction::Cascade)
@@ -79,7 +79,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(KeyValue::Value).binary().not_null())
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk_keyvalue_id_enr_id")
+                            .name("fk_keyvalue_id-enr_id")
                             .from(KeyValue::Table, KeyValue::RecordId)
                             .to(Record::Table, Record::Id)
                             .on_delete(ForeignKeyAction::Cascade)

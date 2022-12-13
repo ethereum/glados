@@ -6,7 +6,7 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub node_id: Vec<u8>,
+    pub node_id: i32,
     pub sequence_number: i32,
     pub raw: Vec<u8>,
     pub created_at: DateTime<Utc>,
