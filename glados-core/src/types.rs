@@ -77,7 +77,7 @@ mod tests {
         let content_key = BlockHeaderContentKey { hash: block_hash };
         assert_eq!(
             content_key.hex_encode(),
-            "00d1c390624d3bd4e409a61a858e5dcc5517729a9170d014a6c96530d64dd8621d"
+            "0x00d1c390624d3bd4e409a61a858e5dcc5517729a9170d014a6c96530d64dd8621d"
         );
     }
 
