@@ -14,6 +14,7 @@ members = [".", "glados-core", "glados-web", "glados-monitor", "entity", "migrat
 entity = { path = "entity" }
 glados-core = { path = "glados-core" }
 glados-monitor = { path = "glados-monitor" }
+glados-audit = { path = "glados-audit" }
 glados-web = { path = "glados-web" }
 migration = { path = "migration" }
 tokio = { version = "1", features = ["full"] }

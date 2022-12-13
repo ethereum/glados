@@ -7,7 +7,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
-use serde_json::value::RawValue;
+use serde_json::value::{to_raw_value, RawValue};
 
 use thiserror::Error;
 
@@ -15,6 +15,8 @@ use ethereum_types::{H256, U256};
 
 use discv5::enr::CombinedKey;
 type Enr = discv5::enr::Enr<CombinedKey>;
+
+use crate::types::ContentKey;
 
 //
 // JSON RPC Client
@@ -115,6 +117,10 @@ pub struct RoutingTableInfo {
     pub buckets: Vec<RoutingTableEntry>,
 }
 
+pub struct Content {
+    pub raw: Vec<u8>,
+}
+
 // TryClone is used because JSON-RPC responses are not followed by EOF. We must read bytes
 // from the stream until a complete object is detected, and the simplest way of doing that
 // with available APIs is to give ownership of a Read to a serde_json::Deserializer. If we
@@ -193,6 +199,17 @@ where
                 })
                 .collect(),
         }
+    }
+
+    pub fn get_content(&mut self, content_key: &dyn ContentKey) -> Content {
+        let params = Some(vec![to_raw_value(&content_key.hex_encode()).unwrap()]);
+        let req = self.build_request("portal_historyRecursiveFindContent", &params);
+        let resp = self.make_request(req).unwrap();
+
+        let content_as_hex: String = serde_json::from_value(resp.result).unwrap();
+        let content_raw = hex::decode(&content_as_hex[2..]).unwrap();
+
+        Content { raw: content_raw }
     }
 
     //fn get_node_enr(&mut self) -> Enr {

@@ -1,6 +1,8 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{NotSet, Set};
 
+use chrono::{DateTime, Utc};
+
 use glados_core::types::ContentKey;
 
 use crate::contentid;
@@ -14,6 +16,7 @@ pub struct Model {
     pub content_id: i32,
     #[sea_orm(unique, indexed)]
     pub content_key: Vec<u8>,
+    pub created_at: DateTime<Utc>,
 }
 
 impl Model {
@@ -53,12 +56,21 @@ pub async fn get_or_create(content_key_raw: &impl ContentKey, conn: &DatabaseCon
             id: NotSet,
             content_id: Set(content_id.id),
             content_key: Set(content_key_raw.encode()),
+            created_at: Set(chrono::offset::Utc::now()),
         };
         content_key
             .insert(conn)
             .await
             .expect("Error inserting new content key")
     }
+}
+
+pub async fn get(content_key: &impl ContentKey, conn: &DatabaseConnection) -> Option<Model> {
+    Entity::find()
+        .filter(Column::ContentKey.eq(content_key.encode()))
+        .one(conn)
+        .await
+        .unwrap()
 }
 
 impl Related<super::contentid::Entity> for Entity {

@@ -1,25 +1,39 @@
+pub(crate) use std::fmt;
+
 use sha2::{Digest, Sha256};
 
 use ethereum_types::H256;
 
-pub struct BlockHeaderContentKey {
-    pub hash: H256,
-}
-
-pub trait ContentKey {
+pub trait ContentKey: fmt::Display + fmt::Debug {
     fn encode(&self) -> Vec<u8>;
 
     fn hex_encode(&self) -> String {
-        hex::encode(self.encode())
+        format!("0x{}", hex::encode(self.encode()))
     }
 
     fn content_id(&self) -> H256;
+}
+
+pub struct BlockHeaderContentKey {
+    pub hash: H256,
 }
 
 impl BlockHeaderContentKey {}
 
 unsafe impl Send for BlockHeaderContentKey {}
 unsafe impl Sync for BlockHeaderContentKey {}
+
+impl fmt::Display for BlockHeaderContentKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "(key={}, cid={})", self.hex_encode(), self.content_id())
+    }
+}
+
+impl fmt::Debug for BlockHeaderContentKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "(key={}, cid={})", self.hex_encode(), self.content_id())
+    }
+}
 
 impl ContentKey for BlockHeaderContentKey {
     fn encode(&self) -> Vec<u8> {

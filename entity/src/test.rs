@@ -239,6 +239,7 @@ async fn test_audit_crud() -> Result<(), DbErr> {
         id: NotSet,
         content_id: Set(content_id.id),
         content_key: Set(content_key_raw.clone().as_bytes().to_vec()),
+        created_at: Set(Utc::now()),
     };
 
     let content_key = content_key.insert(&conn).await?;

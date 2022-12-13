@@ -1,5 +1,5 @@
 [package]
-name = "glados-core"
+name = "glados-audit"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -9,13 +9,14 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-discv5 = "0.1.0"
+glados-core = { path = "../glados-core" }
+migration = { path = "../migration" }
+entity = { path = "../entity" }
+clap = { version = "4.0.24", features = ["derive"] }
+web3 = "0.18.0"
+tokio = "1.21.2"
+sea-orm = "0.10.3"
 ethereum-types = "0.14.0"
-hex = "0.4.3"
-jsonrpc = "0.13.0"
-serde = "1.0.147"
-serde_json = "1.0.87"
-sha2 = "0.10.6"
-thiserror = "1.0.37"
 env_logger = "0.9.3"
 tracing = "0.1.37"
+hex = "0.4.3"
