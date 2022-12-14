@@ -59,7 +59,11 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(ContentKey::ContentKey).binary().not_null())
                     //.index(Index::create().unique().name("idx-contentkey-content_key").col(ContentKey::ContentKey))
-                    .col(ColumnDef::new(ContentKey::CreatedAt).date_time().not_null())
+                    .col(
+                        ColumnDef::new(ContentKey::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -93,7 +97,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(ContentAudit::CreatedAt)
-                            .date_time()
+                            .timestamp_with_time_zone()
                             .not_null(),
                     )
                     //.index(Index::create().name("idx-contentaudit-created_at").col(ContentAudit::CreatedAt))
