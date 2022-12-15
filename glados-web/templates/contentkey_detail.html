@@ -17,7 +17,7 @@
       <h3>Content Audits</h3>
       <ul>
         {% for content_audit in contentaudit_list %}
-          <li>Audit#: {{ content_audit.id }} <span class="badge text-bg-{% if content_audit.is_success() %}success{% else %}danger{% endif %}">TODO</span></li>
+          <li>Audit#: {{ content_audit.id }} <span class="badge text-bg-{% if content_audit.is_success() %}success{% else %}danger{% endif %}">{% if content_audit.is_success() %}Success{% else %}Fail{% endif %}</span></li>
         {% else %}
           <li>No audits</li>
         {% endfor %}
