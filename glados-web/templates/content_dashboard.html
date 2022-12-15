@@ -21,7 +21,7 @@
       <h2>Recent Audits</h2>
       <ul>
         {% for contentaudit in contentaudit_list %}
-          <li>Key={{ contentaudit.content_key }} <span class="badge text-bg-{% if contentaudit.is_success() %}success{% else %}danger{% endif %}">TODO</span></li>
+        <li>Audit#={{ contentaudit.content_key }} <span class="badge text-bg-{% if contentaudit.is_success() %}success{% else %}danger{% endif %}">{% if contentaudit.is_success() %}Success{% else %}Fail{% endif %}</span></li>
         {% else %}
           <li>No audits found</li>
         {% endfor %}
