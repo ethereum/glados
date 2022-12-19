@@ -4,42 +4,31 @@ use sha2::{Digest, Sha256};
 
 use ethereum_types::H256;
 
-pub trait ContentKey: fmt::Display + fmt::Debug {
+pub enum ContentKeySelector {
+    BlockHeader,
+    BlockBody,
+    BlockReceipts,
+    EpochAccumulator,
+}
+
+impl ContentKeySelector {
+    fn value(&self) -> u8 {
+        match *self {
+            ContentKeySelector::BlockHeader => 0,
+            ContentKeySelector::BlockBody => 1,
+            ContentKeySelector::BlockReceipts => 2,
+            ContentKeySelector::EpochAccumulator => 3,
+        }
+    }
+}
+
+pub trait ContentKey: fmt::Debug {
+    const SELECTOR: ContentKeySelector;
+
     fn encode(&self) -> Vec<u8>;
 
     fn hex_encode(&self) -> String {
         format!("0x{}", hex::encode(self.encode()))
-    }
-
-    fn content_id(&self) -> H256;
-}
-
-pub struct BlockHeaderContentKey {
-    pub hash: H256,
-}
-
-impl BlockHeaderContentKey {}
-
-unsafe impl Send for BlockHeaderContentKey {}
-unsafe impl Sync for BlockHeaderContentKey {}
-
-impl fmt::Display for BlockHeaderContentKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "(key={}, cid={})", self.hex_encode(), self.content_id())
-    }
-}
-
-impl fmt::Debug for BlockHeaderContentKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "(key={}, cid={})", self.hex_encode(), self.content_id())
-    }
-}
-
-impl ContentKey for BlockHeaderContentKey {
-    fn encode(&self) -> Vec<u8> {
-        let mut encoded: Vec<u8> = vec![0];
-        encoded.extend_from_slice(&self.hash[..]);
-        encoded
     }
 
     fn content_id(&self) -> H256 {
@@ -47,6 +36,72 @@ impl ContentKey for BlockHeaderContentKey {
         hasher.update(self.encode());
         let raw_hash = hasher.finalize();
         H256::from_slice(&raw_hash)
+    }
+}
+
+#[derive(Debug)]
+pub struct BlockHeaderContentKey {
+    pub hash: H256,
+}
+
+impl fmt::Display for BlockHeaderContentKey {
+    // TODO: how can this be implemented generically
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "(key={}, cid={})", self.hex_encode(), self.content_id())
+    }
+}
+
+impl ContentKey for BlockHeaderContentKey {
+    const SELECTOR: ContentKeySelector = ContentKeySelector::BlockHeader;
+
+    fn encode(&self) -> Vec<u8> {
+        let mut encoded: Vec<u8> = vec![BlockHeaderContentKey::SELECTOR.value()];
+        encoded.extend_from_slice(&self.hash[..]);
+        encoded
+    }
+}
+
+#[derive(Debug)]
+pub struct BlockBodyContentKey {
+    pub hash: H256,
+}
+
+impl fmt::Display for BlockBodyContentKey {
+    // TODO: how can this be implemented generically
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "(key={}, cid={})", self.hex_encode(), self.content_id())
+    }
+}
+
+impl ContentKey for BlockBodyContentKey {
+    const SELECTOR: ContentKeySelector = ContentKeySelector::BlockBody;
+
+    fn encode(&self) -> Vec<u8> {
+        let mut encoded: Vec<u8> = vec![BlockBodyContentKey::SELECTOR.value()];
+        encoded.extend_from_slice(&self.hash[..]);
+        encoded
+    }
+}
+
+#[derive(Debug)]
+pub struct BlockReceiptsContentKey {
+    pub hash: H256,
+}
+
+impl fmt::Display for BlockReceiptsContentKey {
+    // TODO: how can this be implemented generically
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "(key={}, cid={})", self.hex_encode(), self.content_id())
+    }
+}
+
+impl ContentKey for BlockReceiptsContentKey {
+    const SELECTOR: ContentKeySelector = ContentKeySelector::BlockReceipts;
+
+    fn encode(&self) -> Vec<u8> {
+        let mut encoded: Vec<u8> = vec![BlockReceiptsContentKey::SELECTOR.value()];
+        encoded.extend_from_slice(&self.hash[..]);
+        encoded
     }
 }
 
