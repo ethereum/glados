@@ -201,7 +201,7 @@ where
         }
     }
 
-    pub fn get_content(&mut self, content_key: &dyn ContentKey) -> Content {
+    pub fn get_content(&mut self, content_key: &impl ContentKey) -> Content {
         let params = Some(vec![to_raw_value(&content_key.hex_encode()).unwrap()]);
         let req = self.build_request("portal_historyRecursiveFindContent", &params);
         let resp = self.make_request(req).unwrap();

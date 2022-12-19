@@ -11,7 +11,9 @@ use web3::types::BlockId;
 
 use ethereum_types::H256;
 
-use glados_core::types::{BlockHeaderContentKey, ContentKey};
+use glados_core::types::{
+    BlockBodyContentKey, BlockHeaderContentKey, BlockReceiptsContentKey, ContentKey,
+};
 
 use entity::contentkey;
 
@@ -99,18 +101,48 @@ async fn retrieve_new_blocks(
                     block.number=?block_number_to_retrieve,
                     "received block",
                 );
-                let raw_content_key = BlockHeaderContentKey {
+
+                // Create block header content key
+                let raw_header_content_key = BlockHeaderContentKey {
                     hash: H256::from_slice(block_hash.as_bytes()),
                 };
 
                 debug!(
-                    content.key=raw_content_key.hex_encode(),
-                    content.id=?raw_content_key.content_id(),
+                    content.key=raw_header_content_key.hex_encode(),
+                    content.id=?raw_header_content_key.content_id(),
                     content.kind="block-header",
-                    "block header content",
+                    "Creating content database record",
                 );
 
-                contentkey::get_or_create(&raw_content_key, &conn).await;
+                contentkey::get_or_create(&raw_header_content_key, &conn).await;
+
+                // Create block body content key
+                let raw_body_content_key = BlockBodyContentKey {
+                    hash: H256::from_slice(block_hash.as_bytes()),
+                };
+
+                debug!(
+                    content.key=raw_body_content_key.hex_encode(),
+                    content.id=?raw_body_content_key.content_id(),
+                    content.kind="block-body",
+                    "Creating content database record",
+                );
+
+                contentkey::get_or_create(&raw_body_content_key, &conn).await;
+
+                // Create block receipts content key
+                let raw_receipts_content_key = BlockReceiptsContentKey {
+                    hash: H256::from_slice(block_hash.as_bytes()),
+                };
+
+                debug!(
+                    content.key=raw_receipts_content_key.hex_encode(),
+                    content.id=?raw_receipts_content_key.content_id(),
+                    content.kind="block-receipts",
+                    "Creating content database record",
+                );
+
+                contentkey::get_or_create(&raw_receipts_content_key, &conn).await;
             }
         } else {
             error!(
