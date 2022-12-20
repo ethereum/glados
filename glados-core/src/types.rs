@@ -105,6 +105,28 @@ impl ContentKey for BlockReceiptsContentKey {
     }
 }
 
+#[derive(Debug)]
+pub struct EpochAccumulatorContentKey {
+    pub hash: H256,
+}
+
+impl fmt::Display for EpochAccumulatorContentKey {
+    // TODO: how can this be implemented generically
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "(key={}, cid={})", self.hex_encode(), self.content_id())
+    }
+}
+
+impl ContentKey for EpochAccumulatorContentKey {
+    const SELECTOR: ContentKeySelector = ContentKeySelector::EpochAccumulator;
+
+    fn encode(&self) -> Vec<u8> {
+        let mut encoded: Vec<u8> = vec![EpochAccumulatorContentKey::SELECTOR.value()];
+        encoded.extend_from_slice(&self.hash[..]);
+        encoded
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

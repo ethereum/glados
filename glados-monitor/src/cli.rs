@@ -1,10 +1,33 @@
-use clap::Parser;
+use std::path::PathBuf;
+
+use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-pub struct Args {
-    #[arg(short, long)]
-    pub provider_url: String,
+pub struct Cli {
+    // Connection to a database where content keys will be injected
     #[arg(short, long, default_value = "sqlite::memory:")]
     pub database_url: String,
+
+    #[arg(short, long, default_value = "false")]
+    pub migrate: bool,
+
+    #[command(subcommand)]
+    pub command: Option<Commands>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    FollowHead {
+        // HTTP web3 provider
+        #[arg(short, long)]
+        provider_url: String,
+    },
+
+    /// does testing things
+    ImportPreMergeAccumulators {
+        /// lists test values
+        #[arg(short, long)]
+        path: PathBuf,
+    },
 }
