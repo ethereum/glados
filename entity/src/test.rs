@@ -259,6 +259,7 @@ async fn test_audit_crud() -> Result<(), DbErr> {
         content_key: Set(content_key.id),
         created_at: Set(Utc::now()),
         result: Set(contentaudit::AuditResult::Success),
+        trace: Set("{}".to_owned()),
     };
 
     let content_audit = content_audit.insert(&conn).await?;

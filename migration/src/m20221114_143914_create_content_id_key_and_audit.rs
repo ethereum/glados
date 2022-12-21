@@ -100,6 +100,7 @@ impl MigrationTrait for Migration {
                             .timestamp_with_time_zone()
                             .not_null(),
                     )
+                    .col(ColumnDef::new(ContentAudit::Trace).string())
                     //.index(Index::create().name("idx-contentaudit-created_at").col(ContentAudit::CreatedAt))
                     .col(ColumnDef::new(ContentAudit::Result).integer().not_null())
                     .to_owned(),
@@ -148,4 +149,5 @@ enum ContentAudit {
     ContentKey,
     CreatedAt,
     Result,
+    Trace,
 }

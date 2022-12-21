@@ -40,6 +40,12 @@ pub struct ContentIdDetailTemplate {
 }
 
 #[derive(Template)]
+#[template(path = "contentaudit_detail.html")]
+pub struct ContentAuditDetailTemplate {
+    pub audit: contentaudit::Model,
+}
+
+#[derive(Template)]
 #[template(path = "contentkey_list.html")]
 pub struct ContentKeyListTemplate {
     pub contentkey_list: Vec<contentkey::Model>,

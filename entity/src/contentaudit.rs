@@ -21,6 +21,7 @@ pub struct Model {
     pub content_key: i32,
     pub created_at: DateTime<Utc>,
     pub result: AuditResult,
+    pub trace: String,
 }
 
 impl Model {
@@ -43,6 +44,7 @@ pub async fn create(
     content_key_id: i32,
     query_successful: bool,
     conn: &DatabaseConnection,
+    trace_string: String,
 ) -> Model {
     // If no record exists, create one and return it
     let audit_result = if query_successful {
@@ -56,6 +58,7 @@ pub async fn create(
         content_key: Set(content_key_id),
         created_at: Set(chrono::offset::Utc::now()),
         result: Set(audit_result),
+        trace: Set(trace_string),
     };
     content_audit
         .insert(conn)

@@ -85,12 +85,11 @@ async fn perform_content_audits(
             content.id=?content_key.content_id(),
             "auditing content",
         );
-        let content = client.get_content(&content_key);
+        let (content, trace) = client.get_content_with_trace(&content_key);
 
         let raw_data = content.raw;
-
         let content_key_id = contentkey::get(&content_key, &conn).await.unwrap().id;
-        contentaudit::create(content_key_id, raw_data.len() > 2, &conn).await;
+        contentaudit::create(content_key_id, raw_data.len() > 2, &conn, trace).await;
 
         info!("Successfully audited content.");
     }

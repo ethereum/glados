@@ -7,7 +7,10 @@ use std::path::Path;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
-use serde_json::value::{to_raw_value, RawValue};
+use serde_json::{
+    value::{to_raw_value, RawValue},
+    Value,
+};
 
 use thiserror::Error;
 
@@ -117,6 +120,12 @@ pub struct RoutingTableInfo {
     pub buckets: Vec<RoutingTableEntry>,
 }
 
+#[derive(Deserialize)]
+pub struct TracedQueryResult {
+    pub content: String,
+    pub trace: Value,
+}
+
 pub struct Content {
     pub raw: Vec<u8>,
 }
@@ -210,6 +219,17 @@ where
         let content_raw = hex::decode(&content_as_hex[2..]).unwrap();
 
         Content { raw: content_raw }
+    }
+
+    pub fn get_content_with_trace(&mut self, content_key: &dyn ContentKey) -> (Content, String) {
+        let params = Some(vec![to_raw_value(&content_key.hex_encode()).unwrap()]);
+        let req = self.build_request("portal_historyTraceRecursiveFindContent", &params);
+        let resp = self.make_request(req).unwrap();
+
+        let query_result: TracedQueryResult = serde_json::from_value(resp.result).unwrap();
+        let content_raw = hex::decode(&query_result.content[2..]).unwrap();
+        let trace = query_result.trace.to_string();
+        (Content { raw: content_raw }, trace)
     }
 
     //fn get_node_enr(&mut self) -> Enr {

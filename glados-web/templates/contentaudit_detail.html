@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Audit: {{ audit.content_key }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <h1>Audit: {{ audit.content_key }}</h1>
+</div>
+<div class="row">
+    <div class="col">
+        <ul>
+            <li>Result: {{ audit.result }}</li>
+            <li>Key: {{ audit.content_key }}</li>
+        </ul>
+    </div>
+    <div class="col" id="trace">
+        <h3>Trace</h3>
+        <script src="https://d3js.org/d3.v7.min.js"></script>
+        <script src="/static/js/trace/enr.js"></script>
+        <script src="/static/js/trace/graph.js"></script>
+        <script src="/static/js/trace/main.js"></script>
+        <script>
+            let trace = JSON.parse("{{ audit.trace }}".replace(/&quot;/g, '"'));
+            let graphSvg = createGraph(trace);
+            $('#trace').append(graphSvg);
+        </script>
+    </div>
+</div>
+</div>
+{% endblock %}

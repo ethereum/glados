@@ -10,6 +10,7 @@ use glados_web::{cli::Args, run_glados_web, state::State};
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
     // parse command line arguments
     let args = Args::parse();
 

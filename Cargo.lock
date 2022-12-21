@@ -1458,6 +1458,7 @@ dependencies = [
  "axum",
  "clap 4.0.26",
  "entity",
+ "env_logger",
  "ethereum-types 0.14.0",
  "glados-core",
  "hex",
@@ -1465,6 +1466,7 @@ dependencies = [
  "sea-orm",
  "tokio",
  "tower-http",
+ "tracing",
 ]
 
 [[package]]
