@@ -341,6 +341,7 @@ mod tests {
                     created_at: Set(Utc::now().into()),
                     strategy_used: Set(Some(SelectionStrategy::Random)),
                     result: Set(result),
+                    trace: Set("".to_owned()),
                 };
                 content_audit_active_model.insert(&conn).await?;
             }

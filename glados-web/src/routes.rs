@@ -18,13 +18,14 @@ use sea_orm::{
     QueryOrder, QuerySelect,
 };
 use tracing::error;
+use tracing::info;
 use trin_utils::bytes::{hex_decode, hex_encode};
 
 use crate::state::State;
 use crate::templates::{
-    ContentDashboardTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
-    ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate, HtmlTemplate,
-    IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate,
+    ContentAuditDetailTemplate, ContentDashboardTemplate, ContentIdDetailTemplate,
+    ContentIdListTemplate, ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate,
+    HtmlTemplate, IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate,
 };
 
 //
@@ -460,6 +461,29 @@ pub async fn contentkey_detail(
         block_number,
     };
     Ok(HtmlTemplate(template))
+}
+
+pub async fn contentaudit_detail(
+    Path(audit_id): Path<String>,
+    Extension(state): Extension<Arc<State>>,
+) -> impl IntoResponse {
+    let audit_id = audit_id.parse::<i32>().unwrap();
+    info!("Audit ID: {}", audit_id);
+    let audit = content_audit::Entity::find_by_id(audit_id)
+        .one(&state.database_connection)
+        .await
+        .unwrap()
+        .expect("No audit found");
+
+    let content = audit
+        .find_related(content::Entity)
+        .one(&state.database_connection)
+        .await
+        .unwrap()
+        .expect("Failed to get audit content key");
+
+    let template = ContentAuditDetailTemplate { audit, content };
+    HtmlTemplate(template)
 }
 
 pub enum Period {

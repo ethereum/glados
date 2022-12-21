@@ -19,6 +19,7 @@ use serde_json::{
     value::{to_raw_value, RawValue},
     Value,
 };
+
 use thiserror::Error;
 use tracing::error;
 use trin_utils::bytes::{hex_decode, ByteUtilsError};
@@ -145,6 +146,12 @@ pub struct RoutingTableEntry {
 pub struct RoutingTableInfo {
     pub localKey: H256,
     pub buckets: Vec<RoutingTableEntry>,
+}
+
+#[derive(Deserialize)]
+pub struct TracedQueryResult {
+    pub content: String,
+    pub trace: Value,
 }
 
 pub struct Content {
@@ -335,6 +342,26 @@ impl PortalClient {
                 Ok(Some(Content { raw: content_raw }))
             }
             None => Ok(None),
+        }
+    }
+
+    pub async fn get_content_with_trace<T: OverlayContentKey>(
+        self,
+        content_key: &T,
+    ) -> Result<(Option<Content>, String), JsonRpcError> {
+        let params = Some(vec![to_raw_value(&content_key.to_hex())?]);
+        let resp = self
+            .make_request("portal_historyTraceRecursiveFindContent", params)
+            .await?
+            .non_content_response_to_string()?;
+
+        let query_result: TracedQueryResult = serde_json::from_str(&resp)?;
+        let trace = query_result.trace.to_string();
+        if query_result.content.len() > 2 {
+            let content_raw = hex_decode(&query_result.content)?;
+            Ok((Some(Content { raw: content_raw }), trace))
+        } else {
+            Ok((None, trace))
         }
     }
 }

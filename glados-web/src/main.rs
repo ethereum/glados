@@ -22,5 +22,6 @@ async fn main() -> Result<()> {
         database_connection: conn,
     });
 
-    run_glados_web(config).await
+    run_glados_web(config).await?;
+    Ok(())
 }

@@ -123,6 +123,8 @@ impl MigrationTrait for Migration {
                             .timestamp_with_time_zone() // chrono::DateTime<FixedOffset>
                             .not_null(),
                     )
+                    .col(ColumnDef::new(ContentAudit::Trace).string())
+                    //.index(Index::create().name("idx-contentaudit-created_at").col(ContentAudit::CreatedAt))
                     .col(ColumnDef::new(ContentAudit::Result).integer().not_null())
                     .to_owned(),
             )
@@ -174,4 +176,5 @@ enum ContentAudit {
     ContentKey, // Foreign key
     CreatedAt,  // datetime
     Result,     // Custom enum: Succeed/Fail
+    Trace,      // Trace object from query
 }

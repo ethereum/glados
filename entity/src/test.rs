@@ -213,6 +213,7 @@ async fn test_audit_crud() -> Result<(), DbErr> {
         created_at: Set(Utc::now().into()),
         strategy_used: Set(Some(SelectionStrategy::Random)),
         result: Set(content_audit::AuditResult::Success),
+        trace: Set("{}".to_owned()),
     };
 
     let content_audit_model = content_audit_active_model.insert(&conn).await?;
