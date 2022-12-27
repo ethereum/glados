@@ -21,7 +21,7 @@
         <h2>Recent Audits</h2>
         <ul>
             {% for contentaudit in contentaudit_list %}
-            <li>Audit#={{ contentaudit.id }} <span
+            <li><a href="/audit/id/{{ contentaudit.id }}">Audit#={{ contentaudit.id }}</a> <span
                     class="badge text-bg-{% if contentaudit.is_success() %}success{% else %}danger{% endif %}">{% if
                     contentaudit.is_success() %}Success{% else %}Fail{% endif %}</span></li>
             {% else %}
