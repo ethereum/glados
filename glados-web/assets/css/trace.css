@@ -1,0 +1,50 @@
+#graph {
+    border-radius: 5px;
+    height: calc(100vh - 325px);
+    background-color: #FFFFFC;
+    overflow: visible;
+    z-index: 1000;
+}
+
+#legend {
+    float: left;
+    border-top: none;
+    border-left: none;
+    display: flex;
+}
+
+#legend text {
+    color: gray;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 5;
+    border: 0.5px solid white;
+    -moz-border-radius: 10px;
+    border-radius: 10px;
+    margin-top: 4px;
+    margin-left: 6px;
+    margin-right: 3px;
+}
+
+#origin {
+    background: #F08E3A;
+}
+
+#responded {
+    background: #507AA5;
+}
+
+#no-response {
+    background: #BAB0AC;
+}
+
+#found-content {
+    background: #5CA053;
+}
+
+#no-progress {
+    background: #956955;
+}

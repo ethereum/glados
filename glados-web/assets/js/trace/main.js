@@ -1,17 +1,15 @@
 // Creates a graph from a trace object and returns an SVG.
-function createGraph(trace) {
+function createGraph(graphData) {
 
-    let graph_data = createGraphData(trace);
-
-    return ForceGraph(graph_data, {
+    return ForceGraph(graphData, {
         nodeId: d => d.id,
         nodeGroup: d => d.group,
         nodeGroups: [0, 1, 2, 3, 4, 5, 6, 7, 9],
-        nodeTitle: d => generate_node_metadata(d),
+        nodeTitle: d => generateNodeMetadata(d),
         linkStrokeWidth: l => Math.sqrt(l.value),
-        width: 2000,
-        height: 2000,
-        invalidation: null
+        width: $('#graph').width(),
+        height: $('#graph').height(),
+        invalidation: null,
     });
 
 }
@@ -47,6 +45,8 @@ function createGraphData(trace) {
     let nodes = [];
     let nodesSeen = [];
     let responses = trace.responses;
+    let trinNodesResponded = 0;
+    let trinNodesNoResponse = 0;
     Object.keys(responses).forEach((enr, _) => {
 
         let node = responses[enr];
@@ -56,18 +56,25 @@ function createGraphData(trace) {
             return;
         }
         if (!nodesSeen.includes(enr)) {
+            console.log(trace.node_metadata[enr].distance_to_content);
             let group = 0;
             if ('origin' in trace && trace.origin == enr) {
                 group = colors.orange;
-            }
-            else if ('found_content_at' in trace && trace.found_content_at == enr) {
-                group = colors.green;
-            } else if (respondedWith.length == 0) {
-                group = colors.brown;
             } else {
-                group = colors.blue;
+                if (ENR.ENR.decodeTxt(enr).client === 'trin') {
+
+                    trinNodesResponded++;
+                }
+                if ('found_content_at' in trace && trace.found_content_at == enr) {
+                    group = colors.green;
+                } else if (respondedWith.length == 0) {
+                    group = colors.brown;
+                } else {
+                    group = colors.blue;
+                }
             }
-            nodes.push({ id: enr, group: group, timestamp: timestamp });
+            let scale = trace.node_metadata[enr].distance_to_content / 10000;
+            nodes.push({ id: enr, group: group, timestamp: timestamp, x: scale, y: timestamp });
             nodesSeen.push(enr);
         }
     });
@@ -83,8 +90,11 @@ function createGraphData(trace) {
         }
         responded_with.forEach((enr_target, _) => {
             if (!nodesSeen.includes(enr_target)) {
-
-                nodes.push({ id: enr_target, group: colors.gray });
+                if (ENR.ENR.decodeTxt(enr_target).client === 'trin') {
+                    trinNodesNoResponse++;
+                }
+                let scale = trace.node_metadata[enr_target].distance_to_content / 10000;
+                nodes.push({ id: enr_target, group: colors.gray, x: scale, y: node.timestamp_ms + 30 });
                 nodesSeen.push(enr_target)
             }
             let value = 1;
@@ -102,6 +112,12 @@ function createGraphData(trace) {
     let graph = {
         nodes: nodes,
         links: links,
+        metadata: {
+            nodesContacted: nodes.length - 1,
+            nodesResponded: Object.keys(responses).length - 1,
+            trinNodesContacted: trinNodesResponded + trinNodesNoResponse,
+            trinNodesResponded: trinNodesResponded,
+        }
     }
     return graph;
 
@@ -147,7 +163,7 @@ function computeSuccessfulRoute(trace) {
 }
 
 // Generates a string to appear on hover-over of a node.
-function generate_node_metadata(node) {
+function generateNodeMetadata(node) {
 
     let enr = ENR.ENR.decodeTxt(node.id);
     let timestamp = node.timestamp;

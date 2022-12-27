@@ -3,30 +3,32 @@
 {% block title %}Content Dashboard{% endblock %}
 
 {% block content %}
-  <div class="row">
+<div class="row">
     <h1>Content Dashboard</h1>
-  </div>
-  <div class="row">
+</div>
+<div class="row">
     <div class="col">
-      <h2>Recent Content</h2>
-      <ul>
-        {% for contentid in contentid_list %}
-          <li><a href="/content/id/{{contentid.as_hex() }}">{{ contentid.as_hash() }}</a></li>
-        {% else %}
-          <li>No content found</li>
-        {% endfor %}
-      </ul>
+        <h2>Recent Content</h2>
+        <ul>
+            {% for contentid in contentid_list %}
+            <li><a href="/content/id/{{contentid.as_hex() }}">{{ contentid.as_hash() }}</a></li>
+            {% else %}
+            <li>No content found</li>
+            {% endfor %}
+        </ul>
     </div>
     <div class="col">
-      <h2>Recent Audits</h2>
-      <ul>
-        {% for contentaudit in contentaudit_list %}
-        <li>Audit#={{ contentaudit.content_key }} <span class="badge text-bg-{% if contentaudit.is_success() %}success{% else %}danger{% endif %}">{% if contentaudit.is_success() %}Success{% else %}Fail{% endif %}</span></li>
-        {% else %}
-          <li>No audits found</li>
-        {% endfor %}
-      </ul>
+        <h2>Recent Audits</h2>
+        <ul>
+            {% for contentaudit in contentaudit_list %}
+            <li>Audit#={{ contentaudit.id }} <span
+                    class="badge text-bg-{% if contentaudit.is_success() %}success{% else %}danger{% endif %}">{% if
+                    contentaudit.is_success() %}Success{% else %}Fail{% endif %}</span></li>
+            {% else %}
+            <li>No audits found</li>
+            {% endfor %}
+        </ul>
     </div>
-  </div>
+</div>
 </div>
 {% endblock %}

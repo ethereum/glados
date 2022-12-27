@@ -149,6 +149,24 @@ pub async fn contentaudit_detail(
         .unwrap()
         .expect("No audit found");
 
-    let template = ContentAuditDetailTemplate { audit };
+    let content_key = audit
+        .find_related(contentkey::Entity)
+        .one(&state.database_connection)
+        .await
+        .unwrap()
+        .expect("Failed to get audit content key");
+
+    let content_id = content_key
+        .find_related(contentid::Entity)
+        .one(&state.database_connection)
+        .await
+        .unwrap()
+        .expect("Failed to get audit's content ID");
+
+    let template = ContentAuditDetailTemplate {
+        audit,
+        content_id,
+        content_key,
+    };
     HtmlTemplate(template)
 }

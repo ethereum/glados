@@ -28,6 +28,12 @@ impl Model {
     pub fn is_success(&self) -> bool {
         self.result == AuditResult::Success
     }
+    pub fn result_string(&self) -> String {
+        match self.result {
+            AuditResult::Failure => "Failure".to_owned(),
+            AuditResult::Success => "Success".to_owned(),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
