@@ -1,9 +1,11 @@
+use std::path::PathBuf;
 use std::time::Duration;
 
 use tracing::{debug, error, info};
 
 use sea_orm::DatabaseConnection;
 
+use tokio::fs::read_dir;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
@@ -13,6 +15,7 @@ use ethereum_types::H256;
 
 use glados_core::types::{
     BlockBodyContentKey, BlockHeaderContentKey, BlockReceiptsContentKey, ContentKey,
+    EpochAccumulatorContentKey,
 };
 
 use entity::contentkey;
@@ -148,6 +151,56 @@ async fn retrieve_new_blocks(
             error!(
                 block.number=?block_number_to_retrieve,
                 "failure retrieving block",
+            );
+        }
+    }
+}
+
+pub async fn import_pre_merge_accumulators(conn: DatabaseConnection, base_path: PathBuf) {
+    info!(base_path = %base_path.as_path().display(), "Starting import of pre-merge accumulators");
+
+    let mut entries = read_dir(base_path).await.unwrap();
+
+    while let Some(entry) = entries.next_entry().await.unwrap() {
+        let path = entry.path();
+
+        debug!(path = path.as_path().to_str(), "Processing path");
+
+        if path.is_file() {
+            if let Some(file_stem) = path.file_stem() {
+                if let Some(file_stem_str) = file_stem.to_str() {
+                    if file_stem_str.len() != 68 {
+                        error!(file_stem = file_stem.to_str(), "Filename wrong length");
+                        continue;
+                    }
+                    match &file_stem_str[..2] {
+                        "0x" => match hex::decode(&file_stem_str[2..]) {
+                            Ok(content_key_raw) => {
+                                let content_key = EpochAccumulatorContentKey {
+                                    hash: H256::from_slice(&content_key_raw[1..]),
+                                };
+                                debug!(content_key = %content_key, "Importing");
+                                let content_key_db =
+                                    contentkey::get_or_create(&content_key, &conn).await;
+                                info!(content_key = %content_key, database_id = content_key_db.id, "Imported");
+                            }
+                            Err(_) => info!(
+                                path = %path.as_path().display(),
+                                file_stem = file_stem_str,
+                                "Hex decoding error on file"
+                            ),
+                        },
+                        _ => info!(
+                            path = %path.as_path().display(),
+                            "File name is not 0x prefixed"
+                        ),
+                    }
+                }
+            }
+        } else {
+            info!(
+                path = %path.as_path().display(),
+                "Skipping non-file path"
             );
         }
     }
