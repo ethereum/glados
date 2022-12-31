@@ -1,16 +1,59 @@
+body {
+    overflow: hidden;
+}
+
+#trace {
+    border-top: thin solid black;
+}
+
 #graph {
-    border-radius: 5px;
-    height: calc(100vh - 325px);
+    border-radius: 10px;
     background-color: #FFFFFC;
-    overflow: visible;
+    overflow: hidden;
     z-index: 1000;
+    margin: 0px;
+    padding: 0px;
+}
+
+#node-table {
+    padding: 0px;
+    margin: 0px;
+    border-left: 1px solid black;
+    position: relative;
+    height: 100%;
+    overflow: auto;
+    display: block;
+}
+
+#node-table-inner {
+    margin: 0px;
 }
 
 #legend {
+    border: 1px solid black;
+    border-bottom-right-radius: 3px;
     float: left;
     border-top: none;
     border-left: none;
     display: flex;
+    padding-right: 3px;
+    padding-left: 10px;
+    position: relative;
+    user-select: none;
+}
+
+#trin-button {
+    border: 1px solid black;
+    border-bottom-left-radius: 3px;
+    border-bottom-right-radius: 3px;
+    display: flex;
+    float: left;
+
+    margin-left: 10px;
+    border-top: none;
+    padding-left: 3px;
+    padding-right: 3px;
+    user-select: none;
 }
 
 #legend text {
@@ -24,7 +67,7 @@
     border: 0.5px solid white;
     -moz-border-radius: 10px;
     border-radius: 10px;
-    margin-top: 4px;
+    margin-top: 6px;
     margin-left: 6px;
     margin-right: 3px;
 }

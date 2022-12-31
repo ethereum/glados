@@ -4,7 +4,7 @@ function createGraph(graphData) {
     return ForceGraph(graphData, {
         nodeId: d => d.id,
         nodeGroup: d => d.group,
-        nodeGroups: [0, 1, 2, 3, 4, 5, 6, 7, 9],
+        nodeGroups: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
         nodeTitle: d => generateNodeMetadata(d),
         linkStrokeWidth: l => Math.sqrt(l.value),
         width: $('#graph').width(),
@@ -14,20 +14,21 @@ function createGraph(graphData) {
 
 }
 
+const colors = {
+    blue: 0,
+    orange: 1,
+    red: 2,
+    other: 5,
+    green: 4,
+    brown: 8,
+    gray: 9,
+
+};
+
 // Converts json response to format expected by D3 ForceGraph:
 // { nodes: [{ id, group }], links: [{ source_id, target_id, group }] }
 // Group of nodes determines color, group of links determines thickness.
 function createGraphData(trace) {
-
-    const colors = {
-        blue: 0,
-        orange: 1,
-        red: 2,
-        green: 4,
-        brown: 9,
-        gray: 8,
-
-    };
 
     if (Object.keys(trace).length === 0) {
         return {
@@ -56,7 +57,6 @@ function createGraphData(trace) {
             return;
         }
         if (!nodesSeen.includes(enr)) {
-            console.log(trace.node_metadata[enr].distance_to_content);
             let group = 0;
             if ('origin' in trace && trace.origin == enr) {
                 group = colors.orange;
@@ -73,8 +73,24 @@ function createGraphData(trace) {
                     group = colors.blue;
                 }
             }
-            let scale = trace.node_metadata[enr].distance_to_content / 10000;
-            nodes.push({ id: enr, group: group, timestamp: timestamp, x: scale, y: timestamp });
+            let metadata = trace.node_metadata[enr];
+            let ip = metadata.ip;
+            let port = metadata.port;
+            let distance_to_content = metadata.distance_to_content;
+            let distance_log2 = metadata.distance_log2;
+            let node_id = metadata.node_id;
+            let client = ENR.ENR.decodeTxt(enr).client;
+            nodes.push({
+                id: enr,
+                group: group,
+                timestamp: timestamp,
+                ip: ip,
+                port: port,
+                distance: distance_to_content,
+                distance_log2,
+                node_id: node_id,
+                client: client
+            });
             nodesSeen.push(enr);
         }
     });
@@ -93,8 +109,23 @@ function createGraphData(trace) {
                 if (ENR.ENR.decodeTxt(enr_target).client === 'trin') {
                     trinNodesNoResponse++;
                 }
-                let scale = trace.node_metadata[enr_target].distance_to_content / 10000;
-                nodes.push({ id: enr_target, group: colors.gray, x: scale, y: node.timestamp_ms + 30 });
+                let metadata = trace.node_metadata[enr_target];
+                let ip = metadata.ip;
+                let port = metadata.port;
+                let distance_to_content = metadata.distance_to_content;
+                let distance_log2 = metadata.distance_log2;
+                let node_id = metadata.node_id;
+                let client = ENR.ENR.decodeTxt(enr_target).client;
+                nodes.push({
+                    id: enr_target,
+                    group: colors.gray,
+                    ip: ip,
+                    port: port,
+                    distance: distance_to_content,
+                    distance_log2,
+                    node_id: node_id,
+                    client: client
+                });
                 nodesSeen.push(enr_target)
             }
             let value = 1;
@@ -122,6 +153,8 @@ function createGraphData(trace) {
     return graph;
 
 }
+
+
 
 // Returns a list of nodes in the route.
 // Starts from the end (where the content was found) and finds the way back to the origin.
@@ -165,9 +198,8 @@ function computeSuccessfulRoute(trace) {
 // Generates a string to appear on hover-over of a node.
 function generateNodeMetadata(node) {
 
-    let enr = ENR.ENR.decodeTxt(node.id);
     let timestamp = node.timestamp;
-    let client = enr.client;
+    let client = node.client;
     let metadata = `${node.id}\n`;
     if (timestamp !== undefined) {
         metadata += `${timestamp} ms\n`;
@@ -179,3 +211,91 @@ function generateNodeMetadata(node) {
 
 }
 
+function generateTable(nodes) {
+
+    nodes.sort((a, b) => a.distance - b.distance);
+    nodes.forEach((node, index) => {
+
+        let node_id_string = node.node_id;
+        node_id_string = node_id_string.substr(0, 6)
+            + '...' + node_id_string.substr(node_id_string.length - 4, node_id_string.length);
+
+        let enr_shortened = node.id.substr(5, 4) + '...' + node.id.substr(node.id.length - 5, node.id.length);
+
+        let tr = document.createElement("tr");
+        tr.innerHTML = `<th scope="row">${index + 1}</th>
+            <td>${enr_shortened}</td>
+            <td>${node_id_string}</td>
+            <td>${node.distance_log2}</td>
+            <td>${node.ip}:${node.port}</td>
+            <td>${node.client === undefined ? "" : node.client}</td>`;
+
+        tr.addEventListener('mouseenter', () => {
+            tr.style.backgroundColor = 'lightgray';
+            highlightNode(node.id);
+        });
+        tr.addEventListener('mouseleave', () => {
+            tr.style.backgroundColor = 'white';
+            unHighlight();
+        });
+        tr.id = node.id.substring(4);
+
+        $('#enr-table').append(tr);
+    });
+
+}
+
+function highlightTableEntry(node) {
+    unHighlight();
+    let enr = node.target.__data__.id.substring(4);
+    let id_string = '#' + enr;
+    $(id_string).css('background-color', 'lightgray');
+}
+
+function highlightNode(node) {
+    d3.selectAll("g").selectAll("circle")
+        .filter(d => d.id === node)
+        .attr("r", function (node) {
+            return 10;
+        });
+}
+
+function highlightTrinNodes() {
+
+    d3.selectAll("g").selectAll("circle")
+        .attr("r", function (node) {
+            if (node.client === "trin") {
+                return 5;
+            } else {
+                return 0;
+            }
+
+        });
+
+}
+
+function highlightTrinNodes() {
+
+    d3.selectAll("g").selectAll("circle")
+        .attr("r", function (node) {
+            let enr = node.id;
+            let client = ENR.ENR.decodeTxt(enr).client;
+            if (client === "trin") {
+                return 5;
+            } else {
+                return 0;
+            }
+
+        });
+
+}
+
+function unHighlight() {
+
+    d3.selectAll("g").selectAll("circle")
+        .attr("r", function (node) {
+            return 5;
+        });
+    $('tr').css('background-color', 'white');
+
+}

@@ -7,57 +7,97 @@
 <script src="/static/js/trace/enr.js"></script>
 <script src="/static/js/trace/graph.js"></script>
 <script src="/static/js/trace/main.js"></script>
-<div class="row">
-    <h1>Audit #{{ audit.id }}</h1>
-    <div class="col">
-        <ul>
-            <li>Content Key: {{ content_key.as_hex() }}</li>
-            <li>Content ID: {{ content_id.as_hex() }}</li>
-            <li>Started: {{ audit.created_at }}</li>
-            <li>Result: {{ audit.result_string() }}</li>
-        </ul>
+
+
+<div id="top-of-audit-detail">
+    <div class="row">
+        <h1>Audit #{{ audit.id }}</h1>
+        <div class="col">
+            <ul>
+                <li>Content Key: {{ content_key.as_hex() }}</li>
+                <li>Content ID: {{ content_id.as_hex() }}</li>
+                <li>Started: {{ audit.created_at }}</li>
+                <li>Result: {{ audit.result_string() }}</li>
+            </ul>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col">
+            <text>Nodes Contacted:</text>
+            <text id="nodes-contacted"> </text>
+            </br>
+            <text>Response Rate:</text>
+            <text id="nodes-responded"></text>
+        </div>
+        <div class="col">
+            <text>Trin Nodes Contacted:</text>
+            <text id="trin-nodes-contacted"></text>
+            </br>
+            <text>Trin Nodes Response Rate:</text>
+            <text id="trin-nodes-responded"></text>
+        </div>
+        <div class="col">
+            <text>Non-Trin Nodes Contacted:</text>
+            <text id="non-trin-nodes-contacted"></text>
+            </br>
+            <text>Non-Trin Nodes Response Rate:</text>
+            <text id="non-trin-nodes-responded"></text>
+        </div>
     </div>
 </div>
-<div class="row">
-    <div class="col">
-        <p>Nodes Contacted:</p>
 
-        <p id="nodes-contacted"> </p>
-        <p>Response Rate:</p>
-        <p id="nodes-responded"></p>
+<div id="trace" class="row">
+    <div id="graph" class="w-66">
+        <div id="legend">
+            <div class="legend-dot" id="origin"></div>
+            <text>Origin</text>
+            <div class="legend-dot" id="responded"></div>
+            <text>Responded</text>
+            <div class="legend-dot" id="no-response"></div>
+            <text>No Response</text>
+            <div class="legend-dot" id="no-progress"></div>
+            <text>No Progress</text>
+            <div class="legend-dot" id="found-content"></div>
+            <text>Content Found</text>
+        </div>
+        <div id="trin-button">
+            <text>Trin</text>
+        </div>
     </div>
-    <div class="col">
-        <p>Trin Nodes Contacted:</p>
-        <p id="trin-nodes-contacted"></p>
-        <p>Trin Nodes Response Rate:</p>
-        <p id="trin-nodes-responded"></p>
+    <div id="node-table" class="w-33">
+        <table class="table-sm text-xsmall">
+            <thead>
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">ENR</th>
+                    <th scope="col">Node ID</th>
+                    <th scope="col">Distance from Content</th>
+                    <th scope="col">Address</th>
+                    <th scope="col">Client</th>
+                </tr>
+            </thead>
+            <tbody id="enr-table">
+
+            </tbody>
+        </table>
     </div>
-    <div class="col">
-        <p>Non-Trin Nodes Contacted:</p>
-        <p id="non-trin-nodes-contacted"></p>
-        <p>Non-Trin Nodes Response Rate:</p>
-        <p id="non-trin-nodes-responded"></p>
-    </div>
+
 </div>
 
-<div class="col" id="graph">
-    <div id="legend">
-        <div class="legend-dot" id="origin"></div>
-        <text>Origin</text>
-        <div class="legend-dot" id="responded"></div>
-        <text>Responded</text>
-        <div class="legend-dot" id="no-response"></div>
-        <text>No Response</text>
-        <div class="legend-dot" id="no-progress"></div>
-        <text>No Progress</text>
-        <div class="legend-dot" id="found-content"></div>
-        <text>Content Found</text>
-    </div>
-    <!-- <div id="graph"></div> -->
-    <script>
+<script>
+    $(document).ready(function () {
+
         let trace = JSON.parse("{{ audit.trace }}".replace(/&quot;/g, '"'));
+
+        let heightTaken = $('#top-of-audit-detail').height();
+        let heightAvailable = Math.floor($(window).height() - heightTaken);
+        $('#trace').css('height', `${heightAvailable}px`);
+
         let graphData = createGraphData(trace);
         let graphSvg = createGraph(graphData);
+        $('#graph').append(graphSvg);
+
+        generateTable(graphData.nodes);
 
         let metadata = graphData.metadata;
         let nodesResponded = metadata.nodesResponded / metadata.nodesContacted;
@@ -73,8 +113,14 @@
         $('#non-trin-nodes-contacted').text(nonTrinNodesContacted);
         $('#non-trin-nodes-responded').text(Math.round(nonTrinNodesResponseRate * 100) + '%');
 
-        $('#graph').append(graphSvg);
-    </script>
-</div>
+        $('#trin-button').on("mouseenter", function () {
+            $('#trin-button').css('background-color', 'lightgray');
+            highlightTrinNodes();
+        }).on('mouseleave', function () {
+            $('#trin-button').css('background-color', 'white');
+            unHighlight();
+        });
+    });
+</script>
 
 {% endblock %}

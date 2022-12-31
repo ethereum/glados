@@ -83,6 +83,8 @@ function ForceGraph({
         .data(nodes)
         .join("circle")
         .attr("r", nodeRadius)
+        .on("mouseenter", highlightTableEntry)
+        .on("mouseleave", unHighlight)
         .call(drag(simulation));
 
     if (W) link.attr("stroke-width", ({ index: i }) => W[i]);
@@ -96,15 +98,25 @@ function ForceGraph({
     }
 
     function ticked() {
+        const width = $('#graph').width();
+        const height = $('#graph').height();
         link
-            .attr("x1", d => d.source.x)
-            .attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.x)
-            .attr("y2", d => d.target.y);
+            .attr("x1", d => enforceBorder(d.source.x, -width / 2, width / 2))
+            .attr("y1", d => enforceBorder(d.source.y, -height / 2, (height / 2) - 24))
+            .attr("x2", d => enforceBorder(d.target.x, -width / 2, width / 2))
+            .attr("y2", d => enforceBorder(d.target.y, -height / 2, (height / 2) - 24));
 
         node
-            .attr("cx", d => d.x)
-            .attr("cy", d => d.y);
+            .attr("cx", d => enforceBorder(d.x, -width / 2, width / 2))
+            .attr("cy", d => enforceBorder(d.y, -height / 2, (height / 2) - 24));
+    }
+
+    function enforceBorder(position, lowerLimit, upperLimit) {
+        lowerLimit += 20;
+        upperLimit -= 20;
+        if (position < lowerLimit) position = lowerLimit;
+        if (position > upperLimit) position = upperLimit;
+        return position;
     }
 
     function drag(simulation) {
