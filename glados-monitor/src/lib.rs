@@ -1,14 +1,16 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use ethereum_types::H256;
+use ethportal_api::types::content_key::{
+    BlockBodyKey, BlockHeaderKey, BlockReceiptsKey, EpochAccumulatorKey, HistoryContentKey,
+    OverlayContentKey,
+};
 use sea_orm::DatabaseConnection;
 use tokio::{fs::read_dir, sync::mpsc, time::sleep};
 use tracing::{debug, error, info, warn};
-use web3::types::BlockId;
+use web3::types::{BlockId, H256};
 
 use entity::contentkey;
-use glados_core::types::{BlockHeaderContentKey, ContentKey, EpochAccumulatorContentKey};
 use migration::DbErr;
 
 pub mod cli;
@@ -98,6 +100,7 @@ async fn retrieve_new_blocks(
             );
             continue
         };
+
         let Some(block_hash) = blk.hash else {
             error!(head.number=?block_number_to_retrieve, "Fetched block has no hash (skipping)");
             continue
@@ -109,11 +112,16 @@ async fn retrieve_new_blocks(
             "received block",
         );
 
-        let hash = H256::from_slice(block_hash.as_bytes());
-
-        let header = BlockHeaderContentKey { hash };
-        let body = BlockHeaderContentKey { hash };
-        let receipts = BlockHeaderContentKey { hash };
+        // Create block header content key
+        let header = HistoryContentKey::BlockHeader(BlockHeaderKey {
+            block_hash: *block_hash.as_fixed_bytes(),
+        });
+        let body = HistoryContentKey::BlockBody(BlockBodyKey {
+            block_hash: *block_hash.as_fixed_bytes(),
+        });
+        let receipts = HistoryContentKey::BlockReceipts(BlockReceiptsKey {
+            block_hash: *block_hash.as_fixed_bytes(),
+        });
 
         store_content_key(&header, "block-header", &conn).await;
         store_content_key(&body, "block-body", &conn).await;
@@ -124,9 +132,17 @@ async fn retrieve_new_blocks(
 /// Accepts a ContentKey and attempts to store it.
 ///
 /// Errors are logged.
-async fn store_content_key<T: ContentKey>(key: &T, name: &str, conn: &DatabaseConnection) {
+async fn store_content_key<'b, T: OverlayContentKey>(
+    key: &'b T,
+    name: &str,
+    conn: &DatabaseConnection,
+) where
+    Vec<u8>: From<&'b T>,
+{
+    let encoded: Vec<u8> = key.into();
+
     debug!(
-        content.key=key.hex_encode(),
+        content.key=format!("{:x?}", encoded),
         content.id=?key.content_id(),
         content.kind=name,
         "Creating content database record",
@@ -134,7 +150,7 @@ async fn store_content_key<T: ContentKey>(key: &T, name: &str, conn: &DatabaseCo
 
     if let Err(e) = contentkey::get_or_create(key, conn).await {
         error!(
-            content.key=key.hex_encode(),
+            content.key=format!("{:x?}", encoded),
             content.id=?key.content_id(),
             content.kind=name,
             err=?e,
@@ -166,9 +182,10 @@ pub async fn import_pre_merge_accumulators(
                     match &file_stem_str[..2] {
                         "0x" => match hex::decode(&file_stem_str[2..]) {
                             Ok(content_key_raw) => {
-                                let content_key = EpochAccumulatorContentKey {
-                                    hash: H256::from_slice(&content_key_raw[1..]),
-                                };
+                                let content_key =
+                                    HistoryContentKey::EpochAccumulator(EpochAccumulatorKey {
+                                        epoch_hash: H256::from_slice(&content_key_raw[1..]),
+                                    });
                                 debug!(content_key = %content_key, "Importing");
                                 let content_key_db =
                                     contentkey::get_or_create(&content_key, &conn).await?;

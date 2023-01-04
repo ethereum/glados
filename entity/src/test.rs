@@ -2,13 +2,13 @@
 #[cfg(test)]
 use chrono::prelude::*;
 use ethereum_types::H256;
+use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey};
 use sea_orm::entity::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Database, DbConn, DbErr, EntityTrait, NotSet, PaginatorTrait,
     QueryFilter, Set,
 };
 
-use glados_core::types::BlockHeaderContentKey;
 use migration::{Migrator, MigratorTrait};
 
 use crate::{contentaudit, contentid, contentkey, node};
@@ -172,13 +172,13 @@ async fn test_contentid_get_or_create() -> Result<(), DbErr> {
 async fn test_contentkey_get_or_create() -> Result<(), DbErr> {
     let conn = setup_database().await?;
 
-    let block_header_hash = H256::from_slice(
+    let block_hash = H256::from_slice(
         &hex::decode("d1c390624d3bd4e409a61a858e5dcc5517729a9170d014a6c96530d64dd8621d").unwrap(),
     );
 
-    let header_content_key = BlockHeaderContentKey {
-        hash: block_header_hash,
-    };
+    let header_content_key = HistoryContentKey::BlockHeader(BlockHeaderKey {
+        block_hash: block_hash.to_fixed_bytes(),
+    });
 
     // Ensure our database is empty
     assert_eq!(contentid::Entity::find().count(&conn).await?, 0);
