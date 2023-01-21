@@ -37,7 +37,10 @@ pub enum Relation {
     ContentAudit,
 }
 
-pub async fn get_or_create(content_key_raw: &impl ContentKey, conn: &DatabaseConnection) -> Result<Model, DbErr> {
+pub async fn get_or_create(
+    content_key_raw: &impl ContentKey,
+    conn: &DatabaseConnection,
+) -> Result<Model, DbErr> {
     // First try to lookup an existing entry.
     let content_key = Entity::find()
         .filter(Column::ContentKey.eq(content_key_raw.encode()))
@@ -46,7 +49,7 @@ pub async fn get_or_create(content_key_raw: &impl ContentKey, conn: &DatabaseCon
 
     if let Some(content_key) = content_key {
         // If there is an existing record, return it
-        return Ok(content_key)
+        return Ok(content_key);
     }
     let content_id_raw = content_key_raw.content_id();
     let content_id = contentid::get_or_create(&content_id_raw, conn).await;
@@ -57,9 +60,7 @@ pub async fn get_or_create(content_key_raw: &impl ContentKey, conn: &DatabaseCon
         content_key: Set(content_key_raw.encode()),
         created_at: Set(chrono::offset::Utc::now()),
     };
-    Ok(content_key
-        .insert(conn)
-        .await?)
+    content_key.insert(conn).await
 }
 
 pub async fn get(content_key: &impl ContentKey, conn: &DatabaseConnection) -> Option<Model> {

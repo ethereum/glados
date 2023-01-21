@@ -14,10 +14,7 @@ use web3::types::BlockId;
 
 use ethereum_types::H256;
 
-use glados_core::types::{
-    BlockBodyContentKey, BlockHeaderContentKey, BlockReceiptsContentKey, ContentKey,
-    EpochAccumulatorContentKey,
-};
+use glados_core::types::{BlockHeaderContentKey, ContentKey, EpochAccumulatorContentKey};
 
 use entity::contentkey;
 
@@ -68,7 +65,7 @@ async fn follow_chain_head(
 
         if candidate_block_number <= block_number {
             debug!(head.number=?block_number, "head unchanged");
-            continue
+            continue;
         }
         info!(
             old_head.number=?block_number,
@@ -142,13 +139,20 @@ async fn store_content_key<T: ContentKey>(key: &T, name: &str, conn: &DatabaseCo
     );
 
     if let Err(e) = contentkey::get_or_create(key, conn).await {
-        error!("Failed to record {} key in db (key = {}, id = {}) (error: {})",
-        name, key.hex_encode(), key.content_id(), e);
+        error!(
+            "Failed to record {} key in db (key = {}, id = {}) (error: {})",
+            name,
+            key.hex_encode(),
+            key.content_id(),
+            e
+        );
     }
 }
 
-
-pub async fn import_pre_merge_accumulators(conn: DatabaseConnection, base_path: PathBuf) -> Result<(), DbErr> {
+pub async fn import_pre_merge_accumulators(
+    conn: DatabaseConnection,
+    base_path: PathBuf,
+) -> Result<(), DbErr> {
     info!(base_path = %base_path.as_path().display(), "Starting import of pre-merge accumulators");
 
     let mut entries = read_dir(base_path).await.unwrap();
@@ -195,7 +199,6 @@ pub async fn import_pre_merge_accumulators(conn: DatabaseConnection, base_path: 
                 "Skipping non-file path"
             );
         }
-
     }
     Ok(())
 }
