@@ -86,15 +86,19 @@ async fn retrieve_new_blocks(
     w3: web3::Web3<web3::transports::Http>,
     mut rx: mpsc::Receiver<web3::types::U64>,
     conn: DatabaseConnection,
-) -> Result<(), DbErr> {
-    while let Some(block_number_to_retrieve) = rx.recv().await {
+) {
+    loop {
+        let Some(block_number_to_retrieve) = rx.recv().await else {continue};
         debug!(block.number=?block_number_to_retrieve, "fetching block");
 
-        let block = w3
+        let Ok(block) = w3
             .eth()
             .block(BlockId::from(block_number_to_retrieve))
             .await
-            .expect("failed to retrieve block");
+        else {
+            warn!("Failed to retrieve {block_number_to_retrieve}");
+            continue
+        };
 
         // If we got a block back
         if let Some(blk) = block {
@@ -118,7 +122,9 @@ async fn retrieve_new_blocks(
                     "Creating content database record",
                 );
 
-                contentkey::get_or_create(&raw_header_content_key, &conn).await?;
+                if let Err(e) = contentkey::get_or_create(&raw_header_content_key, &conn).await {
+                    error!("Failed to get or create raw_header_content_key {raw_header_content_key} (error: {e}")
+                }
 
                 // Create block body content key
                 let raw_body_content_key = BlockBodyContentKey {
@@ -132,7 +138,9 @@ async fn retrieve_new_blocks(
                     "Creating content database record",
                 );
 
-                contentkey::get_or_create(&raw_body_content_key, &conn).await?;
+                if let Err(e) = contentkey::get_or_create(&raw_body_content_key, &conn).await {
+                    error!("Failed to get or create raw_body_content_key {raw_body_content_key} (error: {e}")
+                }
 
                 // Create block receipts content key
                 let raw_receipts_content_key = BlockReceiptsContentKey {
@@ -146,7 +154,9 @@ async fn retrieve_new_blocks(
                     "Creating content database record",
                 );
 
-                contentkey::get_or_create(&raw_receipts_content_key, &conn).await?;
+                if let Err(e) = contentkey::get_or_create(&raw_receipts_content_key, &conn).await {
+                    error!("Failed to get or create raw_receipts_content_key {raw_receipts_content_key} (error: {e}")
+                }
             }
         } else {
             error!(
@@ -155,7 +165,6 @@ async fn retrieve_new_blocks(
             );
         }
     }
-    Ok(())
 }
 
 pub async fn import_pre_merge_accumulators(conn: DatabaseConnection, base_path: PathBuf) -> Result<(), DbErr> {
