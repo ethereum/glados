@@ -100,69 +100,70 @@ async fn retrieve_new_blocks(
             continue
         };
 
-        // If we got a block back
-        if let Some(blk) = block {
-            // And if that block has a hash
-            if let Some(block_hash) = blk.hash {
-                info!(
-                    block.hash=?block_hash,
-                    block.number=?block_number_to_retrieve,
-                    "received block",
-                );
-
-                // Create block header content key
-                let raw_header_content_key = BlockHeaderContentKey {
-                    hash: H256::from_slice(block_hash.as_bytes()),
-                };
-
-                debug!(
-                    content.key=raw_header_content_key.hex_encode(),
-                    content.id=?raw_header_content_key.content_id(),
-                    content.kind="block-header",
-                    "Creating content database record",
-                );
-
-                if let Err(e) = contentkey::get_or_create(&raw_header_content_key, &conn).await {
-                    error!("Failed to get or create raw_header_content_key {raw_header_content_key} (error: {e}")
-                }
-
-                // Create block body content key
-                let raw_body_content_key = BlockBodyContentKey {
-                    hash: H256::from_slice(block_hash.as_bytes()),
-                };
-
-                debug!(
-                    content.key=raw_body_content_key.hex_encode(),
-                    content.id=?raw_body_content_key.content_id(),
-                    content.kind="block-body",
-                    "Creating content database record",
-                );
-
-                if let Err(e) = contentkey::get_or_create(&raw_body_content_key, &conn).await {
-                    error!("Failed to get or create raw_body_content_key {raw_body_content_key} (error: {e}")
-                }
-
-                // Create block receipts content key
-                let raw_receipts_content_key = BlockReceiptsContentKey {
-                    hash: H256::from_slice(block_hash.as_bytes()),
-                };
-
-                debug!(
-                    content.key=raw_receipts_content_key.hex_encode(),
-                    content.id=?raw_receipts_content_key.content_id(),
-                    content.kind="block-receipts",
-                    "Creating content database record",
-                );
-
-                if let Err(e) = contentkey::get_or_create(&raw_receipts_content_key, &conn).await {
-                    error!("Failed to get or create raw_receipts_content_key {raw_receipts_content_key} (error: {e}")
-                }
-            }
-        } else {
+        let Some(blk) = block else {
             error!(
                 block.number=?block_number_to_retrieve,
                 "failure retrieving block",
             );
+            continue
+        };
+        let Some(block_hash) = blk.hash else {
+            error!("Block {:?} has no hash (skipping)", blk);
+            continue
+        };
+        
+        info!(
+            block.hash=?block_hash,
+            block.number=?block_number_to_retrieve,
+            "received block",
+        );
+
+        // Create block header content key
+        let raw_header_content_key = BlockHeaderContentKey {
+            hash: H256::from_slice(block_hash.as_bytes()),
+        };
+
+        debug!(
+            content.key=raw_header_content_key.hex_encode(),
+            content.id=?raw_header_content_key.content_id(),
+            content.kind="block-header",
+            "Creating content database record",
+        );
+
+        if let Err(e) = contentkey::get_or_create(&raw_header_content_key, &conn).await {
+            error!("Failed to get or create raw_header_content_key {raw_header_content_key} (error: {e}")
+        }
+
+        // Create block body content key
+        let raw_body_content_key = BlockBodyContentKey {
+            hash: H256::from_slice(block_hash.as_bytes()),
+        };
+
+        debug!(
+            content.key=raw_body_content_key.hex_encode(),
+            content.id=?raw_body_content_key.content_id(),
+            content.kind="block-body",
+            "Creating content database record",
+        );
+
+        if let Err(e) = contentkey::get_or_create(&raw_body_content_key, &conn).await {
+            error!("Failed to get or create raw_body_content_key {raw_body_content_key} (error: {e}")
+        }
+
+        // Create block receipts content key
+        let raw_receipts_content_key = BlockReceiptsContentKey {
+            hash: H256::from_slice(block_hash.as_bytes()),
+        };
+
+        debug!(
+            content.key=raw_receipts_content_key.hex_encode(),
+            content.id=?raw_receipts_content_key.content_id(),
+            content.kind="block-receipts",
+            "Creating content database record",
+        );
+
+        if let Err(e) = contentkey::get_or_create(&raw_receipts_content_key, &conn).await {
+            error!("Failed to get or create raw_receipts_content_key {raw_receipts_content_key} (error: {e}")
         }
     }
 }
