@@ -75,9 +75,9 @@ async fn follow_chain_head(
             new_head.number=?candidate_block_number,
             "new head",
         );
-        block_number = candidate_block_number;
-        if let Err(e) = tx.send(block_number).await {
-            warn!("Failed to send new block number {e}")
+        match tx.send(candidate_block_number).await {
+            Ok(_) => block_number = candidate_block_number,
+            Err(e) => warn!("Failed to send new block number {block_number} (error: {e})"),
         };
     }
 }
