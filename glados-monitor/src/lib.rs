@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use migration::DbErr;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use sea_orm::DatabaseConnection;
 
@@ -64,21 +64,21 @@ async fn follow_chain_head(
 
         debug!(head.number=?block_number, "checking for new block");
 
-        let candidate_block_number = w3.eth().block_number().await.unwrap();
+        let Ok(candidate_block_number) = w3.eth().block_number().await else {continue};
 
-        if candidate_block_number > block_number {
-            info!(
-                old_head.number=?block_number,
-                new_head.number=?candidate_block_number,
-                "new head",
-            );
-            block_number = candidate_block_number;
-            tx.send(block_number)
-                .await
-                .expect("Failed to send new block number");
-        } else {
+        if candidate_block_number <= block_number {
             debug!(head.number=?block_number, "head unchanged");
+            continue
         }
+        info!(
+            old_head.number=?block_number,
+            new_head.number=?candidate_block_number,
+            "new head",
+        );
+        block_number = candidate_block_number;
+        if let Err(e) = tx.send(block_number).await {
+            warn!("Failed to send new block number {e}")
+        };
     }
 }
 
