@@ -111,62 +111,42 @@ async fn retrieve_new_blocks(
             error!("Block {:?} has no hash (skipping)", blk);
             continue
         };
-        
+
         info!(
             block.hash=?block_hash,
             block.number=?block_number_to_retrieve,
             "received block",
         );
 
-        // Create block header content key
-        let raw_header_content_key = BlockHeaderContentKey {
-            hash: H256::from_slice(block_hash.as_bytes()),
-        };
+        let hash = H256::from_slice(block_hash.as_bytes());
 
-        debug!(
-            content.key=raw_header_content_key.hex_encode(),
-            content.id=?raw_header_content_key.content_id(),
-            content.kind="block-header",
-            "Creating content database record",
-        );
+        let header = BlockHeaderContentKey { hash };
+        let body = BlockHeaderContentKey { hash };
+        let receipts = BlockHeaderContentKey { hash };
 
-        if let Err(e) = contentkey::get_or_create(&raw_header_content_key, &conn).await {
-            error!("Failed to get or create raw_header_content_key {raw_header_content_key} (error: {e}")
-        }
-
-        // Create block body content key
-        let raw_body_content_key = BlockBodyContentKey {
-            hash: H256::from_slice(block_hash.as_bytes()),
-        };
-
-        debug!(
-            content.key=raw_body_content_key.hex_encode(),
-            content.id=?raw_body_content_key.content_id(),
-            content.kind="block-body",
-            "Creating content database record",
-        );
-
-        if let Err(e) = contentkey::get_or_create(&raw_body_content_key, &conn).await {
-            error!("Failed to get or create raw_body_content_key {raw_body_content_key} (error: {e}")
-        }
-
-        // Create block receipts content key
-        let raw_receipts_content_key = BlockReceiptsContentKey {
-            hash: H256::from_slice(block_hash.as_bytes()),
-        };
-
-        debug!(
-            content.key=raw_receipts_content_key.hex_encode(),
-            content.id=?raw_receipts_content_key.content_id(),
-            content.kind="block-receipts",
-            "Creating content database record",
-        );
-
-        if let Err(e) = contentkey::get_or_create(&raw_receipts_content_key, &conn).await {
-            error!("Failed to get or create raw_receipts_content_key {raw_receipts_content_key} (error: {e}")
-        }
+        store_content_key(&header, "block-header", &conn).await;
+        store_content_key(&body, "block-body", &conn).await;
+        store_content_key(&receipts, "block-receipts", &conn).await;
     }
 }
+
+/// Accepts a ContentKey and attempts to store it.
+///
+/// Errors are logged.
+async fn store_content_key<T: ContentKey>(key: &T, name: &str, conn: &DatabaseConnection) {
+    debug!(
+        content.key=key.hex_encode(),
+        content.id=?key.content_id(),
+        content.kind=name,
+        "Creating content database record",
+    );
+
+    if let Err(e) = contentkey::get_or_create(key, conn).await {
+        error!("Failed to record {} key in db (key = {}, id = {}) (error: {})",
+        name, key.hex_encode(), key.content_id(), e);
+    }
+}
+
 
 pub async fn import_pre_merge_accumulators(conn: DatabaseConnection, base_path: PathBuf) -> Result<(), DbErr> {
     info!(base_path = %base_path.as_path().display(), "Starting import of pre-merge accumulators");
