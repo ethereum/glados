@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use migration::DbErr;
 use tracing::{debug, error, info};
 
 use sea_orm::DatabaseConnection;
@@ -85,7 +86,7 @@ async fn retrieve_new_blocks(
     w3: web3::Web3<web3::transports::Http>,
     mut rx: mpsc::Receiver<web3::types::U64>,
     conn: DatabaseConnection,
-) {
+) -> Result<(), DbErr> {
     while let Some(block_number_to_retrieve) = rx.recv().await {
         debug!(block.number=?block_number_to_retrieve, "fetching block");
 
@@ -117,7 +118,7 @@ async fn retrieve_new_blocks(
                     "Creating content database record",
                 );
 
-                contentkey::get_or_create(&raw_header_content_key, &conn).await;
+                contentkey::get_or_create(&raw_header_content_key, &conn).await?;
 
                 // Create block body content key
                 let raw_body_content_key = BlockBodyContentKey {
@@ -131,7 +132,7 @@ async fn retrieve_new_blocks(
                     "Creating content database record",
                 );
 
-                contentkey::get_or_create(&raw_body_content_key, &conn).await;
+                contentkey::get_or_create(&raw_body_content_key, &conn).await?;
 
                 // Create block receipts content key
                 let raw_receipts_content_key = BlockReceiptsContentKey {
@@ -145,7 +146,7 @@ async fn retrieve_new_blocks(
                     "Creating content database record",
                 );
 
-                contentkey::get_or_create(&raw_receipts_content_key, &conn).await;
+                contentkey::get_or_create(&raw_receipts_content_key, &conn).await?;
             }
         } else {
             error!(
@@ -154,9 +155,10 @@ async fn retrieve_new_blocks(
             );
         }
     }
+    Ok(())
 }
 
-pub async fn import_pre_merge_accumulators(conn: DatabaseConnection, base_path: PathBuf) {
+pub async fn import_pre_merge_accumulators(conn: DatabaseConnection, base_path: PathBuf) -> Result<(), DbErr> {
     info!(base_path = %base_path.as_path().display(), "Starting import of pre-merge accumulators");
 
     let mut entries = read_dir(base_path).await.unwrap();
@@ -181,7 +183,7 @@ pub async fn import_pre_merge_accumulators(conn: DatabaseConnection, base_path: 
                                 };
                                 debug!(content_key = %content_key, "Importing");
                                 let content_key_db =
-                                    contentkey::get_or_create(&content_key, &conn).await;
+                                    contentkey::get_or_create(&content_key, &conn).await?;
                                 info!(content_key = %content_key, database_id = content_key_db.id, "Imported");
                             }
                             Err(_) => info!(
@@ -203,5 +205,7 @@ pub async fn import_pre_merge_accumulators(conn: DatabaseConnection, base_path: 
                 "Skipping non-file path"
             );
         }
+
     }
+    Ok(())
 }

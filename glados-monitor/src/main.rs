@@ -1,3 +1,4 @@
+use migration::DbErr;
 use tokio::signal;
 use tokio::task;
 
@@ -15,7 +16,7 @@ use glados_monitor::{
 };
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), DbErr> {
     // Setup logging
     env_logger::init();
 
@@ -70,11 +71,14 @@ async fn main() {
             println!("Command completed, exiting");
         }
     }
+    Ok(())
 }
 
-async fn do_nothing() {}
+async fn do_nothing() -> Result<(), DbErr> {
+    Ok(())
+}
 
-async fn follow_head_command(conn: DatabaseConnection, provider_url: String) {
+async fn follow_head_command(conn: DatabaseConnection, provider_url: String) -> Result<(), DbErr> {
     //
     // Web3 Connection
     //
@@ -90,4 +94,5 @@ async fn follow_head_command(conn: DatabaseConnection, provider_url: String) {
     );
 
     run_glados_monitor(conn, w3).await;
+    Ok(())
 }
