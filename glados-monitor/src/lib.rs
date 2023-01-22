@@ -72,9 +72,10 @@ async fn follow_chain_head(
             new_head.number=?candidate_block_number,
             "new head",
         );
-        match tx.send(candidate_block_number).await {
-            Ok(_) => block_number = candidate_block_number,
-            Err(e) => warn!("Failed to send new block number {block_number} (error: {e})"),
+        if let Err(e) = tx.send(candidate_block_number).await {
+            warn!(head.number=?block_number, err=?e , "Failed to send new block number")
+        } else {
+            block_number = candidate_block_number
         };
     }
 }
@@ -93,7 +94,7 @@ async fn retrieve_new_blocks(
             .block(BlockId::from(block_number_to_retrieve))
             .await
         else {
-            warn!("Failed to retrieve {block_number_to_retrieve}");
+            warn!(head.number=?block_number_to_retrieve, "Failed to retrieve block");
             continue
         };
 
@@ -105,7 +106,7 @@ async fn retrieve_new_blocks(
             continue
         };
         let Some(block_hash) = blk.hash else {
-            error!("Block {:?} has no hash (skipping)", blk);
+            error!(head.number=?block_number_to_retrieve, "Fetched block has no hash (skipping)");
             continue
         };
 
