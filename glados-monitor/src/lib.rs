@@ -141,11 +141,11 @@ async fn store_content_key<T: ContentKey>(key: &T, name: &str, conn: &DatabaseCo
 
     if let Err(e) = contentkey::get_or_create(key, conn).await {
         error!(
-            "Failed to record {} key in db (key = {}, id = {}) (error: {})",
-            name,
-            key.hex_encode(),
-            key.content_id(),
-            e
+            content.key=key.hex_encode(),
+            content.id=?key.content_id(),
+            content.kind=name,
+            err=?e,
+            "Failed to create database record",
         );
     }
 }
