@@ -1,7 +1,7 @@
 use tokio::signal;
 use tokio::task;
 
-use sea_orm::{Database, DatabaseConnection};
+use sea_orm::{Database, DatabaseConnection, ConnectOptions};
 
 use tracing::{debug, info};
 
@@ -32,7 +32,10 @@ async fn main() {
     //
     debug!(DATABASE_URL = &cli.database_url, "Connecting to database");
 
-    let conn = Database::connect(&cli.database_url)
+    let mut opt = ConnectOptions::new(cli.database_url.to_owned());
+    opt.sqlx_logging(false);
+
+    let conn = Database::connect(opt)
         .await
         .expect("Database connection failed");
 
