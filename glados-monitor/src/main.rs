@@ -46,7 +46,7 @@ async fn main() -> Result<(), DbErr> {
 
     if !db_exists {
         info!("creating new database tables");
-        Migrator::up(&conn, None).await.expect("coult not create new database tables");
+        Migrator::up(&conn, None).await.expect("could not create new database tables");
     }
 
     if cli.migrate {
