@@ -48,7 +48,7 @@ In most cases, you will want to set the environment variable `RUST_LOG` to enabl
 
 The `glados-monitor` crate can be run as follows to populate a local database with content ids.
 
-The CLI needs a DATABASE_URL to know what relational database to connect to, as well as an HTTP_PROVIDER_URI to connect to an Ethereum JSON-RPC provider (not a Portal node).
+The CLI needs a DATABASE_URL to know what relational database to connect to, as well as an HTTP_PROVIDER_URI to connect to an Ethereum JSON-RPC provider (not a portal node).
 
 ```
 $ cargo run -p glados-monitor -- --database-url <DATABASE_URL> follow-head --provider-url <HTTP_PROVIDER_URI>
