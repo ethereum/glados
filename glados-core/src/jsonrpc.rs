@@ -170,7 +170,7 @@ where
         let resp = self.make_request(req);
 
         match resp {
-            Err(err) => format!("error: {}", err),
+            Err(err) => format!("error: {err}"),
             Ok(value) => value.result.to_string(),
         }
     }

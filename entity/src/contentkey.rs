@@ -37,32 +37,30 @@ pub enum Relation {
     ContentAudit,
 }
 
-pub async fn get_or_create(content_key_raw: &impl ContentKey, conn: &DatabaseConnection) -> Model {
+pub async fn get_or_create(
+    content_key_raw: &impl ContentKey,
+    conn: &DatabaseConnection,
+) -> Result<Model, DbErr> {
     // First try to lookup an existing entry.
     let content_key = Entity::find()
         .filter(Column::ContentKey.eq(content_key_raw.encode()))
         .one(conn)
-        .await
-        .unwrap(); // TODO: is there a better option than `unwrap` here?
+        .await?;
 
     if let Some(content_key) = content_key {
         // If there is an existing record, return it
-        content_key
-    } else {
-        let content_id_raw = content_key_raw.content_id();
-        let content_id = contentid::get_or_create(&content_id_raw, conn).await;
-        // If no record exists, create one and return it
-        let content_key = ActiveModel {
-            id: NotSet,
-            content_id: Set(content_id.id),
-            content_key: Set(content_key_raw.encode()),
-            created_at: Set(chrono::offset::Utc::now()),
-        };
-        content_key
-            .insert(conn)
-            .await
-            .expect("Error inserting new content key")
+        return Ok(content_key);
     }
+    let content_id_raw = content_key_raw.content_id();
+    let content_id = contentid::get_or_create(&content_id_raw, conn).await;
+    // If no record exists, create one and return it
+    let content_key = ActiveModel {
+        id: NotSet,
+        content_id: Set(content_id.id),
+        content_key: Set(content_key_raw.encode()),
+        created_at: Set(chrono::offset::Utc::now()),
+    };
+    content_key.insert(conn).await
 }
 
 pub async fn get(content_key: &impl ContentKey, conn: &DatabaseConnection) -> Option<Model> {

@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use tracing::{debug, error, info};
+use migration::DbErr;
+use tracing::{debug, error, info, warn};
 
 use sea_orm::DatabaseConnection;
 
@@ -13,10 +14,7 @@ use web3::types::BlockId;
 
 use ethereum_types::H256;
 
-use glados_core::types::{
-    BlockBodyContentKey, BlockHeaderContentKey, BlockReceiptsContentKey, ContentKey,
-    EpochAccumulatorContentKey,
-};
+use glados_core::types::{BlockHeaderContentKey, ContentKey, EpochAccumulatorContentKey};
 
 use entity::contentkey;
 
@@ -63,21 +61,22 @@ async fn follow_chain_head(
 
         debug!(head.number=?block_number, "checking for new block");
 
-        let candidate_block_number = w3.eth().block_number().await.unwrap();
+        let Ok(candidate_block_number) = w3.eth().block_number().await else {continue};
 
-        if candidate_block_number > block_number {
-            info!(
-                old_head.number=?block_number,
-                new_head.number=?candidate_block_number,
-                "new head",
-            );
-            block_number = candidate_block_number;
-            tx.send(block_number)
-                .await
-                .expect("Failed to send new block number");
-        } else {
+        if candidate_block_number <= block_number {
             debug!(head.number=?block_number, "head unchanged");
+            continue;
         }
+        info!(
+            old_head.number=?block_number,
+            new_head.number=?candidate_block_number,
+            "new head",
+        );
+        if let Err(e) = tx.send(candidate_block_number).await {
+            warn!(head.number=?block_number, err=?e , "Failed to send new block number")
+        } else {
+            block_number = candidate_block_number
+        };
     }
 }
 
@@ -86,77 +85,75 @@ async fn retrieve_new_blocks(
     mut rx: mpsc::Receiver<web3::types::U64>,
     conn: DatabaseConnection,
 ) {
-    while let Some(block_number_to_retrieve) = rx.recv().await {
+    loop {
+        let Some(block_number_to_retrieve) = rx.recv().await else {continue};
         debug!(block.number=?block_number_to_retrieve, "fetching block");
 
-        let block = w3
+        let Ok(block) = w3
             .eth()
             .block(BlockId::from(block_number_to_retrieve))
             .await
-            .expect("failed to retrieve block");
+        else {
+            warn!(head.number=?block_number_to_retrieve, "Failed to retrieve block");
+            continue
+        };
 
-        // If we got a block back
-        if let Some(blk) = block {
-            // And if that block has a hash
-            if let Some(block_hash) = blk.hash {
-                info!(
-                    block.hash=?block_hash,
-                    block.number=?block_number_to_retrieve,
-                    "received block",
-                );
-
-                // Create block header content key
-                let raw_header_content_key = BlockHeaderContentKey {
-                    hash: H256::from_slice(block_hash.as_bytes()),
-                };
-
-                debug!(
-                    content.key=raw_header_content_key.hex_encode(),
-                    content.id=?raw_header_content_key.content_id(),
-                    content.kind="block-header",
-                    "Creating content database record",
-                );
-
-                contentkey::get_or_create(&raw_header_content_key, &conn).await;
-
-                // Create block body content key
-                let raw_body_content_key = BlockBodyContentKey {
-                    hash: H256::from_slice(block_hash.as_bytes()),
-                };
-
-                debug!(
-                    content.key=raw_body_content_key.hex_encode(),
-                    content.id=?raw_body_content_key.content_id(),
-                    content.kind="block-body",
-                    "Creating content database record",
-                );
-
-                contentkey::get_or_create(&raw_body_content_key, &conn).await;
-
-                // Create block receipts content key
-                let raw_receipts_content_key = BlockReceiptsContentKey {
-                    hash: H256::from_slice(block_hash.as_bytes()),
-                };
-
-                debug!(
-                    content.key=raw_receipts_content_key.hex_encode(),
-                    content.id=?raw_receipts_content_key.content_id(),
-                    content.kind="block-receipts",
-                    "Creating content database record",
-                );
-
-                contentkey::get_or_create(&raw_receipts_content_key, &conn).await;
-            }
-        } else {
+        let Some(blk) = block else {
             error!(
                 block.number=?block_number_to_retrieve,
                 "failure retrieving block",
             );
-        }
+            continue
+        };
+        let Some(block_hash) = blk.hash else {
+            error!(head.number=?block_number_to_retrieve, "Fetched block has no hash (skipping)");
+            continue
+        };
+
+        info!(
+            block.hash=?block_hash,
+            block.number=?block_number_to_retrieve,
+            "received block",
+        );
+
+        let hash = H256::from_slice(block_hash.as_bytes());
+
+        let header = BlockHeaderContentKey { hash };
+        let body = BlockHeaderContentKey { hash };
+        let receipts = BlockHeaderContentKey { hash };
+
+        store_content_key(&header, "block-header", &conn).await;
+        store_content_key(&body, "block-body", &conn).await;
+        store_content_key(&receipts, "block-receipts", &conn).await;
     }
 }
 
-pub async fn import_pre_merge_accumulators(conn: DatabaseConnection, base_path: PathBuf) {
+/// Accepts a ContentKey and attempts to store it.
+///
+/// Errors are logged.
+async fn store_content_key<T: ContentKey>(key: &T, name: &str, conn: &DatabaseConnection) {
+    debug!(
+        content.key=key.hex_encode(),
+        content.id=?key.content_id(),
+        content.kind=name,
+        "Creating content database record",
+    );
+
+    if let Err(e) = contentkey::get_or_create(key, conn).await {
+        error!(
+            content.key=key.hex_encode(),
+            content.id=?key.content_id(),
+            content.kind=name,
+            err=?e,
+            "Failed to create database record",
+        );
+    }
+}
+
+pub async fn import_pre_merge_accumulators(
+    conn: DatabaseConnection,
+    base_path: PathBuf,
+) -> Result<(), DbErr> {
     info!(base_path = %base_path.as_path().display(), "Starting import of pre-merge accumulators");
 
     let mut entries = read_dir(base_path).await.unwrap();
@@ -181,7 +178,7 @@ pub async fn import_pre_merge_accumulators(conn: DatabaseConnection, base_path: 
                                 };
                                 debug!(content_key = %content_key, "Importing");
                                 let content_key_db =
-                                    contentkey::get_or_create(&content_key, &conn).await;
+                                    contentkey::get_or_create(&content_key, &conn).await?;
                                 info!(content_key = %content_key, database_id = content_key_db.id, "Imported");
                             }
                             Err(_) => info!(
@@ -204,4 +201,5 @@ pub async fn import_pre_merge_accumulators(conn: DatabaseConnection, base_path: 
             );
         }
     }
+    Ok(())
 }

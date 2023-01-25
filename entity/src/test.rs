@@ -190,13 +190,17 @@ async fn test_contentkey_get_or_create() -> Result<(), DbErr> {
     assert_eq!(contentid::Entity::find().count(&conn).await?, 0);
     assert_eq!(contentkey::Entity::find().count(&conn).await?, 0);
 
-    let content_key_a = contentkey::get_or_create(&header_content_key, &conn).await;
+    let content_key_a = contentkey::get_or_create(&header_content_key, &conn)
+        .await
+        .unwrap();
 
     // Ensure our database now has entries for both
     assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
     assert_eq!(contentkey::Entity::find().count(&conn).await?, 1);
 
-    let content_key_b = contentkey::get_or_create(&header_content_key, &conn).await;
+    let content_key_b = contentkey::get_or_create(&header_content_key, &conn)
+        .await
+        .unwrap();
 
     // Ensure the existing entries were found
     assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
