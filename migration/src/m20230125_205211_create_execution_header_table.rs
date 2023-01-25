@@ -45,7 +45,7 @@ impl MigrationTrait for Migration {
                         Index::create()
                             .unique()
                             .name("idx-execution_header-content_id")
-                            .col(ExecutionHeader::ContentId),
+                            .col(ExecutionHeader::ContentidId),
                     )
                     .index(
                         Index::create()
@@ -63,20 +63,30 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .drop_table(Table::drop().table(ExecutionHeader::Table).to_owned())
             .await?;
+
+        Ok(())
     }
 }
 
 /// Learn more at https://docs.rs/sea-query#iden
 #[derive(Iden)]
-enum Post {
+enum ContentId {
     Table,
     Id,
-    Title,
-    Text,
+}
+
+#[derive(Iden)]
+enum ExecutionHeader {
+    Table,
+    Id,
+    ContentidId,
+    BlockNumber,
+    BlockHash,
 }
