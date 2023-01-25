@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{Error, Result};
 use ethportal_api::types::content_key::{
     BlockBodyKey, BlockHeaderKey, BlockReceiptsKey, EpochAccumulatorKey, HistoryContentKey,
     OverlayContentKey,
@@ -11,7 +11,7 @@ use tokio::{fs::read_dir, sync::mpsc, time::sleep};
 use tracing::{debug, error, info, warn};
 use web3::types::{BlockId, H256};
 
-use entity::contentkey;
+use entity::{contentkey, executionbody, executionheader, executionreceipts};
 
 pub mod cli;
 
@@ -75,6 +75,7 @@ async fn follow_chain_head(
     }
 }
 
+/// Listens on a channel, requests blocks from an Execution node and stores derived content keys.
 async fn retrieve_new_blocks(
     w3: web3::Web3<web3::transports::Http>,
     mut rx: mpsc::Receiver<web3::types::U64>,
@@ -111,52 +112,90 @@ async fn retrieve_new_blocks(
             block.number=?block_number_to_retrieve,
             "received block",
         );
+        store_block_keys(
+            block_number_to_retrieve.as_u64(),
+            block_hash.as_fixed_bytes(),
+            &conn,
+        )
+        .await;
+    }
+}
 
-        // Create block header content key
-        let header = HistoryContentKey::BlockHeader(BlockHeaderKey {
-            block_hash: *block_hash.as_fixed_bytes(),
-        });
-        let body = HistoryContentKey::BlockBody(BlockBodyKey {
-            block_hash: *block_hash.as_fixed_bytes(),
-        });
-        let receipts = HistoryContentKey::BlockReceipts(BlockReceiptsKey {
-            block_hash: *block_hash.as_fixed_bytes(),
-        });
+/// Stores the content keys and block metadata for the given block.
+///
+/// The metadata included is the block number and hash under the execution
+/// header, body and receipts tables.
+///
+/// Errors are logged.
+async fn store_block_keys(block_number: u64, block_hash: &[u8; 32], conn: &DatabaseConnection) {
+    // SQLite only supports i64.
+    let block_number = block_number as i64;
 
-        store_content_key(&header, "block-header", &conn).await;
-        store_content_key(&body, "block-body", &conn).await;
-        store_content_key(&receipts, "block-receipts", &conn).await;
+    let header = HistoryContentKey::BlockHeader(BlockHeaderKey {
+        block_hash: *block_hash,
+    });
+    let body = HistoryContentKey::BlockBody(BlockBodyKey {
+        block_hash: *block_hash,
+    });
+    let receipts = HistoryContentKey::BlockReceipts(BlockReceiptsKey {
+        block_hash: *block_hash,
+    });
+
+    // content_keys
+    store_content_key(&header, "block_header", conn).await;
+    match executionheader::get_or_create(&header, block_number, block_hash, conn).await {
+        Ok(_) => log_record_outcome(&header, "header_metadata", DbOutcome::Success),
+        Err(e) => log_record_outcome(&header, "header_metadata", DbOutcome::Fail(e)),
+    }
+
+    store_content_key(&body, "block_body", conn).await;
+    match executionbody::get_or_create(&body, block_number, block_hash, conn).await {
+        Ok(_) => log_record_outcome(&body, "body_metadata", DbOutcome::Success),
+        Err(e) => log_record_outcome(&body, "body_metadata", DbOutcome::Fail(e)),
+    }
+
+    store_content_key(&receipts, "block_receipts", conn).await;
+    match executionreceipts::get_or_create(&receipts, block_number, block_hash, conn).await {
+        Ok(_) => log_record_outcome(&receipts, "receipts_metadata", DbOutcome::Success),
+        Err(e) => log_record_outcome(&receipts, "receipts_metadata", DbOutcome::Fail(e)),
     }
 }
 
 /// Accepts a ContentKey and attempts to store it.
 ///
 /// Errors are logged.
-async fn store_content_key<'b, T: OverlayContentKey>(
-    key: &'b T,
-    name: &str,
-    conn: &DatabaseConnection,
-) where
-    Vec<u8>: From<&'b T>,
-{
-    let encoded: Vec<u8> = key.into();
+async fn store_content_key<T: OverlayContentKey>(key: &T, name: &str, conn: &DatabaseConnection) {
+    match contentkey::get_or_create(key, conn).await {
+        Ok(_) => log_record_outcome(key, name, DbOutcome::Success),
+        Err(e) => log_record_outcome(key, name, DbOutcome::Fail(e)),
+    }
+}
 
-    debug!(
-        content.key=format!("encoded{:x?}", encoded),
-        content.id=?key.content_id(),
-        content.kind=name,
-        "Creating content database record",
-    );
-
-    if let Err(e) = contentkey::get_or_create(key, conn).await {
-        error!(
-            content.key=format!("{:x?}", encoded),
-            content.id=?key.content_id(),
+/// Logs a database record error for the given key.
+///
+/// Helper function for common error pattern to be logged.
+fn log_record_outcome<T: OverlayContentKey>(key: &T, name: &str, outcome: DbOutcome) {
+    // TODO (Perama 2023-01-28) replace .clone() with ".bytes()" here (see cdc09d2).
+    let bytes: Vec<u8> = key.clone().into();
+    let encoded = hex::encode(bytes);
+    match outcome {
+        DbOutcome::Success => debug!(
+            content.key = format!("0x{encoded}"),
+            content.kind = name,
+            "Successful record",
+        ),
+        DbOutcome::Fail(e) => error!(
+            content.key=format!("0x{encoded}"),
             content.kind=name,
             err=?e,
             "Failed to create database record",
-        );
+        ),
     }
+}
+
+enum DbOutcome {
+    Success,
+    Fail(Error),
 }
 
 pub async fn import_pre_merge_accumulators(

@@ -37,47 +37,45 @@ pub enum Relation {
     ContentAudit,
 }
 
-pub async fn get_or_create<'b, T: OverlayContentKey>(
-    content_key_raw: &'b T,
+pub async fn get_or_create<T: OverlayContentKey>(
+    content_key: &T,
     conn: &DatabaseConnection,
-) -> Result<Model>
-where
-    Vec<u8>: From<&'b T>,
-{
-    let encoded: Vec<u8> = content_key_raw.into();
+) -> Result<Model> {
+    // The passing of &OverlayContentKey is currently limited (requires lifetimes).
+    // This is a temporary fix / reminder. Likely solutions are that OverlayContentKey should:
+    // 1. Have a method `fn bytes(&self) -> [u8; u32]` that can replace `clone()` here.
+    // 2. Be `From<&Self>`, which when impl should internall call self.clone().
+    let content_key_bytes: Vec<u8> = content_key.clone().into();
     // First try to lookup an existing entry.
-    let content_key = Entity::find()
-        .filter(Column::ContentKey.eq(encoded.to_owned()))
+    if let Some(content_key_model) = Entity::find()
+        .filter(Column::ContentKey.eq(content_key_bytes.clone()))
         .one(conn)
-        .await?;
-
-    if let Some(content_key) = content_key {
+        .await?
+    {
         // If there is an existing record, return it
-        return Ok(content_key);
+        return Ok(content_key_model);
     }
-    let content_id_raw = content_key_raw.content_id();
-    let content_id_hash = H256::from_slice(&content_id_raw);
-    let content_id = contentid::get_or_create(&content_id_hash, conn).await?;
+
+    let content_id = content_key.content_id();
+    let content_id_hash = H256::from_slice(&content_id);
+    let content_id_model = contentid::get_or_create(&content_id_hash, conn).await?;
     // If no record exists, create one and return it
     let content_key = ActiveModel {
         id: NotSet,
-        content_id: Set(content_id.id),
-        content_key: Set(encoded),
+        content_id: Set(content_id_model.id),
+        content_key: Set(content_key_bytes),
         created_at: Set(chrono::offset::Utc::now()),
     };
     Ok(content_key.insert(conn).await?)
 }
 
-pub async fn get<'b, T: OverlayContentKey>(
-    content_key: &'b T,
+pub async fn get<T: OverlayContentKey>(
+    content_key: &T,
     conn: &DatabaseConnection,
-) -> Result<Option<Model>>
-where
-    Vec<u8>: From<&'b T>,
-{
-    let encoded: Vec<u8> = content_key.into();
+) -> Result<Option<Model>> {
+    let content_key_bytes: Vec<u8> = content_key.clone().into();
     Ok(Entity::find()
-        .filter(Column::ContentKey.eq(encoded))
+        .filter(Column::ContentKey.eq(content_key_bytes))
         .one(conn)
         .await?)
 }

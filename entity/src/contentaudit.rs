@@ -1,10 +1,12 @@
 use std::i32;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
 
 use ethportal_api::types::content_key::OverlayContentKey;
+
+use crate::contentkey;
 
 #[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
@@ -41,10 +43,10 @@ pub enum Relation {
 }
 
 pub async fn create(
-    content_key_id: i32,
+    content_key_model_id: i32,
     query_successful: bool,
     conn: &DatabaseConnection,
-) -> Model {
+) -> Result<Model> {
     // If no record exists, create one and return it
     let audit_result = if query_successful {
         AuditResult::Success
@@ -54,26 +56,23 @@ pub async fn create(
 
     let content_audit = ActiveModel {
         id: NotSet,
-        content_key: Set(content_key_id),
+        content_key: Set(content_key_model_id),
         created_at: Set(chrono::offset::Utc::now()),
         result: Set(audit_result),
     };
-    content_audit
-        .insert(conn)
-        .await
-        .expect("Error inserting new content_audit")
+    Ok(content_audit.insert(conn).await?)
 }
 
-pub async fn get_audits<'b, T: OverlayContentKey>(
-    content_key: &'b T,
+pub async fn get_audits<T: OverlayContentKey>(
+    content_key: &T,
     conn: &DatabaseConnection,
-) -> Result<Vec<Model>>
-where
-    Vec<u8>: From<&'b T>,
-{
-    let encoded: Vec<u8> = content_key.into();
+) -> Result<Vec<Model>> {
+    let Some(content_key_model) = contentkey::get(content_key, conn).await?
+    else {
+       bail!("Expected stored content_key found none.")
+    };
     Ok(Entity::find()
-        .filter(Column::ContentKey.eq(encoded))
+        .filter(Column::ContentKey.eq(content_key_model.id))
         .all(conn)
         .await?)
 }
