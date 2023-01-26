@@ -1,7 +1,6 @@
+use ethereum_types::H256;
 use sea_orm::entity::prelude::*;
 use sea_orm::{NotSet, Set};
-
-use ethereum_types::H256;
 
 #[derive(Clone, Debug, Eq, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "content_id")]

@@ -1,17 +1,18 @@
 use std::path::PathBuf;
 
 use ethereum_types::H256;
+use sea_orm::{DatabaseConnection, EntityTrait, QueryOrder, QuerySelect};
+use tokio::{
+    sync::mpsc,
+    time::{interval, Duration},
+};
 use tracing::{debug, error, info};
 
-use sea_orm::{DatabaseConnection, EntityTrait, QueryOrder, QuerySelect};
-
-use tokio::sync::mpsc;
-use tokio::time::{interval, Duration};
-
-use glados_core::jsonrpc::PortalClient;
-use glados_core::types::{BlockHeaderContentKey, ContentKey};
-
 use entity::{contentaudit, contentkey};
+use glados_core::{
+    jsonrpc::PortalClient,
+    types::{BlockHeaderContentKey, ContentKey},
+};
 
 pub mod cli;
 

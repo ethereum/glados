@@ -1,18 +1,14 @@
 use std::io;
 use std::sync::Arc;
 
-use axum::http::StatusCode;
 use axum::{
     extract::{Extension, Path},
+    http::StatusCode,
     response::IntoResponse,
 };
-
 use sea_orm::{ColumnTrait, EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect};
 
-use entity::contentaudit;
-use entity::contentid;
-use entity::contentkey;
-use entity::node;
+use entity::{contentaudit, contentid, contentkey, node};
 
 use crate::state::State;
 use crate::templates::{

@@ -9,14 +9,13 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use serde_json::value::{to_raw_value, RawValue};
 
+use discv5::enr::CombinedKey;
+use ethereum_types::{H256, U256};
 use thiserror::Error;
 
-use ethereum_types::{H256, U256};
-
-use discv5::enr::CombinedKey;
-type Enr = discv5::enr::Enr<CombinedKey>;
-
 use crate::types::ContentKey;
+
+type Enr = discv5::enr::Enr<CombinedKey>;
 
 //
 // JSON RPC Client

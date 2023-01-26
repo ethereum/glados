@@ -1,19 +1,13 @@
-use migration::DbErr;
-use tokio::signal;
-use tokio::task;
-
-use sea_orm::{Database, DatabaseConnection};
-
-use tracing::{debug, info};
-
 use clap::Parser;
-
-use migration::{Migrator, MigratorTrait};
+use sea_orm::{Database, DatabaseConnection};
+use tokio::{signal, task};
+use tracing::{debug, info};
 
 use glados_monitor::{
     cli::{Cli, Commands},
     import_pre_merge_accumulators, run_glados_monitor,
 };
+use migration::{DbErr, Migrator, MigratorTrait};
 
 #[tokio::main]
 async fn main() -> Result<(), DbErr> {

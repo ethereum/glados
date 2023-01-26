@@ -1,22 +1,15 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use migration::DbErr;
-use tracing::{debug, error, info, warn};
-
+use ethereum_types::H256;
 use sea_orm::DatabaseConnection;
-
-use tokio::fs::read_dir;
-use tokio::sync::mpsc;
-use tokio::time::sleep;
-
+use tokio::{fs::read_dir, sync::mpsc, time::sleep};
+use tracing::{debug, error, info, warn};
 use web3::types::BlockId;
 
-use ethereum_types::H256;
-
-use glados_core::types::{BlockHeaderContentKey, ContentKey, EpochAccumulatorContentKey};
-
 use entity::contentkey;
+use glados_core::types::{BlockHeaderContentKey, ContentKey, EpochAccumulatorContentKey};
+use migration::DbErr;
 
 pub mod cli;
 
