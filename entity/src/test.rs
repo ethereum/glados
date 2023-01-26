@@ -1,23 +1,17 @@
 #![allow(unused_imports)]
 #[cfg(test)]
 use chrono::prelude::*;
-
+use ethereum_types::H256;
 use sea_orm::entity::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Database, DbConn, DbErr, EntityTrait, NotSet, PaginatorTrait,
     QueryFilter, Set,
 };
 
-use ethereum_types::H256;
-
+use glados_core::types::BlockHeaderContentKey;
 use migration::{Migrator, MigratorTrait};
 
-use glados_core::types::BlockHeaderContentKey;
-
-use crate::contentaudit;
-use crate::contentid;
-use crate::contentkey;
-use crate::node;
+use crate::{contentaudit, contentid, contentkey, node};
 
 #[allow(dead_code)]
 async fn setup_database() -> Result<DbConn, DbErr> {

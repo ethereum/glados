@@ -1,9 +1,9 @@
+use std::i32;
+
 use chrono::{DateTime, Utc};
 use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
 
 use glados_core::types::ContentKey;
-
-use std::i32;
 
 #[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]

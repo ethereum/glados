@@ -1,14 +1,11 @@
-use sea_orm::Database;
-
-use tracing::{debug, info};
-
-use clap::Parser;
-
 use std::path::PathBuf;
 
-use migration::{Migrator, MigratorTrait};
+use clap::Parser;
+use sea_orm::Database;
+use tracing::{debug, info};
 
 use glados_audit::{cli::Args, run_glados_audit};
+use migration::{Migrator, MigratorTrait};
 
 #[tokio::main]
 async fn main() {

@@ -4,10 +4,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 
-use entity::contentaudit;
-use entity::contentid;
-use entity::contentkey;
-use entity::node;
+use entity::{contentaudit, contentid, contentkey, node};
 
 #[derive(Template)]
 #[template(path = "index.html")]

@@ -1,8 +1,7 @@
 pub(crate) use std::fmt;
 
-use sha2::{Digest, Sha256};
-
 use ethereum_types::H256;
+use sha2::{Digest, Sha256};
 
 pub enum ContentKeySelector {
     BlockHeader,

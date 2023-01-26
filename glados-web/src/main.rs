@@ -1,12 +1,10 @@
 use std::sync::Arc;
 
+use clap::Parser;
 use sea_orm::Database;
 
-use clap::Parser;
-
-use migration::{Migrator, MigratorTrait};
-
 use glados_web::{cli::Args, run_glados_web, state::State};
+use migration::{Migrator, MigratorTrait};
 
 #[tokio::main]
 async fn main() {

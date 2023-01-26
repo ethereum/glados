@@ -6,7 +6,6 @@ use axum::{
     routing::{get, get_service},
     Router,
 };
-
 use tower_http::services::ServeDir;
 
 pub mod cli;
