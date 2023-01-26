@@ -36,26 +36,8 @@ async fn main() -> Result<(), DbErr> {
         "database connection established"
     );
 
-    let manager = SchemaManager::new(&conn);
-    let mut db_exists = true;
-    for t in [
-        "content_audit",
-        "content_id",
-        "content_key",
-        "node",
-        "record",
-    ] {
-        if !manager
-            .has_table(t)
-            .await
-            .expect("could not query database")
-        {
-            db_exists = false;
-        };
-    }
-
-    if !db_exists {
-        info!("creating new database tables");
+    if no_tables(&conn).await {
+        info!("No database tables present, creating new tables.");
         Migrator::up(&conn, None)
             .await
             .expect("could not create new database tables");
@@ -114,4 +96,36 @@ async fn follow_head_command(conn: DatabaseConnection, provider_url: String) -> 
 
     run_glados_monitor(conn, w3).await;
     Ok(())
+}
+
+/// Returns true if there are no tables in the database.
+///
+/// Useful if deciding whether to create a new database or not.
+///
+/// Rather than looking for individual tables (which may break
+/// if new tables are added/removed), this handles the search generally
+/// for the supported tables in Sea_Orm.
+async fn no_tables(db: &DatabaseConnection) -> bool {
+    // A statement finding all tables for the given backend.
+    let statement = match db.get_database_backend() {
+        backend @ DbBackend::MySql => {
+            let q = "SHOW TABLES";
+            warn!("This {backend:?} query to retrieve all tables is untested: {q}");
+            Statement::from_sql_and_values(backend, q, vec![])
+        }
+        backend @ DbBackend::Postgres => {
+            let q = "SELECT * FROM information_schema.tables WHERE table_schema='public';";
+            warn!("This {backend:?} query to retrieve all tables is untested: {q}");
+            Statement::from_sql_and_values(backend, q, vec![])
+        }
+        backend @ DbBackend::Sqlite => {
+            let q = "SELECT name FROM sqlite_master WHERE type='table';";
+            Statement::from_sql_and_values(backend, q, vec![])
+        }
+    };
+    JsonValue::find_by_statement(statement)
+        .all(db)
+        .await
+        .expect("Couldn't query database for tables")
+        .is_empty()
 }
