@@ -36,31 +36,6 @@ async fn main() -> Result<(), DbErr> {
         "database connection established"
     );
 
-    let manager = SchemaManager::new(&conn);
-    let mut db_exists = true;
-    for t in [
-        "content_audit",
-        "content_id",
-        "content_key",
-        "node",
-        "record",
-    ] {
-        if !manager
-            .has_table(t)
-            .await
-            .expect("could not query database")
-        {
-            db_exists = false;
-        };
-    }
-
-    if !db_exists {
-        info!("creating new database tables");
-        Migrator::up(&conn, None)
-            .await
-            .expect("could not create new database tables");
-    }
-
     if cli.migrate {
         info!("running database migrations");
         Migrator::up(&conn, None).await.unwrap();
