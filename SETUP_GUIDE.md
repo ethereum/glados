@@ -16,8 +16,7 @@ This example uses the following:
 All commands are issued on `machine-a` unless otherwise stated.
 
 Important notes:
-- If `glados-monitor`, `glados-audit` and `glados-web` are in `sqlite::memory:`-mode they won't be able to share a database.
-- The database used is ephemeral (for testing) and will be removed if the machine reboots.
+- If `glados-monitor`, `glados-audit` and `glados-web` are in `sqlite::memory:`-mode they won't be able to share a database. In-memory databases are ephemeral and only persist as long as the process is running.
 
 Start Ethereum execution client (not covered here).
 
