@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use ethereum_types::H256;
+use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
 use sea_orm::{DatabaseConnection, EntityTrait, QueryOrder, QuerySelect};
 use tokio::{
     sync::mpsc,
@@ -9,10 +10,7 @@ use tokio::{
 use tracing::{debug, error, info};
 
 use entity::{contentaudit, contentkey};
-use glados_core::{
-    jsonrpc::PortalClient,
-    types::{BlockHeaderContentKey, ContentKey},
-};
+use glados_core::jsonrpc::PortalClient;
 
 pub mod cli;
 
@@ -32,10 +30,10 @@ pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
     info!("got CTRL+C. shutting down...");
 }
 
-async fn do_audit_orchestration(
-    tx: mpsc::Sender<BlockHeaderContentKey>,
-    conn: DatabaseConnection,
-) -> ! {
+async fn do_audit_orchestration(tx: mpsc::Sender<HistoryContentKey>, conn: DatabaseConnection) -> !
+where
+    Vec<u8>: From<HistoryContentKey>,
+{
     debug!("initializing audit process");
 
     let mut interval = interval(Duration::from_secs(AUDIT_PERIOD_SECONDS));
@@ -63,7 +61,9 @@ async fn do_audit_orchestration(
             info!("Content Key: {:?}", content_key_db.content_key);
             // Get the block hash (by removing the first byte from the content key)
             let hash = H256::from_slice(&content_key_db.content_key[1..33]);
-            let content_key = BlockHeaderContentKey { hash };
+            let content_key = HistoryContentKey::BlockHeader(BlockHeaderKey {
+                block_hash: hash.to_fixed_bytes(),
+            });
 
             // Send it to the audit process
             tx.send(content_key)
@@ -74,15 +74,17 @@ async fn do_audit_orchestration(
 }
 
 async fn perform_content_audits(
-    mut rx: mpsc::Receiver<BlockHeaderContentKey>,
+    mut rx: mpsc::Receiver<HistoryContentKey>,
     ipc_path: PathBuf,
     conn: DatabaseConnection,
-) {
+) where
+    Vec<u8>: From<HistoryContentKey>,
+{
     let mut client = PortalClient::from_ipc(&ipc_path).unwrap();
 
     while let Some(content_key) = rx.recv().await {
         debug!(
-            content.key=?content_key.hex_encode(),
+            content.key=?content_key,
             content.id=?content_key.content_id(),
             "auditing content",
         );

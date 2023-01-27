@@ -6,14 +6,12 @@ use uds_windows::UnixStream;
 use std::path::Path;
 use std::str::FromStr;
 
-use serde::{Deserialize, Serialize};
-use serde_json::value::{to_raw_value, RawValue};
-
 use discv5::enr::CombinedKey;
 use ethereum_types::{H256, U256};
+use ethportal_api::types::content_key::OverlayContentKey;
+use serde::{Deserialize, Serialize};
+use serde_json::value::{to_raw_value, RawValue};
 use thiserror::Error;
-
-use crate::types::ContentKey;
 
 type Enr = discv5::enr::Enr<CombinedKey>;
 
@@ -200,8 +198,13 @@ where
         }
     }
 
-    pub fn get_content(&mut self, content_key: &impl ContentKey) -> Content {
-        let params = Some(vec![to_raw_value(&content_key.hex_encode()).unwrap()]);
+    pub fn get_content<'b, T: OverlayContentKey>(&mut self, content_key: &'b T) -> Content
+    where
+        Vec<u8>: From<&'b T>,
+    {
+        //let encoded: Vec<u8> = <T as Into<Vec<u8>>>::into(content_key);
+        let encoded: Vec<u8> = content_key.into();
+        let params = Some(vec![to_raw_value(&hex::encode(encoded)).unwrap()]);
         let req = self.build_request("portal_historyRecursiveFindContent", &params);
         let resp = self.make_request(req).unwrap();
 

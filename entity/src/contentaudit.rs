@@ -3,7 +3,7 @@ use std::i32;
 use chrono::{DateTime, Utc};
 use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
 
-use glados_core::types::ContentKey;
+use ethportal_api::types::content_key::OverlayContentKey;
 
 #[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
@@ -63,9 +63,16 @@ pub async fn create(
         .expect("Error inserting new content_audit")
 }
 
-pub async fn get_audits(content_key: &impl ContentKey, conn: &DatabaseConnection) -> Vec<Model> {
+pub async fn get_audits<'b, T: OverlayContentKey>(
+    content_key: &'b T,
+    conn: &DatabaseConnection,
+) -> Vec<Model>
+where
+    Vec<u8>: From<&'b T>,
+{
+    let encoded: Vec<u8> = content_key.into();
     Entity::find()
-        .filter(Column::ContentKey.eq(content_key.encode()))
+        .filter(Column::ContentKey.eq(encoded))
         .all(conn)
         .await
         .unwrap()
