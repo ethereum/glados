@@ -36,9 +36,11 @@ async fn main() -> Result<(), DbErr> {
         "database connection established"
     );
 
-    if cli.migrate {
+    if cli.migrate || cli.database_url == "sqlite::memory:" {
         info!("running database migrations");
-        Migrator::up(&conn, None).await.unwrap();
+        Migrator::up(&conn, None)
+            .await
+            .expect("Database migration failed");
     }
 
     let task_handle = match &cli.command {
