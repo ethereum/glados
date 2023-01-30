@@ -125,7 +125,7 @@ async fn retrieve_new_blocks(
 ///
 /// Errors are logged.
 async fn store_block_keys(block_number: i32, block_hash: &[u8; 32], conn: &DatabaseConnection) {
-    let header = HistoryContentKey::BlockHeader(BlockHeaderKey {
+    let header = HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey {
         block_hash: *block_hash,
     });
     let body = HistoryContentKey::BlockBody(BlockBodyKey {
@@ -169,9 +169,7 @@ async fn store_content_key<T: OverlayContentKey>(key: &T, name: &str, conn: &Dat
 ///
 /// Helper function for common error pattern to be logged.
 fn log_record_outcome<T: OverlayContentKey>(key: &T, name: &str, outcome: DbOutcome) {
-    // TODO (Perama 2023-01-28) replace .clone() with ".bytes()" here (see cdc09d2).
-    let bytes: Vec<u8> = key.clone().into();
-    let encoded = hex::encode(bytes);
+    let encoded = hex::encode(key.to_bytes());
     match outcome {
         DbOutcome::Success => debug!(
             content.key = format!("0x{encoded}"),

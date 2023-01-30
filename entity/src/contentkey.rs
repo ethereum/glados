@@ -41,14 +41,9 @@ pub async fn get_or_create<T: OverlayContentKey>(
     content_key: &T,
     conn: &DatabaseConnection,
 ) -> Result<Model> {
-    // The passing of &OverlayContentKey is currently limited (requires lifetimes).
-    // This is a temporary fix / reminder. Likely solutions are that OverlayContentKey should:
-    // 1. Have a method `fn bytes(&self) -> [u8; u32]` that can replace `clone()` here.
-    // 2. Be `From<&Self>`, which when impl should internall call self.clone().
-    let content_key_bytes: Vec<u8> = content_key.clone().into();
     // First try to lookup an existing entry.
     if let Some(content_key_model) = Entity::find()
-        .filter(Column::ContentKey.eq(content_key_bytes.clone()))
+        .filter(Column::ContentKey.eq(content_key.to_bytes()))
         .one(conn)
         .await?
     {
@@ -63,7 +58,7 @@ pub async fn get_or_create<T: OverlayContentKey>(
     let content_key = ActiveModel {
         id: NotSet,
         content_id: Set(content_id_model.id),
-        content_key: Set(content_key_bytes),
+        content_key: Set(content_key.to_bytes()),
         created_at: Set(chrono::offset::Utc::now()),
     };
     Ok(content_key.insert(conn).await?)
@@ -73,9 +68,8 @@ pub async fn get<T: OverlayContentKey>(
     content_key: &T,
     conn: &DatabaseConnection,
 ) -> Result<Option<Model>> {
-    let content_key_bytes: Vec<u8> = content_key.clone().into();
     Ok(Entity::find()
-        .filter(Column::ContentKey.eq(content_key_bytes))
+        .filter(Column::ContentKey.eq(content_key.to_bytes()))
         .one(conn)
         .await?)
 }

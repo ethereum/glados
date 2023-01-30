@@ -45,11 +45,9 @@ pub async fn get_or_create<T: OverlayContentKey>(
     block_hash: &[u8; 32],
     conn: &DatabaseConnection,
 ) -> Result<Model> {
-    // TODO (Perama 2023-01-28) replace .clone() with ".bytes()" here (see cdc09d2).
-    let hash = block_hash.clone().to_vec();
     // First try to lookup an existing entry.
     let body = Entity::find()
-        .filter(Column::BlockHash.eq(hash.clone()))
+        .filter(Column::BlockHash.eq(block_hash.to_vec()))
         .one(conn)
         .await?;
 
@@ -64,7 +62,7 @@ pub async fn get_or_create<T: OverlayContentKey>(
         id: NotSet,
         content_key: Set(content_key_model.id),
         block_number: Set(block_number),
-        block_hash: Set(hash),
+        block_hash: Set(block_hash.to_vec()),
     };
     Ok(body_model.insert(conn).await?)
 }

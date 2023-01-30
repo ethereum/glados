@@ -184,7 +184,7 @@ async fn test_contentkey_get_or_create() -> Result<(), DbErr> {
         &hex::decode("d1c390624d3bd4e409a61a858e5dcc5517729a9170d014a6c96530d64dd8621d").unwrap(),
     );
 
-    let header_content_key = HistoryContentKey::BlockHeader(BlockHeaderKey {
+    let header_content_key = HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey {
         block_hash: block_hash.to_fixed_bytes(),
     });
 
