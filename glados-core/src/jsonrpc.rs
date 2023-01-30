@@ -6,6 +6,7 @@ use uds_windows::UnixStream;
 use std::path::Path;
 use std::str::FromStr;
 
+use anyhow::{bail, Context, Result};
 use discv5::enr::CombinedKey;
 use ethereum_types::{H256, U256};
 use ethportal_api::types::content_key::OverlayContentKey;
@@ -40,14 +41,14 @@ fn build_request<'a>(
 }
 
 pub trait TryClone {
-    fn try_clone(&self) -> std::io::Result<Self>
+    fn try_clone(&self) -> Result<Self>
     where
         Self: Sized;
 }
 
 impl TryClone for UnixStream {
-    fn try_clone(&self) -> std::io::Result<Self> {
-        UnixStream::try_clone(self)
+    fn try_clone(&self) -> Result<Self> {
+        Ok(UnixStream::try_clone(self)?)
     }
 }
 
@@ -60,10 +61,10 @@ where
 }
 
 impl PortalClient<UnixStream> {
-    pub fn from_ipc(path: &Path) -> std::io::Result<Self> {
-        // TODO: a nice error if this file does not exist
+    pub fn from_ipc(path: &Path) -> Result<Self> {
         Ok(Self {
-            stream: UnixStream::connect(path)?,
+            stream: UnixStream::connect(path)
+                .with_context(|| format!("Could not open ipc file {}", path.display()))?,
             request_id: 0,
         })
     }
@@ -145,21 +146,20 @@ where
         result
     }
 
-    fn make_request(&mut self, req: jsonrpc::Request) -> Result<JsonRPCResult, JsonRpcError> {
-        let data = serde_json::to_vec(&req).unwrap();
+    fn make_request(&mut self, req: jsonrpc::Request) -> Result<JsonRPCResult> {
+        let data = serde_json::to_vec(&req)?;
 
-        self.stream.write_all(&data).unwrap();
-        self.stream.flush().unwrap();
+        self.stream.write_all(&data)?;
+        self.stream.flush()?;
 
-        let clone = self.stream.try_clone().unwrap();
+        let clone = self.stream.try_clone()?;
         let deser = serde_json::Deserializer::from_reader(clone);
 
-        if let Some(obj) = deser.into_iter::<JsonRPCResult>().next() {
-            return obj.map_err(JsonRpcError::Malformed);
-        }
-
-        // this should only happen when they immediately send EOF
-        Err(JsonRpcError::Empty)
+        let Some(obj) = deser.into_iter::<JsonRPCResult>().next() else {
+            // this should only happen when they immediately send EOF
+            return Err(JsonRpcError::Empty)?
+        };
+        Ok(obj?)
     }
 
     pub fn get_client_version(&mut self) -> String {
@@ -172,51 +172,48 @@ where
         }
     }
 
-    pub fn get_node_info(&mut self) -> NodeInfo {
+    pub fn get_node_info(&mut self) -> Result<NodeInfo> {
         let req = self.build_request("discv5_nodeInfo", &None);
-        let resp = self.make_request(req).unwrap();
-
-        let result: NodeInfo = serde_json::from_value(resp.result).unwrap();
-        result
+        let resp = self.make_request(req)?;
+        Ok(serde_json::from_value(resp.result)?)
     }
 
-    pub fn get_routing_table_info(&mut self) -> RoutingTableInfo {
+    pub fn get_routing_table_info(&mut self) -> Result<RoutingTableInfo> {
         let req = self.build_request("discv5_routingTableInfo", &None);
-        let resp = self.make_request(req).unwrap();
+        let resp = self.make_request(req)?;
 
-        let result_raw: RoutingTableInfoRaw = serde_json::from_value(resp.result).unwrap();
-        let local_node_id = H256::from_str(&result_raw.localKey).unwrap();
-        RoutingTableInfo {
-            localKey: H256::from_str(&result_raw.localKey).unwrap(),
-            buckets: result_raw
-                .buckets
-                .iter()
-                .map(|entry| {
-                    parse_routing_table_entry(&local_node_id, &entry.0, &entry.1, &entry.2)
-                })
-                .collect(),
-        }
+        let result_raw: RoutingTableInfoRaw = serde_json::from_value(resp.result)?;
+        let local_node_id = H256::from_str(&result_raw.localKey)?;
+        let buckets: Result<Vec<RoutingTableEntry>> = result_raw
+            .buckets
+            .iter()
+            .map(|entry| parse_routing_table_entry(&local_node_id, &entry.0, &entry.1, &entry.2))
+            .collect();
+        Ok(RoutingTableInfo {
+            localKey: H256::from_str(&result_raw.localKey)?,
+            buckets: buckets?,
+        })
     }
 
-    pub fn get_content<'b, T: OverlayContentKey>(&mut self, content_key: &'b T) -> Content
+    pub fn get_content<'b, T: OverlayContentKey>(&mut self, content_key: &'b T) -> Result<Content>
     where
         Vec<u8>: From<&'b T>,
     {
         //let encoded: Vec<u8> = <T as Into<Vec<u8>>>::into(content_key);
         let encoded: Vec<u8> = content_key.into();
-        let params = Some(vec![to_raw_value(&hex::encode(encoded)).unwrap()]);
+        let params = Some(vec![to_raw_value(&hex::encode(encoded))?]);
         let req = self.build_request("portal_historyRecursiveFindContent", &params);
-        let resp = self.make_request(req).unwrap();
+        let resp = self.make_request(req)?;
 
-        let content_as_hex: String = serde_json::from_value(resp.result).unwrap();
-        let content_raw = hex::decode(&content_as_hex[2..]).unwrap();
+        let content_as_hex: String = serde_json::from_value(resp.result)?;
+        let content_raw = hex::decode(&content_as_hex[2..])?;
 
-        Content { raw: content_raw }
+        Ok(Content { raw: content_raw })
     }
 
     //fn get_node_enr(&mut self) -> Enr {
     //    let node_info = self.get_node_info();
-    //    Enr::from_str(node_info.result.enr).unwrap()
+    //    Enr::from_str(node_info.result.enr)?
     //}
 }
 
@@ -225,18 +222,20 @@ fn parse_routing_table_entry(
     raw_node_id: &str,
     encoded_enr: &str,
     status: &String,
-) -> RoutingTableEntry {
-    let node_id = H256::from_str(raw_node_id).unwrap();
-    let enr = Enr::from_str(encoded_enr).unwrap();
+) -> Result<RoutingTableEntry> {
+    let node_id = H256::from_str(raw_node_id)?;
+    let Ok(enr) = Enr::from_str(encoded_enr) else {
+        bail!("Could not make ENR from string: {}", encoded_enr)
+    };
     let distance = distance_xor(node_id.as_fixed_bytes(), local_node_id.as_fixed_bytes());
-    let log_distance = distance_log2(distance);
-    RoutingTableEntry {
+    let log_distance = distance_log2(distance)?;
+    Ok(RoutingTableEntry {
         node_id,
         enr,
         status: status.to_string(),
         distance,
         log_distance,
-    }
+    })
 }
 
 fn distance_xor(x: &[u8; 32], y: &[u8; 32]) -> U256 {
@@ -247,10 +246,10 @@ fn distance_xor(x: &[u8; 32], y: &[u8; 32]) -> U256 {
     U256::from_big_endian(z.as_slice())
 }
 
-fn distance_log2(distance: U256) -> u16 {
+fn distance_log2(distance: U256) -> Result<u16> {
     if distance.is_zero() {
-        0
+        Ok(0)
     } else {
-        (256 - distance.leading_zeros()).try_into().unwrap()
+        Ok((256 - distance.leading_zeros()).try_into()?)
     }
 }

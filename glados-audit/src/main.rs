@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use anyhow::Result;
 use clap::Parser;
 use sea_orm::Database;
 use tracing::{debug, info};
@@ -8,7 +9,7 @@ use glados_audit::{cli::Args, run_glados_audit};
 use migration::{Migrator, MigratorTrait};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     // Setup logging
     env_logger::init();
 
@@ -26,18 +27,17 @@ async fn main() {
     //
     debug!(database_url = &args.database_url, "Connecting to database");
 
-    let conn = Database::connect(&args.database_url)
-        .await
-        .expect("Database connection failed");
+    let conn = Database::connect(&args.database_url).await?;
 
     info!(
         database_url = &args.database_url,
         "database connection established"
     );
 
-    Migrator::up(&conn, None).await.unwrap();
+    Migrator::up(&conn, None).await?;
 
     let ipc_path: PathBuf = args.ipc_path;
 
     run_glados_audit(conn, ipc_path).await;
+    Ok(())
 }

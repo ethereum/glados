@@ -1,3 +1,4 @@
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use ethereum_types::H256;
 use ethportal_api::types::content_key::OverlayContentKey;
@@ -39,7 +40,7 @@ pub enum Relation {
 pub async fn get_or_create<'b, T: OverlayContentKey>(
     content_key_raw: &'b T,
     conn: &DatabaseConnection,
-) -> Result<Model, DbErr>
+) -> Result<Model>
 where
     Vec<u8>: From<&'b T>,
 {
@@ -56,7 +57,7 @@ where
     }
     let content_id_raw = content_key_raw.content_id();
     let content_id_hash = H256::from_slice(&content_id_raw);
-    let content_id = contentid::get_or_create(&content_id_hash, conn).await;
+    let content_id = contentid::get_or_create(&content_id_hash, conn).await?;
     // If no record exists, create one and return it
     let content_key = ActiveModel {
         id: NotSet,
@@ -64,22 +65,21 @@ where
         content_key: Set(encoded),
         created_at: Set(chrono::offset::Utc::now()),
     };
-    content_key.insert(conn).await
+    Ok(content_key.insert(conn).await?)
 }
 
 pub async fn get<'b, T: OverlayContentKey>(
     content_key: &'b T,
     conn: &DatabaseConnection,
-) -> Option<Model>
+) -> Result<Option<Model>>
 where
     Vec<u8>: From<&'b T>,
 {
     let encoded: Vec<u8> = content_key.into();
-    Entity::find()
+    Ok(Entity::find()
         .filter(Column::ContentKey.eq(encoded))
         .one(conn)
-        .await
-        .unwrap()
+        .await?)
 }
 
 impl Related<super::contentid::Entity> for Entity {

@@ -1128,6 +1128,7 @@ dependencies = [
 name = "entity"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "enr 0.7.0",
  "ethereum-types 0.14.0",
@@ -1664,6 +1665,7 @@ dependencies = [
 name = "glados-audit"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "clap 4.0.26",
  "entity",
  "env_logger",
@@ -1682,6 +1684,7 @@ dependencies = [
 name = "glados-core"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "discv5",
  "env_logger",
  "ethereum-types 0.14.0",
@@ -1699,6 +1702,7 @@ dependencies = [
 name = "glados-monitor"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "clap 4.0.26",
  "entity",
  "env_logger",
@@ -1717,6 +1721,7 @@ dependencies = [
 name = "glados-web"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "askama",
  "axum",
  "clap 4.0.26",

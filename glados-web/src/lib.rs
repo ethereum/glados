@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use anyhow::{bail, Result};
 use axum::{
     extract::Extension,
     routing::{get, get_service},
@@ -15,13 +16,11 @@ pub mod templates;
 
 use crate::state::State;
 
-pub async fn run_glados_web(config: Arc<State>) {
-    let assets_path = Path::new(std::file!())
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("assets");
+pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
+    let Some(parent) = Path::new(std::file!()).parent() else {bail!("No parent of config file")};
+    let Some(grandparent) = parent.parent() else {bail!("No grandparent of config file")};
+    let assets_path = grandparent.join("assets");
+
     let serve_dir = get_service(ServeDir::new(assets_path)).handle_error(routes::handle_error);
 
     // setup router
@@ -41,8 +40,7 @@ pub async fn run_glados_web(config: Arc<State>) {
         .layer(Extension(config));
 
     // run it with hyper on localhost:3000
-    axum::Server::bind(&"0.0.0.0:3001".parse().unwrap())
+    Ok(axum::Server::bind(&"0.0.0.0:3001".parse()?)
         .serve(app.into_make_service())
-        .await
-        .unwrap();
+        .await?)
 }

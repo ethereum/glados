@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use anyhow::Result;
 use ethportal_api::types::content_key::{
     BlockBodyKey, BlockHeaderKey, BlockReceiptsKey, EpochAccumulatorKey, HistoryContentKey,
     OverlayContentKey,
@@ -11,7 +12,6 @@ use tracing::{debug, error, info, warn};
 use web3::types::{BlockId, H256};
 
 use entity::contentkey;
-use migration::DbErr;
 
 pub mod cli;
 
@@ -142,7 +142,7 @@ async fn store_content_key<'b, T: OverlayContentKey>(
     let encoded: Vec<u8> = key.into();
 
     debug!(
-        content.key=format!("{:x?}", encoded),
+        content.key=format!("encoded{:x?}", encoded),
         content.id=?key.content_id(),
         content.kind=name,
         "Creating content database record",
@@ -162,12 +162,12 @@ async fn store_content_key<'b, T: OverlayContentKey>(
 pub async fn import_pre_merge_accumulators(
     conn: DatabaseConnection,
     base_path: PathBuf,
-) -> Result<(), DbErr> {
+) -> Result<()> {
     info!(base_path = %base_path.as_path().display(), "Starting import of pre-merge accumulators");
 
-    let mut entries = read_dir(base_path).await.unwrap();
+    let mut entries = read_dir(base_path).await?;
 
-    while let Some(entry) = entries.next_entry().await.unwrap() {
+    while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
 
         debug!(path = path.as_path().to_str(), "Processing path");
