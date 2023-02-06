@@ -113,7 +113,9 @@ async fn test_contentid_as_hash() -> Result<(), DbErr> {
         25, 26, 27, 28, 29, 30, 31,
     ];
     let content_id_hash = H256::from_slice(&content_id_raw);
-    let content_id = contentid::get_or_create(&content_id_hash, &conn).await;
+    let content_id = contentid::get_or_create(&content_id_hash, &conn)
+        .await
+        .unwrap();
 
     // ensure our database is empty
     assert_eq!(content_id.as_hash(), content_id_hash);
@@ -130,7 +132,9 @@ async fn test_contentid_as_hex() -> Result<(), DbErr> {
         25, 26, 27, 28, 29, 30, 31,
     ];
     let content_id_hash = H256::from_slice(&content_id_raw);
-    let content_id = contentid::get_or_create(&content_id_hash, &conn).await;
+    let content_id = contentid::get_or_create(&content_id_hash, &conn)
+        .await
+        .unwrap();
 
     // ensure our database is empty
     assert_eq!(
@@ -154,12 +158,16 @@ async fn test_contentid_get_or_create() -> Result<(), DbErr> {
     // ensure our database is empty
     assert_eq!(contentid::Entity::find().count(&conn).await?, 0);
 
-    let content_id_a = contentid::get_or_create(&content_id_hash, &conn).await;
+    let content_id_a = contentid::get_or_create(&content_id_hash, &conn)
+        .await
+        .unwrap();
 
     // ensure we added a new record to the database.
     assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
 
-    let content_id_b = contentid::get_or_create(&content_id_hash, &conn).await;
+    let content_id_b = contentid::get_or_create(&content_id_hash, &conn)
+        .await
+        .unwrap();
 
     // ensure that get_or_create found the existing entry.
     assert_eq!(contentid::Entity::find().count(&conn).await?, 1);

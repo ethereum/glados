@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use anyhow::Result;
 use ethereum_types::H256;
 use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
 use sea_orm::{DatabaseConnection, EntityTrait, QueryOrder, QuerySelect};
@@ -77,10 +78,11 @@ async fn perform_content_audits(
     mut rx: mpsc::Receiver<HistoryContentKey>,
     ipc_path: PathBuf,
     conn: DatabaseConnection,
-) where
+) -> Result<()>
+where
     Vec<u8>: From<HistoryContentKey>,
 {
-    let mut client = PortalClient::from_ipc(&ipc_path).unwrap();
+    let mut client = PortalClient::from_ipc(&ipc_path)?;
 
     while let Some(content_key) = rx.recv().await {
         debug!(
@@ -88,13 +90,21 @@ async fn perform_content_audits(
             content.id=?content_key.content_id(),
             "auditing content",
         );
-        let content = client.get_content(&content_key);
+        let content = client.get_content(&content_key)?;
 
         let raw_data = content.raw;
 
-        let content_key_id = contentkey::get(&content_key, &conn).await.unwrap().id;
-        contentaudit::create(content_key_id, raw_data.len() > 2, &conn).await;
+        let Ok(Some(content_key_id)) = contentkey::get(&content_key, &conn).await else {
+            debug!(
+                content.key=?content_key,
+                content.id=?content_key.content_id(),
+                "no content found",
+            );
+            continue
+        };
+        contentaudit::create(content_key_id.id, raw_data.len() > 2, &conn).await;
 
         info!("Successfully audited content.");
     }
+    Ok(())
 }

@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::Parser;
 use sea_orm::{Database, DatabaseConnection};
 use tokio::{signal, task};
@@ -7,10 +8,10 @@ use glados_monitor::{
     cli::{Cli, Commands},
     import_pre_merge_accumulators, run_glados_monitor,
 };
-use migration::{DbErr, Migrator, MigratorTrait};
+use migration::{Migrator, MigratorTrait};
 
 #[tokio::main]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<()> {
     // Setup logging
     env_logger::init();
 
@@ -70,11 +71,11 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-async fn do_nothing() -> Result<(), DbErr> {
+async fn do_nothing() -> Result<()> {
     Ok(())
 }
 
-async fn follow_head_command(conn: DatabaseConnection, provider_url: String) -> Result<(), DbErr> {
+async fn follow_head_command(conn: DatabaseConnection, provider_url: String) -> Result<()> {
     //
     // Web3 Connection
     //

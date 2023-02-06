@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use ethereum_types::H256;
 use sea_orm::entity::prelude::*;
 use sea_orm::{NotSet, Set};
@@ -21,17 +22,16 @@ impl Model {
     }
 }
 
-pub async fn get_or_create(content_id_hash: &H256, conn: &DatabaseConnection) -> Model {
+pub async fn get_or_create(content_id_hash: &H256, conn: &DatabaseConnection) -> Result<Model> {
     // First try to lookup an existing entry.
     let content_id = Entity::find()
         .filter(Column::ContentId.eq(content_id_hash.as_bytes()))
         .one(conn)
-        .await
-        .unwrap(); // TODO: is there a better option than `unwrap` here?
+        .await?;
 
     if let Some(content_id) = content_id {
         // If there is an existing record, return it
-        content_id
+        Ok(content_id)
     } else {
         // If no record exists, create one and return it
         let content_id = ActiveModel {
@@ -41,7 +41,7 @@ pub async fn get_or_create(content_id_hash: &H256, conn: &DatabaseConnection) ->
         content_id
             .insert(conn)
             .await
-            .expect("Error inserting new content_id")
+            .with_context(|| "Error inserting new content_id")
     }
 }
 

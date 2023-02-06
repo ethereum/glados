@@ -1,5 +1,6 @@
 use std::i32;
 
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
 
@@ -66,16 +67,15 @@ pub async fn create(
 pub async fn get_audits<'b, T: OverlayContentKey>(
     content_key: &'b T,
     conn: &DatabaseConnection,
-) -> Vec<Model>
+) -> Result<Vec<Model>>
 where
     Vec<u8>: From<&'b T>,
 {
     let encoded: Vec<u8> = content_key.into();
-    Entity::find()
+    Ok(Entity::find()
         .filter(Column::ContentKey.eq(encoded))
         .all(conn)
-        .await
-        .unwrap()
+        .await?)
 }
 
 impl Related<super::contentkey::Entity> for Entity {

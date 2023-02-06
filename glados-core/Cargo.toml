@@ -9,6 +9,7 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.68"
 discv5 = "0.1.0"
 ethereum-types = "0.14.0"
 hex = "0.4.3"
