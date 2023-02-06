@@ -79,7 +79,7 @@ pub enum JsonRpcError {
     Empty,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct JsonRPCResult {
     id: u32,
     jsonrpc: String,
