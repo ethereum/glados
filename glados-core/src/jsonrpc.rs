@@ -195,13 +195,11 @@ where
         })
     }
 
-    pub fn get_content<'b, T: OverlayContentKey>(&mut self, content_key: &'b T) -> Result<Content>
-    where
-        Vec<u8>: From<&'b T>,
-    {
-        //let encoded: Vec<u8> = <T as Into<Vec<u8>>>::into(content_key);
-        let encoded: Vec<u8> = content_key.into();
-        let params = Some(vec![to_raw_value(&hex::encode(encoded))?]);
+    pub fn get_content<T: OverlayContentKey>(&mut self, content_key: &T) -> Result<Content> {
+        let bytes: Vec<u8> = content_key.clone().into();
+        let encoded = hex::encode(bytes);
+        let content_key_string = format!("0x{encoded}");
+        let params = Some(vec![to_raw_value(&content_key_string).unwrap()]);
         let req = self.build_request("portal_historyRecursiveFindContent", &params);
         let resp = self.make_request(req)?;
 
