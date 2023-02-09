@@ -10,6 +10,8 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique, indexed)]
     pub content_id: Vec<u8>,
+    #[sea_orm(unique)]
+    pub content_key: i32
 }
 
 impl Model {
@@ -22,7 +24,8 @@ impl Model {
     }
 }
 
-pub async fn get_or_create(content_id_hash: &H256, conn: &DatabaseConnection) -> Result<Model> {
+/// Stores the content id, associated with a content key foreign id.
+pub async fn get_or_create(content_id_hash: &H256, content_key_model_id: i32, conn: &DatabaseConnection) -> Result<Model> {
     // First try to lookup an existing entry.
     let content_id = Entity::find()
         .filter(Column::ContentId.eq(content_id_hash.as_bytes()))
@@ -31,18 +34,18 @@ pub async fn get_or_create(content_id_hash: &H256, conn: &DatabaseConnection) ->
 
     if let Some(content_id) = content_id {
         // If there is an existing record, return it
-        Ok(content_id)
-    } else {
-        // If no record exists, create one and return it
-        let content_id = ActiveModel {
-            id: NotSet,
-            content_id: Set(content_id_hash.as_bytes().to_vec()),
-        };
-        content_id
-            .insert(conn)
-            .await
-            .with_context(|| "Error inserting new content_id")
+        return Ok(content_id)
     }
+    // If no record exists, create one and return it
+    let content_id = ActiveModel {
+        id: NotSet,
+        content_key: Set(content_key_model_id),
+        content_id: Set(content_id_hash.as_bytes().to_vec()),
+    };
+    Ok(content_id
+        .insert(conn)
+        .await
+        .with_context(|| "Error inserting new content_id")?)
 }
 
 impl Model {
@@ -51,16 +54,25 @@ impl Model {
     }
 }
 
+
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::contentkey::Entity")]
+    #[sea_orm(
+        belongs_to = "super::contentkey::Entity",
+        from = "Column::ContentKey",
+        to = "super::contentkey::Column::Id",
+        on_update = "Cascade",
+        on_delete = "SetNull"
+    )]
     ContentKey,
 }
+
 
 impl Related<super::contentkey::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::ContentKey.def()
     }
 }
+
 
 impl ActiveModelBehavior for ActiveModel {}
