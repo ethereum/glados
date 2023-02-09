@@ -45,7 +45,11 @@ pub struct ContentKeyListTemplate {
 #[derive(Template)]
 #[template(path = "contentkey_detail.html")]
 pub struct ContentKeyDetailTemplate {
-    pub content_key: contentkey::Model,
+    pub content_key_model: contentkey::Model,
+    pub content_key: String,
+    pub content_id: String,
+    pub content_kind: String,
+    pub block_number: Option<i32>,
     pub contentaudit_list: Vec<contentaudit::Model>,
 }
 

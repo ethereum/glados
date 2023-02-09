@@ -1728,6 +1728,7 @@ dependencies = [
  "entity",
  "env_logger",
  "ethereum-types 0.14.0",
+ "ethportal-api",
  "glados-core",
  "hex",
  "migration",
