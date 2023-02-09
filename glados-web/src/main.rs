@@ -9,6 +9,7 @@ use migration::{Migrator, MigratorTrait};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    env_logger::init();
     // parse command line arguments
     let args = Args::parse();
 
