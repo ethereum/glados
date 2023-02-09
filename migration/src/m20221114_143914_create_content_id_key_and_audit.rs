@@ -38,35 +38,6 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-        // ContentKey
-        manager
-            .create_table(
-                Table::create()
-                    .table(ContentId::Table)
-                    .if_not_exists()
-                    .col(
-                        ColumnDef::new(ContentId::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
-                    )
-                    .col(ColumnDef::new(ContentId::ContentKey).integer().not_null())
-                    //.index(Index::create().name("idx-contentkey-content_id").col(ContentKey::ContentId))
-                    .foreign_key(
-                        ForeignKey::create()
-                            .name("FK_content_id_content_key")
-                            .from(ContentId::Table, ContentId::ContentKey)
-                            .to(ContentKey::Table, ContentKey::Id)
-                            .on_delete(ForeignKeyAction::Cascade)
-                            .on_update(ForeignKeyAction::Cascade),
-                    )
-                    .col(ColumnDef::new(ContentId::ContentId).binary().not_null())
-                    //.index(Index::create().unique().name("idx-contentkey-content_key").col(ContentKey::ContentKey))
-                    .to_owned(),
-            )
-            .await?;
-
         // ContentAudit
         manager
             .create_table(
@@ -110,9 +81,6 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(ContentId::Table).to_owned())
-            .await?;
-        manager
             .drop_table(Table::drop().table(ContentKey::Table).to_owned())
             .await?;
         manager
@@ -130,14 +98,6 @@ enum ContentKey {
     Id,
     ContentKey,
     CreatedAt,
-}
-
-#[derive(Iden)]
-enum ContentId {
-    Table,
-    Id,
-    ContentId,
-    ContentKey,
 }
 
 #[derive(Iden)]

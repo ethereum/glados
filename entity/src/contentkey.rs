@@ -1,11 +1,8 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use ethereum_types::H256;
 use ethportal_api::types::content_key::OverlayContentKey;
 use sea_orm::entity::prelude::*;
 use sea_orm::{NotSet, Set};
-
-use crate::contentid;
 
 #[derive(Clone, Debug, Eq, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "content_key")]
@@ -25,8 +22,6 @@ impl Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::contentid::Entity")]
-    ContentId,
     #[sea_orm(has_many = "super::contentaudit::Entity")]
     ContentAudit,
 }
@@ -53,11 +48,7 @@ pub async fn get_or_create<T: OverlayContentKey>(
         content_key: Set(content_key_bytes),
         created_at: Set(chrono::offset::Utc::now()),
     };
-    let content_key_model = content_key_active_model.insert(conn).await?;
-    let content_id = content_key.content_id();
-    let content_id_hash = H256::from_slice(&content_id);
-    contentid::get_or_create(&content_id_hash, content_key_model.id, conn).await?;
-    Ok(content_key_model)
+    Ok(content_key_active_model.insert(conn).await?)
 }
 
 pub async fn get<T: OverlayContentKey>(
@@ -69,12 +60,6 @@ pub async fn get<T: OverlayContentKey>(
         .filter(Column::ContentKey.eq(content_key_bytes))
         .one(conn)
         .await?)
-}
-
-impl Related<super::contentid::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::ContentId.def()
-    }
 }
 
 impl Related<super::contentaudit::Entity> for Entity {

@@ -11,7 +11,7 @@ use sea_orm::{
 
 use migration::{Migrator, MigratorTrait};
 
-use crate::{contentaudit, contentid, contentkey, node};
+use crate::{contentaudit, contentkey, node};
 
 #[allow(dead_code)]
 async fn setup_database() -> Result<DbConn, DbErr> {
@@ -104,77 +104,6 @@ async fn crud_record() -> Result<(), DbErr> {
 
     Ok(())
 }
-#[tokio::test]
-async fn test_contentid_as_hash() -> Result<(), DbErr> {
-    let conn = setup_database().await?;
-
-    let content_id_raw: Vec<u8> = vec![
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-        25, 26, 27, 28, 29, 30, 31,
-    ];
-    let content_id_hash = H256::from_slice(&content_id_raw);
-    let content_id = contentid::get_or_create(&content_id_hash, &conn)
-        .await
-        .unwrap();
-
-    // ensure our database is empty
-    assert_eq!(content_id.as_hash(), content_id_hash);
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_contentid_as_hex() -> Result<(), DbErr> {
-    let conn = setup_database().await?;
-
-    let content_id_raw: Vec<u8> = vec![
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-        25, 26, 27, 28, 29, 30, 31,
-    ];
-    let content_id_hash = H256::from_slice(&content_id_raw);
-    let content_id = contentid::get_or_create(&content_id_hash, &conn)
-        .await
-        .unwrap();
-
-    // ensure our database is empty
-    assert_eq!(
-        content_id.as_hex(),
-        "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_contentid_get_or_create() -> Result<(), DbErr> {
-    let conn = setup_database().await?;
-
-    let content_id_raw: Vec<u8> = vec![
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-        25, 26, 27, 28, 29, 30, 31,
-    ];
-    let content_id_hash = H256::from_slice(&content_id_raw);
-
-    // ensure our database is empty
-    assert_eq!(contentid::Entity::find().count(&conn).await?, 0);
-
-    let content_id_a = contentid::get_or_create(&content_id_hash, &conn)
-        .await
-        .unwrap();
-
-    // ensure we added a new record to the database.
-    assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
-
-    let content_id_b = contentid::get_or_create(&content_id_hash, &conn)
-        .await
-        .unwrap();
-
-    // ensure that get_or_create found the existing entry.
-    assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
-    assert_eq!(content_id_a.id, content_id_b.id);
-
-    Ok(())
-}
 
 #[tokio::test]
 async fn test_contentkey_get_or_create() -> Result<(), DbErr> {
@@ -189,94 +118,96 @@ async fn test_contentkey_get_or_create() -> Result<(), DbErr> {
     });
 
     // Ensure our database is empty
-    assert_eq!(contentid::Entity::find().count(&conn).await?, 0);
     assert_eq!(contentkey::Entity::find().count(&conn).await?, 0);
 
     let content_key_a = contentkey::get_or_create(&header_content_key, &conn)
         .await
         .unwrap();
 
-    // Ensure our database now has entries for both
-    assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
+    // Ensure our database now has an entry
     assert_eq!(contentkey::Entity::find().count(&conn).await?, 1);
 
     let content_key_b = contentkey::get_or_create(&header_content_key, &conn)
         .await
         .unwrap();
 
-    // Ensure the existing entries were found
-    assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
+    // Ensure the existing entry was found.
     assert_eq!(contentkey::Entity::find().count(&conn).await?, 1);
     assert_eq!(content_key_a.id, content_key_b.id);
-    assert_eq!(content_key_a.content_id, content_key_b.content_id);
+    assert_eq!(content_key_a.content_key, content_key_b.content_key);
 
     Ok(())
 }
 
 #[tokio::test]
-async fn test_audit_crud() -> Result<(), DbErr> {
+async fn test_content_key_create_and_read() -> Result<(), DbErr> {
     let conn = setup_database().await?;
 
-    let content_id_raw: Vec<u8> = vec![
+    let content_key_raw: Vec<u8> = vec![
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
         25, 26, 27, 28, 29, 30, 31,
     ];
 
-    let content_id = contentid::ActiveModel {
+    let content_key_active_model = contentkey::ActiveModel {
         id: NotSet,
-        content_id: Set(content_id_raw.clone()),
+        content_key: Set(content_key_raw.clone()),
+        created_at: Set(Utc::now()),
     };
 
-    let content_id = content_id.insert(&conn).await?;
-    println!("Inserted: content_id={:?}", content_id);
+    let content_key_model = content_key_active_model.insert(&conn).await?;
+    println!("Inserted: content_id={:?}", content_key_model);
 
-    let content_id = contentid::Entity::find()
-        .filter(contentid::Column::ContentId.eq(content_id_raw.clone()))
+    let content_id = contentkey::Entity::find()
+        .filter(contentkey::Column::ContentKey.eq(content_key_raw.clone()))
         .one(&conn)
         .await?
         .unwrap();
+    assert_eq!(content_id.content_key, content_key_raw);
+    Ok(())
+}
 
-    assert_eq!(content_id.content_id, content_id_raw);
-
+#[tokio::test]
+async fn test_audit_create_and_read() -> Result<(), DbErr> {
+    let conn = setup_database().await?;
     // setup the content_key
     let content_key_raw: String =
         String::from("not-a-real-content-key-but-lets-make-sure-its-more-than-32-chars");
+
     let content_key = contentkey::ActiveModel {
         id: NotSet,
-        content_id: Set(content_id.id),
         content_key: Set(content_key_raw.clone().as_bytes().to_vec()),
         created_at: Set(Utc::now()),
     };
 
-    let content_key = content_key.insert(&conn).await?;
-    println!("Inserted: content_key={:?}", content_key);
+    let content_key_active_model = content_key.insert(&conn).await?;
+    println!("Inserted: content_key={:?}", content_key_active_model);
 
-    let content_key = contentkey::Entity::find()
+    let content_key_model = contentkey::Entity::find()
         .filter(contentkey::Column::ContentKey.eq(content_key_raw.clone().as_bytes().to_vec()))
         .one(&conn)
         .await?
         .unwrap();
 
-    assert_eq!(content_key.content_key, content_key_raw.as_bytes().to_vec());
+    assert_eq!(content_key_model.content_key, content_key_raw.as_bytes().to_vec());
 
     // setup the content_audit
-    let content_audit = contentaudit::ActiveModel {
+    let content_audit_active_model = contentaudit::ActiveModel {
         id: NotSet,
-        content_key: Set(content_key.id),
+        content_key: Set(content_key_model.id),
         created_at: Set(Utc::now()),
         result: Set(contentaudit::AuditResult::Success),
     };
 
-    let content_audit = content_audit.insert(&conn).await?;
-    println!("Inserted: content_audit={:?}", content_audit);
+    let content_audit_model = content_audit_active_model.insert(&conn).await?;
+    println!("Inserted: content_audit={:?}", content_audit_model);
 
-    let content_audit = contentaudit::Entity::find_by_id(content_audit.id)
+    let fetched_content_audit_model = contentaudit::Entity::find_by_id(content_audit_model.id)
         .one(&conn)
         .await?
         .unwrap();
 
-    assert_eq!(content_audit.content_key, content_key.id);
-    assert_eq!(content_audit.result, contentaudit::AuditResult::Success);
+    assert_eq!(fetched_content_audit_model.content_key, content_key_model.id);
+    assert_eq!(fetched_content_audit_model.result, contentaudit::AuditResult::Success);
 
     Ok(())
 }
