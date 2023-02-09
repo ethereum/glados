@@ -4,7 +4,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 
-use entity::{contentaudit, contentid, contentkey, node};
+use entity::{contentaudit, contentkey, node};
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -19,21 +19,8 @@ pub struct NodeListTemplate {
 #[derive(Template)]
 #[template(path = "content_dashboard.html")]
 pub struct ContentDashboardTemplate {
-    pub contentid_list: Vec<contentid::Model>,
-    pub contentaudit_list: Vec<contentaudit::Model>,
-}
-
-#[derive(Template)]
-#[template(path = "contentid_list.html")]
-pub struct ContentIdListTemplate {
-    pub contentid_list: Vec<contentid::Model>,
-}
-
-#[derive(Template)]
-#[template(path = "contentid_detail.html")]
-pub struct ContentIdDetailTemplate {
-    pub content_id: contentid::Model,
     pub contentkey_list: Vec<contentkey::Model>,
+    pub contentaudit_list: Vec<contentaudit::Model>,
 }
 
 #[derive(Template)]

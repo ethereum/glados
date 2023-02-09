@@ -188,7 +188,10 @@ async fn test_audit_create_and_read() -> Result<(), DbErr> {
         .await?
         .unwrap();
 
-    assert_eq!(content_key_model.content_key, content_key_raw.as_bytes().to_vec());
+    assert_eq!(
+        content_key_model.content_key,
+        content_key_raw.as_bytes().to_vec()
+    );
 
     // setup the content_audit
     let content_audit_active_model = contentaudit::ActiveModel {
@@ -206,8 +209,14 @@ async fn test_audit_create_and_read() -> Result<(), DbErr> {
         .await?
         .unwrap();
 
-    assert_eq!(fetched_content_audit_model.content_key, content_key_model.id);
-    assert_eq!(fetched_content_audit_model.result, contentaudit::AuditResult::Success);
+    assert_eq!(
+        fetched_content_audit_model.content_key,
+        content_key_model.id
+    );
+    assert_eq!(
+        fetched_content_audit_model.result,
+        contentaudit::AuditResult::Success
+    );
 
     Ok(())
 }

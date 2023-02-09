@@ -10,8 +10,8 @@
     <div class="col">
       <h2>Recent Content</h2>
       <ul>
-        {% for contentid in contentid_list %}
-          <li><a href="/content/id/{{contentid.as_hex() }}">{{ contentid.as_hash() }}</a></li>
+        {% for contentkey in contentkey_list %}
+          <li><a href="/content/key/{{contentkey.as_hex() }}">{{ contentkey.as_hex() }}</a></li>
         {% else %}
           <li>No content found</li>
         {% endfor %}

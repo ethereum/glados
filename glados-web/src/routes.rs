@@ -8,13 +8,12 @@ use axum::{
 };
 use sea_orm::{ColumnTrait, EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect};
 
-use entity::{contentaudit, contentid, contentkey, node};
+use entity::{contentaudit, contentkey, node};
 
 use crate::state::State;
 use crate::templates::{
-    ContentDashboardTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
-    ContentKeyDetailTemplate, ContentKeyListTemplate, HtmlTemplate, IndexTemplate,
-    NodeListTemplate,
+    ContentDashboardTemplate, ContentKeyDetailTemplate, ContentKeyListTemplate, HtmlTemplate,
+    IndexTemplate, NodeListTemplate,
 };
 
 //
@@ -41,8 +40,8 @@ pub async fn node_list(Extension(state): Extension<Arc<State>>) -> impl IntoResp
 }
 
 pub async fn content_dashboard(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
-    let contentid_list = contentid::Entity::find()
-        .order_by_desc(contentid::Column::ContentId)
+    let contentkey_list = contentkey::Entity::find()
+        .order_by_desc(contentkey::Column::ContentKey)
         .limit(10)
         .all(&state.database_connection)
         .await
@@ -54,44 +53,8 @@ pub async fn content_dashboard(Extension(state): Extension<Arc<State>>) -> impl 
         .await
         .unwrap();
     let template = ContentDashboardTemplate {
-        contentid_list,
-        contentaudit_list,
-    };
-    HtmlTemplate(template)
-}
-
-pub async fn contentid_list(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
-    let contentid_list: Vec<contentid::Model> = contentid::Entity::find()
-        .order_by_asc(contentid::Column::ContentId)
-        .limit(50)
-        .all(&state.database_connection)
-        .await
-        .unwrap();
-    let template = ContentIdListTemplate { contentid_list };
-    HtmlTemplate(template)
-}
-
-pub async fn contentid_detail(
-    Path(content_id_hex): Path<String>,
-    Extension(state): Extension<Arc<State>>,
-) -> impl IntoResponse {
-    let content_id_raw = hex::decode(&content_id_hex[2..]).unwrap();
-    let content_id = contentid::Entity::find()
-        .filter(contentid::Column::ContentId.eq(content_id_raw))
-        .one(&state.database_connection)
-        .await
-        .unwrap()
-        .expect("No content found");
-
-    let contentkey_list = content_id
-        .find_related(contentkey::Entity)
-        .all(&state.database_connection)
-        .await
-        .unwrap();
-
-    let template = ContentIdDetailTemplate {
-        content_id,
         contentkey_list,
+        contentaudit_list,
     };
     HtmlTemplate(template)
 }

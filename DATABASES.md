@@ -48,7 +48,6 @@ Defined in `/src/migration/`:
     - Record
     - KeyValue
 - `m20221114_143914_create_content_id_key_and_audit.rs`
-    - ContentId
     - ContentKey
     - ContentAudit
 - `m20230125_205211_create_execution_header_table.rs`
@@ -64,8 +63,7 @@ Tables have the following relationships:
 - Node
     - Record
         - KeyValue
-- ContentId
-    - ContentKey
+- ContentKey
         - ContentAudit (glados audit results)
     - ExecutionHeader (data for context)
     - ExecutionBody (data for context)
@@ -86,10 +84,7 @@ Tables have the following columns:
     - RecordId
     - Key
     - Value
-- ContentId
-    - ContentId
 - ContentKey
-    - ContentId
     - ContentKey
     - CreatedAt
 - ContentAudit
@@ -97,14 +92,14 @@ Tables have the following columns:
     - CreatedAt
     - Result
 - ExecutionHeader
-    - ContentId
+    - ContentKey
     - BlockNumber
     - BlockHash
 - ExecutionBody
-    - ContentId
+    - ContentKey
     - BlockNumber
     - BlockHash
 - ExecutionReceipts
-    - ContentId
+    - ContentKey
     - BlockNumber
     - BlockHash
