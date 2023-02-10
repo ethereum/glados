@@ -14,7 +14,7 @@ pub struct Model {
     #[sea_orm(unique)]
     pub content_key: i32,
     #[sea_orm(unique)]
-    pub block_number: i64,
+    pub block_number: i32,
     #[sea_orm(unique)]
     pub block_hash: Vec<u8>,
 }
@@ -41,7 +41,7 @@ impl ActiveModelBehavior for ActiveModel {}
 
 pub async fn get_or_create<T: OverlayContentKey>(
     content_key: &T,
-    block_number: i64,
+    block_number: i32,
     block_hash: &[u8; 32],
     conn: &DatabaseConnection,
 ) -> Result<Model> {

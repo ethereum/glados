@@ -112,12 +112,9 @@ async fn retrieve_new_blocks(
             block.number=?block_number_to_retrieve,
             "received block",
         );
-        store_block_keys(
-            block_number_to_retrieve.as_u64(),
-            block_hash.as_fixed_bytes(),
-            &conn,
-        )
-        .await;
+        let block_num =
+            i32::try_from(block_number_to_retrieve).expect("Block num does not fit in i32.");
+        store_block_keys(block_num, block_hash.as_fixed_bytes(), &conn).await;
     }
 }
 
@@ -127,10 +124,7 @@ async fn retrieve_new_blocks(
 /// header, body and receipts tables.
 ///
 /// Errors are logged.
-async fn store_block_keys(block_number: u64, block_hash: &[u8; 32], conn: &DatabaseConnection) {
-    // SQLite only supports i64.
-    let block_number = block_number as i64;
-
+async fn store_block_keys(block_number: i32, block_hash: &[u8; 32], conn: &DatabaseConnection) {
     let header = HistoryContentKey::BlockHeader(BlockHeaderKey {
         block_hash: *block_hash,
     });

@@ -154,7 +154,7 @@ where
 
 struct BlockMetadata {
     component: Component,
-    number: i64,
+    number: i32,
     hash: Vec<u8>,
 }
 
