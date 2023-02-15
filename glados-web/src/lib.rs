@@ -1,5 +1,5 @@
-use std::path::Path;
 use std::sync::Arc;
+use std::{net::SocketAddr, path::Path};
 
 use anyhow::{bail, Result};
 use axum::{
@@ -8,6 +8,7 @@ use axum::{
     Router,
 };
 use tower_http::services::ServeDir;
+use tracing::info;
 
 pub mod cli;
 pub mod routes;
@@ -15,6 +16,8 @@ pub mod state;
 pub mod templates;
 
 use crate::state::State;
+
+const SOCKET: &str = "0.0.0.0:3001";
 
 pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
     let Some(parent) = Path::new(std::file!()).parent() else {bail!("No parent of config file")};
@@ -39,8 +42,9 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
         .fallback_service(serve_dir)
         .layer(Extension(config));
 
-    // run it with hyper on localhost:3000
-    Ok(axum::Server::bind(&"0.0.0.0:3001".parse()?)
+    let socket: SocketAddr = SOCKET.parse()?;
+    info!("Serving glados-web at {}", socket);
+    Ok(axum::Server::bind(&socket)
         .serve(app.into_make_service())
         .await?)
 }
