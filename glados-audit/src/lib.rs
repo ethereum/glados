@@ -43,7 +43,10 @@ where
     let mut interval = interval(Duration::from_secs(AUDIT_PERIOD_SECONDS));
     loop {
         interval.tick().await;
-
+        if tx.is_closed() {
+            error!("Channel is closed.");
+            panic!();
+        }
         // Lookup a content key to be audited
         let content_key_db_entries = match contentkey::Entity::find()
             .order_by_desc(contentkey::Column::CreatedAt)
@@ -97,7 +100,7 @@ async fn perform_content_audits(
 where
     Vec<u8>: From<HistoryContentKey>,
 {
-    let mut client = PortalClient::from_ipc(&ipc_path)?;
+    let mut client = PortalClient::from_ipc(&ipc_path).expect("Could not connect to portal node.");
 
     while let Some(content_key) = rx.recv().await {
         let content_key_str = format!("0x{}", hex::encode::<Vec<u8>>(content_key.clone().into()));

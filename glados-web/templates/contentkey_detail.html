@@ -1,16 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Content Key: {{ content_key.as_hex() }}{% endblock %}
+{% block title %}Content Key: {{ content_key_model.as_hex() }}{% endblock %}
 
 {% block content %}
   <div class="row">
-    <h1>Content Key: {{ content_key.as_hex() }}</h1>
+    <h1>Content Key: {{ content_key_model.as_hex() }}</h1>
   </div>
   <div class="row">
     <div class="col">
       <ul>
-        <li>Database ID: {{ content_key.id }}</li>
-        <li>Key: {{ content_key.as_hex() }}</li>
+        <li>Database ID: {{ content_key_model.id }}</li>
+        <li>Content Key: {{ content_key }}</li>
+        <li>Content Id: {{ content_id }}</li>
+        <li>Kind: {{ content_kind }}</li>
+        {% if block_number.is_some() %}
+            <li>Block number: {{ block_number.unwrap() }}</li>
+        {% else %}{% endif %}
       </ul>
     </div>
     <div class="col">

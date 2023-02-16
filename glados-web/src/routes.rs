@@ -6,9 +6,12 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use ethportal_api::{types::content_key::OverlayContentKey, HistoryContentKey};
 use sea_orm::{ColumnTrait, EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect};
 
-use entity::{contentaudit, contentid, contentkey, node};
+use entity::{
+    contentaudit, contentid, contentkey, executionbody, executionheader, executionreceipts, node,
+};
 
 use crate::state::State;
 use crate::templates::{
@@ -107,27 +110,76 @@ pub async fn contentkey_list(Extension(state): Extension<Arc<State>>) -> impl In
     HtmlTemplate(template)
 }
 
+/// Retrieves key details to display.
+///
+/// At present this assumes it is a HistoryContentKey.
 pub async fn contentkey_detail(
     Path(content_key_hex): Path<String>,
     Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
     let content_key_raw = hex::decode(&content_key_hex[2..]).unwrap();
-    let content_key = contentkey::Entity::find()
-        .filter(contentkey::Column::ContentKey.eq(content_key_raw))
+    let content_key_model = contentkey::Entity::find()
+        .filter(contentkey::Column::ContentKey.eq(content_key_raw.clone()))
         .one(&state.database_connection)
         .await
         .unwrap()
         .expect("No content found");
 
-    let contentaudit_list = content_key
+    let contentaudit_list = content_key_model
         .find_related(contentaudit::Entity)
         .all(&state.database_connection)
         .await
-        .unwrap();
+        .expect("Could not look up audits.");
 
+    let content_key: HistoryContentKey = HistoryContentKey::try_from(content_key_raw.clone())
+        .expect("Could not convert key bytes into OverlayContentKey.");
+
+    let block_number = match content_key_raw[0] {
+        0u8 => {
+            let header_model = executionheader::Entity::find()
+                .filter(executionheader::Column::ContentKey.eq(content_key_model.id))
+                .one(&state.database_connection)
+                .await
+                .expect("No content found");
+            match header_model {
+                Some(m) => Some(m.block_number),
+                None => None,
+            }
+        }
+        1u8 => {
+            let body_model = executionbody::Entity::find()
+                .filter(executionbody::Column::ContentKey.eq(content_key_model.id))
+                .one(&state.database_connection)
+                .await
+                .expect("No content found");
+            match body_model {
+                Some(m) => Some(m.block_number),
+                None => None,
+            }
+        }
+        2u8 => {
+            let receipts_model = executionreceipts::Entity::find()
+                .filter(executionreceipts::Column::ContentKey.eq(content_key_model.id))
+                .one(&state.database_connection)
+                .await
+                .expect("No content found");
+            match receipts_model {
+                Some(m) => Some(m.block_number),
+                None => None,
+            }
+        }
+        _ => None,
+    };
+
+    let content_id = format!("0x{}", hex::encode(content_key.content_id()));
+    let content_kind = content_key.to_string();
     let template = ContentKeyDetailTemplate {
-        content_key,
+        content_key: content_key_hex,
+        content_key_model,
         contentaudit_list,
+        content_id,
+        content_kind,
+        block_number,
     };
     HtmlTemplate(template)
 }
