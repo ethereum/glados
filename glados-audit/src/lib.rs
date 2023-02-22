@@ -3,7 +3,7 @@ use std::{fmt::Display, path::PathBuf};
 use anyhow::Result;
 use ethereum_types::H256;
 use ethportal_api::types::content_key::{
-    BlockBodyKey, BlockHeaderKey, BlockReceiptsKey, HistoryContentKey,
+    BlockBodyKey, BlockHeaderKey, BlockReceiptsKey, HistoryContentKey, OverlayContentKey,
 };
 use migration::DbErr;
 use sea_orm::{DatabaseConnection, EntityTrait, QueryOrder, QuerySelect};
@@ -34,10 +34,10 @@ pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
     info!("got CTRL+C. shutting down...");
 }
 
-async fn do_audit_orchestration(tx: mpsc::Sender<HistoryContentKey>, conn: DatabaseConnection) -> !
-where
-    Vec<u8>: From<HistoryContentKey>,
-{
+async fn do_audit_orchestration(
+    tx: mpsc::Sender<HistoryContentKey>,
+    conn: DatabaseConnection,
+) -> ! {
     debug!("initializing audit process");
 
     let mut interval = interval(Duration::from_secs(AUDIT_PERIOD_SECONDS));
@@ -67,7 +67,7 @@ where
         for content_key_db in content_key_db_entries {
             // Get the block hash (by removing the first byte from the content key)
             let hash = H256::from_slice(&content_key_db.content_key[1..33]);
-            let header = HistoryContentKey::BlockHeader(BlockHeaderKey {
+            let header = HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey {
                 block_hash: hash.to_fixed_bytes(),
             });
 
@@ -92,18 +92,18 @@ where
     }
 }
 
-async fn perform_content_audits(
-    mut rx: mpsc::Receiver<HistoryContentKey>,
+async fn perform_content_audits<T>(
+    mut rx: mpsc::Receiver<T>,
     ipc_path: PathBuf,
     conn: DatabaseConnection,
 ) -> Result<()>
 where
-    Vec<u8>: From<HistoryContentKey>,
+    T: OverlayContentKey,
 {
     let mut client = PortalClient::from_ipc(&ipc_path).expect("Could not connect to portal node.");
 
     while let Some(content_key) = rx.recv().await {
-        let content_key_str = format!("0x{}", hex::encode::<Vec<u8>>(content_key.clone().into()));
+        let content_key_str = format!("0x{}", hex::encode(content_key.to_bytes()));
         debug!(content.key = content_key_str, "auditing content",);
         let content = client.get_content(&content_key)?;
 

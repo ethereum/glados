@@ -196,8 +196,7 @@ where
     }
 
     pub fn get_content<T: OverlayContentKey>(&mut self, content_key: &T) -> Result<Content> {
-        let bytes: Vec<u8> = content_key.clone().into();
-        let encoded = hex::encode(bytes);
+        let encoded = hex::encode(content_key.to_bytes());
         let content_key_string = format!("0x{encoded}");
         let params = Some(vec![to_raw_value(&content_key_string).unwrap()]);
         let req = self.build_request("portal_historyRecursiveFindContent", &params);
