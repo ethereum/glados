@@ -3,16 +3,24 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "node")]
+#[sea_orm(table_name = "key_value")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub node_id: Vec<u8>,
+    pub record_id: i32,
+    pub key: Vec<u8>,
+    pub value: Vec<u8>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::record::Entity")]
+    #[sea_orm(
+        belongs_to = "super::record::Entity",
+        from = "Column::RecordId",
+        to = "super::record::Column::Id",
+        on_update = "Cascade",
+        on_delete = "Cascade"
+    )]
     Record,
 }
 

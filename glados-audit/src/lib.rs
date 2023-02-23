@@ -1,14 +1,12 @@
-use std::{fmt::Display, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
-use ethereum_types::H256;
 use ethportal_api::{types::content_key::OverlayContentKey, HistoryContentKey};
-use migration::DbErr;
 use sea_orm::DatabaseConnection;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 
-use entity::{contentaudit, contentkey, executionbody, executionheader, executionreceipts};
+use entity::{content, content_audit, execution_metadata};
 use glados_core::jsonrpc::PortalClient;
 
 use crate::selection::SelectionStrategy;
@@ -55,7 +53,7 @@ where
 
         let raw_data = content.raw;
         let audit_result = raw_data.len() > 2;
-        let content_key_model = match contentkey::get(&content_key, &conn).await {
+        let content_key_model = match content::get(&content_key, &conn).await {
             Ok(Some(m)) => m,
             Ok(None) => {
                 error!(
@@ -74,15 +72,15 @@ where
                 continue;
             }
         };
-        contentaudit::create(content_key_model.id, audit_result, &conn).await?;
+        content_audit::create(content_key_model.id, audit_result, &conn).await?;
 
         // Display audit result with block metadata.
-        match fetch_block_metadata(content_key_model.id, &conn).await {
+        match execution_metadata::get(content_key_model.id, &conn).await {
             Ok(Some(b)) => {
                 info!(
                     content.key=content_key_str,
                     audit.pass=?audit_result,
-                    block = b.to_string(),
+                    block = b.block_number,
                 );
             }
             Ok(None) => {
@@ -99,62 +97,4 @@ where
         };
     }
     Ok(())
-}
-
-struct BlockMetadata {
-    component: Component,
-    number: i32,
-    hash: Vec<u8>,
-}
-
-impl Display for BlockMetadata {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let comp = match self.component {
-            Component::Header => "header",
-            Component::Body => "body",
-            Component::Receipts => "receipts",
-        };
-        let number = self.number;
-        let hash = H256::from_slice(&self.hash).to_string();
-        write!(f, "{comp} for block {number} (hash: {hash})")
-    }
-}
-
-enum Component {
-    Header,
-    Body,
-    Receipts,
-}
-
-/// Gets execution body, header or receipts details for a
-/// single key.
-///
-/// The key is the database-assigned key for a portal content_key.
-/// Search stops as soon as a match is found, otherwise returns None.
-async fn fetch_block_metadata(
-    content_key_model_id: i32,
-    conn: &DatabaseConnection,
-) -> Result<Option<BlockMetadata>, DbErr> {
-    if let Some(header) = executionheader::get(content_key_model_id, conn).await? {
-        return Ok(Some(BlockMetadata {
-            component: Component::Header,
-            number: header.block_number,
-            hash: header.block_hash,
-        }));
-    }
-    if let Some(body) = executionbody::get(content_key_model_id, conn).await? {
-        return Ok(Some(BlockMetadata {
-            component: Component::Body,
-            number: body.block_number,
-            hash: body.block_hash,
-        }));
-    }
-    if let Some(receipts) = executionreceipts::get(content_key_model_id, conn).await? {
-        return Ok(Some(BlockMetadata {
-            component: Component::Receipts,
-            number: receipts.block_number,
-            hash: receipts.block_hash,
-        }));
-    }
-    Ok(None)
 }

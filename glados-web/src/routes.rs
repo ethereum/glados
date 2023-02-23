@@ -10,7 +10,9 @@ use ethportal_api::{types::content_key::OverlayContentKey, HistoryContentKey};
 use sea_orm::{ColumnTrait, EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect};
 
 use entity::{
-    contentaudit, contentid, contentkey, executionbody, executionheader, executionreceipts, node,
+    content,
+    content_audit::{self, AuditResult},
+    execution_metadata, node,
 };
 
 use crate::state::State;
@@ -44,14 +46,21 @@ pub async fn node_list(Extension(state): Extension<Arc<State>>) -> impl IntoResp
 }
 
 pub async fn content_dashboard(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
-    let contentid_list = contentid::Entity::find()
-        .order_by_desc(contentid::Column::ContentId)
+    let contentid_list = content::Entity::find()
+        .order_by_desc(content::Column::ContentId)
         .limit(10)
         .all(&state.database_connection)
         .await
         .unwrap();
-    let contentaudit_list = contentaudit::Entity::find()
-        .order_by_desc(contentaudit::Column::CreatedAt)
+    let contentaudit_list = content_audit::Entity::find()
+        .order_by_desc(content_audit::Column::CreatedAt)
+        .limit(10)
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+    let contentaudit_pass_list = content_audit::Entity::find()
+        .filter(content_audit::Column::Result.eq(AuditResult::Success))
+        .order_by_desc(content_audit::Column::CreatedAt)
         .limit(10)
         .all(&state.database_connection)
         .await
@@ -59,13 +68,14 @@ pub async fn content_dashboard(Extension(state): Extension<Arc<State>>) -> impl 
     let template = ContentDashboardTemplate {
         contentid_list,
         contentaudit_list,
+        contentaudit_pass_list,
     };
     HtmlTemplate(template)
 }
 
 pub async fn contentid_list(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
-    let contentid_list: Vec<contentid::Model> = contentid::Entity::find()
-        .order_by_asc(contentid::Column::ContentId)
+    let contentid_list: Vec<content::Model> = content::Entity::find()
+        .order_by_asc(content::Column::ContentId)
         .limit(50)
         .all(&state.database_connection)
         .await
@@ -79,15 +89,15 @@ pub async fn contentid_detail(
     Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
     let content_id_raw = hex::decode(&content_id_hex[2..]).unwrap();
-    let content_id = contentid::Entity::find()
-        .filter(contentid::Column::ContentId.eq(content_id_raw))
+    let content_id = content::Entity::find()
+        .filter(content::Column::ContentId.eq(content_id_raw.clone()))
         .one(&state.database_connection)
         .await
         .unwrap()
         .expect("No content found");
 
-    let contentkey_list = content_id
-        .find_related(contentkey::Entity)
+    let contentkey_list = content::Entity::find()
+        .filter(content::Column::ContentId.eq(content_id_raw))
         .all(&state.database_connection)
         .await
         .unwrap();
@@ -100,8 +110,8 @@ pub async fn contentid_detail(
 }
 
 pub async fn contentkey_list(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
-    let contentkey_list: Vec<contentkey::Model> = contentkey::Entity::find()
-        .order_by_desc(contentkey::Column::Id)
+    let contentkey_list: Vec<content::Model> = content::Entity::find()
+        .order_by_desc(content::Column::Id)
         .limit(50)
         .all(&state.database_connection)
         .await
@@ -118,58 +128,27 @@ pub async fn contentkey_detail(
     Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
     let content_key_raw = hex::decode(&content_key_hex[2..]).unwrap();
-    let content_key_model = contentkey::Entity::find()
-        .filter(contentkey::Column::ContentKey.eq(content_key_raw.clone()))
+    let content_key_model = content::Entity::find()
+        .filter(content::Column::ContentKey.eq(content_key_raw.clone()))
         .one(&state.database_connection)
         .await
         .unwrap()
         .expect("No content found");
 
     let contentaudit_list = content_key_model
-        .find_related(contentaudit::Entity)
+        .find_related(content_audit::Entity)
         .all(&state.database_connection)
         .await
         .expect("Could not look up audits.");
 
     let content_key: HistoryContentKey = HistoryContentKey::try_from(content_key_raw.clone())
         .expect("Could not convert key bytes into OverlayContentKey.");
-
-    let block_number = match content_key_raw[0] {
-        0u8 => {
-            let header_model = executionheader::Entity::find()
-                .filter(executionheader::Column::ContentKey.eq(content_key_model.id))
-                .one(&state.database_connection)
-                .await
-                .expect("No content found");
-            match header_model {
-                Some(m) => Some(m.block_number),
-                None => None,
-            }
-        }
-        1u8 => {
-            let body_model = executionbody::Entity::find()
-                .filter(executionbody::Column::ContentKey.eq(content_key_model.id))
-                .one(&state.database_connection)
-                .await
-                .expect("No content found");
-            match body_model {
-                Some(m) => Some(m.block_number),
-                None => None,
-            }
-        }
-        2u8 => {
-            let receipts_model = executionreceipts::Entity::find()
-                .filter(executionreceipts::Column::ContentKey.eq(content_key_model.id))
-                .one(&state.database_connection)
-                .await
-                .expect("No content found");
-            match receipts_model {
-                Some(m) => Some(m.block_number),
-                None => None,
-            }
-        }
-        _ => None,
-    };
+    let metadata_model = execution_metadata::Entity::find()
+        .filter(execution_metadata::Column::Content.eq(content_key_model.id))
+        .one(&state.database_connection)
+        .await
+        .expect("No content found");
+    let block_number = metadata_model.map(|m| m.block_number);
 
     let content_id = format!("0x{}", hex::encode(content_key.content_id()));
     let content_kind = content_key.to_string();

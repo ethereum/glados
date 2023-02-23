@@ -2,7 +2,7 @@
 #[cfg(test)]
 use chrono::prelude::*;
 use ethereum_types::H256;
-use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey};
+use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
 use sea_orm::entity::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Database, DbConn, DbErr, EntityTrait, NotSet, PaginatorTrait,
@@ -11,7 +11,8 @@ use sea_orm::{
 
 use migration::{Migrator, MigratorTrait};
 
-use crate::{contentaudit, contentid, contentkey, node};
+use crate::content::SubProtocol;
+use crate::{content, content_audit, node};
 
 #[allow(dead_code)]
 async fn setup_database() -> Result<DbConn, DbErr> {
@@ -104,179 +105,218 @@ async fn crud_record() -> Result<(), DbErr> {
 
     Ok(())
 }
-#[tokio::test]
-async fn test_contentid_as_hash() -> Result<(), DbErr> {
-    let conn = setup_database().await?;
 
-    let content_id_raw: Vec<u8> = vec![
+#[allow(dead_code)]
+/// Returns a history content key representing the header with proof
+/// for block hash `0x0001...1e1f`
+fn sample_history_key() -> HistoryContentKey {
+    let block_hash: [u8; 32] = [
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
         25, 26, 27, 28, 29, 30, 31,
     ];
-    let content_id_hash = H256::from_slice(&content_id_raw);
-    let content_id = contentid::get_or_create(&content_id_hash, &conn)
-        .await
-        .unwrap();
+    HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey { block_hash })
+}
 
-    // ensure our database is empty
-    assert_eq!(content_id.as_hash(), content_id_hash);
-
+/// Tests that the database helper method id_as_hash() works.
+#[tokio::test]
+async fn test_content_id_as_hash() -> Result<(), DbErr> {
+    let conn = setup_database().await?;
+    let key = sample_history_key();
+    let content_id_hash = H256::from_slice(&key.content_id());
+    let content_model = content::get_or_create(&key, &conn).await.unwrap();
+    assert_eq!(content_model.id_as_hash(), content_id_hash);
     Ok(())
 }
 
+/// Tests that the database helper method id_as_hex() works.
 #[tokio::test]
-async fn test_contentid_as_hex() -> Result<(), DbErr> {
+async fn test_content_id_as_hex() -> Result<(), DbErr> {
     let conn = setup_database().await?;
+    let key = sample_history_key();
+    let content_id_hash = H256::from_slice(&key.content_id());
+    let content_id_hex = format!("0x{}", hex::encode(content_id_hash));
+    let content_model = content::get_or_create(&key, &conn).await.unwrap();
+    assert_eq!(content_model.id_as_hex(), content_id_hex);
+    Ok(())
+}
 
-    let content_id_raw: Vec<u8> = vec![
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-        25, 26, 27, 28, 29, 30, 31,
-    ];
-    let content_id_hash = H256::from_slice(&content_id_raw);
-    let content_id = contentid::get_or_create(&content_id_hash, &conn)
-        .await
-        .unwrap();
-
-    // ensure our database is empty
+/// Tests that the database helper method key_as_hex() works.
+#[tokio::test]
+async fn test_content_key_as_hex() -> Result<(), DbErr> {
+    let conn = setup_database().await?;
+    let key = sample_history_key();
+    let content_model = content::get_or_create(&key, &conn).await.unwrap();
     assert_eq!(
-        content_id.as_hex(),
-        "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+        content_model.key_as_hex(),
+        "0x00000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
     );
-
     Ok(())
 }
 
+/// Tests that the get_or_create() function correctly handles the
+/// presence or absence of a key in the database.
 #[tokio::test]
-async fn test_contentid_get_or_create() -> Result<(), DbErr> {
+async fn test_content_get_or_create() -> Result<(), DbErr> {
     let conn = setup_database().await?;
-
-    let content_id_raw: Vec<u8> = vec![
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-        25, 26, 27, 28, 29, 30, 31,
-    ];
-    let content_id_hash = H256::from_slice(&content_id_raw);
-
-    // ensure our database is empty
-    assert_eq!(contentid::Entity::find().count(&conn).await?, 0);
-
-    let content_id_a = contentid::get_or_create(&content_id_hash, &conn)
-        .await
-        .unwrap();
-
-    // ensure we added a new record to the database.
-    assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
-
-    let content_id_b = contentid::get_or_create(&content_id_hash, &conn)
-        .await
-        .unwrap();
-
-    // ensure that get_or_create found the existing entry.
-    assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
-    assert_eq!(content_id_a.id, content_id_b.id);
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_contentkey_get_or_create() -> Result<(), DbErr> {
-    let conn = setup_database().await?;
-
-    let block_hash = H256::from_slice(
-        &hex::decode("d1c390624d3bd4e409a61a858e5dcc5517729a9170d014a6c96530d64dd8621d").unwrap(),
-    );
-
-    let header_content_key = HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey {
-        block_hash: block_hash.to_fixed_bytes(),
-    });
+    let key = sample_history_key();
 
     // Ensure our database is empty
-    assert_eq!(contentid::Entity::find().count(&conn).await?, 0);
-    assert_eq!(contentkey::Entity::find().count(&conn).await?, 0);
+    assert_eq!(content::Entity::find().count(&conn).await?, 0);
 
-    let content_key_a = contentkey::get_or_create(&header_content_key, &conn)
-        .await
-        .unwrap();
+    let content_id_a = content::get_or_create(&key, &conn).await.unwrap();
 
-    // Ensure our database now has entries for both
-    assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
-    assert_eq!(contentkey::Entity::find().count(&conn).await?, 1);
+    // Ensure we added a new record to the database.
+    assert_eq!(content::Entity::find().count(&conn).await?, 1);
 
-    let content_key_b = contentkey::get_or_create(&header_content_key, &conn)
-        .await
-        .unwrap();
+    // Retrieve the key
+    let content_id_b = content::get_or_create(&key, &conn).await.unwrap();
 
-    // Ensure the existing entries were found
-    assert_eq!(contentid::Entity::find().count(&conn).await?, 1);
-    assert_eq!(contentkey::Entity::find().count(&conn).await?, 1);
-    assert_eq!(content_key_a.id, content_key_b.id);
-    assert_eq!(content_key_a.content_id, content_key_b.content_id);
+    // Key was not saved twice.
+    assert_eq!(content::Entity::find().count(&conn).await?, 1);
 
+    // Ensure that get_or_create found the existing entry.
+    assert_eq!(content_id_a.id, content_id_b.id);
+    assert_eq!(content_id_a.content_key, content_id_b.content_key);
     Ok(())
 }
 
 #[tokio::test]
 async fn test_audit_crud() -> Result<(), DbErr> {
     let conn = setup_database().await?;
+    let key = sample_history_key();
 
-    let content_id_raw: Vec<u8> = vec![
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-        25, 26, 27, 28, 29, 30, 31,
-    ];
-
-    let content_id = contentid::ActiveModel {
+    let content_key_active_model = content::ActiveModel {
         id: NotSet,
-        content_id: Set(content_id_raw.clone()),
+        content_id: Set(key.content_id().to_vec()),
+        content_key: Set(key.to_bytes()),
+        protocol_id: Set(SubProtocol::History),
+        first_available_at: Set(Utc::now().into()),
     };
 
-    let content_id = content_id.insert(&conn).await?;
-    println!("Inserted: content_id={:?}", content_id);
+    let content_model = content_key_active_model.insert(&conn).await?;
 
-    let content_id = contentid::Entity::find()
-        .filter(contentid::Column::ContentId.eq(content_id_raw.clone()))
+    let searched_content_model = content::Entity::find()
+        .filter(content::Column::ContentId.eq(key.content_id().to_vec()))
         .one(&conn)
         .await?
         .unwrap();
 
-    assert_eq!(content_id.content_id, content_id_raw);
-
-    // setup the content_key
-    let content_key_raw: String =
-        String::from("not-a-real-content-key-but-lets-make-sure-its-more-than-32-chars");
-    let content_key = contentkey::ActiveModel {
-        id: NotSet,
-        content_id: Set(content_id.id),
-        content_key: Set(content_key_raw.clone().as_bytes().to_vec()),
-        created_at: Set(Utc::now()),
-    };
-
-    let content_key = content_key.insert(&conn).await?;
-    println!("Inserted: content_key={:?}", content_key);
-
-    let content_key = contentkey::Entity::find()
-        .filter(contentkey::Column::ContentKey.eq(content_key_raw.clone().as_bytes().to_vec()))
-        .one(&conn)
-        .await?
-        .unwrap();
-
-    assert_eq!(content_key.content_key, content_key_raw.as_bytes().to_vec());
+    assert_eq!(searched_content_model.content_id, key.content_id());
+    assert_eq!(searched_content_model.content_key, key.to_bytes());
 
     // setup the content_audit
-    let content_audit = contentaudit::ActiveModel {
+    let content_audit_active_model = content_audit::ActiveModel {
         id: NotSet,
-        content_key: Set(content_key.id),
-        created_at: Set(Utc::now()),
-        result: Set(contentaudit::AuditResult::Success),
+        content_key: Set(searched_content_model.id),
+        created_at: Set(Utc::now().into()),
+        result: Set(content_audit::AuditResult::Success),
     };
 
-    let content_audit = content_audit.insert(&conn).await?;
-    println!("Inserted: content_audit={:?}", content_audit);
+    let content_audit_model = content_audit_active_model.insert(&conn).await?;
 
-    let content_audit = contentaudit::Entity::find_by_id(content_audit.id)
+    let searched_content_audit_model = content_audit::Entity::find_by_id(content_audit_model.id)
         .one(&conn)
         .await?
         .unwrap();
 
-    assert_eq!(content_audit.content_key, content_key.id);
-    assert_eq!(content_audit.result, contentaudit::AuditResult::Success);
+    assert_eq!(searched_content_audit_model.content_key, content_model.id);
+    assert_eq!(
+        searched_content_audit_model.result,
+        content_audit::AuditResult::Success
+    );
 
     Ok(())
+}
+
+/// Tests that the content table unique constraints prevent duplicate entries.
+/// No two keys should have the same protocol_id, content_key and content_id combination.
+#[tokio::test]
+async fn test_content_table_unique_constraints() {
+    let conn = setup_database().await.unwrap();
+    let id_a = vec![1; 32];
+    let id_b = vec![2; 32];
+    let key_a = vec![3; 32];
+    let key_b = vec![4; 32];
+    let protocol_a = SubProtocol::History;
+    let protocol_b = SubProtocol::State;
+    // DB=0. Add one key (accepts). DB==1.
+    let action_a = content::ActiveModel {
+        id: NotSet,
+        content_id: Set(id_a.clone()),
+        content_key: Set(key_a.clone()),
+        protocol_id: Set(protocol_a.clone()),
+        first_available_at: Set(Utc::now().into()),
+    };
+    action_a.clone().insert(&conn).await.unwrap();
+    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 1);
+
+    // DB=1. Repeat addition (rejects). DB=1.
+    assert!(action_a
+        .insert(&conn)
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("UNIQUE constraint failed"));
+
+    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 1);
+
+    // DB=1. Add same content_key, same content_id, different protocol (accepts). DB=2.
+    let action_b = content::ActiveModel {
+        id: NotSet,
+        content_id: Set(id_a.clone()),
+        content_key: Set(key_a.clone()),
+        protocol_id: Set(protocol_b),
+        first_available_at: Set(Utc::now().into()),
+    };
+    action_b.clone().insert(&conn).await.unwrap();
+    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
+
+    // DB=2. Repeat addition (rejects). DB=2.
+    assert!(action_b
+        .insert(&conn)
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("UNIQUE constraint failed"));
+    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
+
+    // DB=2. Add same content_key, different content_id, same protocol (accepts). DB=3.
+    let action_c = content::ActiveModel {
+        id: NotSet,
+        content_id: Set(id_b),
+        content_key: Set(key_a),
+        protocol_id: Set(protocol_a.clone()),
+        first_available_at: Set(Utc::now().into()),
+    };
+    action_c.clone().insert(&conn).await.unwrap();
+    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 3);
+
+    // DB=3. Repeat addition (rejects). DB=3.
+    assert!(action_c
+        .insert(&conn)
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("UNIQUE constraint failed"));
+    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 3);
+
+    // DB=3. Add different content_key, same content_id, same protocol (accepts). DB=4.
+    let action_d = content::ActiveModel {
+        id: NotSet,
+        content_id: Set(id_a),
+        content_key: Set(key_b),
+        protocol_id: Set(protocol_a),
+        first_available_at: Set(Utc::now().into()),
+    };
+    action_d.clone().insert(&conn).await.unwrap();
+    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 4);
+
+    // DB=4. Repeat addition (rejects). DB=4.
+    assert!(action_d
+        .insert(&conn)
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("UNIQUE constraint failed"));
+    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 4);
 }
