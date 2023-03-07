@@ -1,5 +1,11 @@
+use std::collections::HashSet;
+
 use ethportal_api::types::content_key::HistoryContentKey;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+use rand::{thread_rng, Rng};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect,
+};
 use tokio::{
     sync::mpsc,
     time::{interval, Duration},
@@ -11,6 +17,7 @@ use entity::{
     contentkey::{self, Model},
 };
 
+/// Interval between audit selections for a particular strategy.
 const AUDIT_SELECTION_PERIOD_SECONDS: u64 = 120;
 
 /// Number of content keys to audit per
@@ -29,7 +36,14 @@ pub enum SelectionStrategy {
     /// Randomly selected content.
     Random,
     /// Content that looks for failed audits and checks whether the data is still missing.
+    /// 1. Key was audited previously
+    /// 2. Latest audit for the key failed (data absent)
+    /// 3. Keys sorted by date audited (keys with oldest failed audit first)
     Failed,
+    /// Content that is:
+    /// 1. Not yet audited.
+    /// 2. Sorted by date entered into glados database (oldest first).
+    OldestMissing,
 }
 
 impl SelectionStrategy {
@@ -40,17 +54,16 @@ impl SelectionStrategy {
     ) {
         match self {
             SelectionStrategy::Latest => select_latest_content_for_audit(tx, conn).await,
-            SelectionStrategy::Random => {
-                warn!("Audit strategy 'Strategy::Random' not yet implemented.")
-            }
-            SelectionStrategy::Failed => {
-                warn!("Audit strategy 'Strategy::Failed' not yet implemented.")
+            SelectionStrategy::Random => select_random_content_for_audit(tx, conn).await,
+            SelectionStrategy::Failed => warn!("Need to implement SelectionStrategy::Failed"),
+            SelectionStrategy::OldestMissing => {
+                warn!("Need to implement SelectionStrategy::OldestMissing")
             }
         }
     }
 }
 
-/// Finds and sends audit tasks for the 'latest' strategy.
+/// Finds and sends audit tasks for [Strategy::Latest].
 ///
 /// Strategy achieved by:
 /// 1. Left joining contentkey table to the contentaudit table to find audits per key.
@@ -60,7 +73,7 @@ async fn select_latest_content_for_audit(
     tx: mpsc::Sender<HistoryContentKey>,
     conn: DatabaseConnection,
 ) -> ! {
-    debug!("initializing audit process");
+    debug!("initializing audit process for 'latest' strategy");
 
     let mut interval = interval(Duration::from_secs(AUDIT_SELECTION_PERIOD_SECONDS));
     loop {
@@ -79,7 +92,7 @@ async fn select_latest_content_for_audit(
         {
             Ok(content_key_db_entries) => content_key_db_entries,
             Err(err) => {
-                error!("DB Error looking up content key: {err}");
+                error!(audit.strategy="latest", err=?err, "Could not make audit query");
                 continue;
             }
         };
@@ -100,6 +113,61 @@ async fn add_to_queue(tx: mpsc::Sender<HistoryContentKey>, items: Vec<Model>) {
         if let Err(e) = tx.send(key).await {
             debug!(err=?e, "Could not send key for audit, channel might be full or closed.")
         }
+    }
+}
+
+/// Finds and sends audit tasks for [Strategy::Random].
+///
+/// Strategy achieved by:
+/// 1. Checking number of keys in DB.
+/// 2. Generating random ids.
+/// 3. Looking up each one separately, then sending them all in the channel.
+async fn select_random_content_for_audit(
+    tx: mpsc::Sender<HistoryContentKey>,
+    conn: DatabaseConnection,
+) -> ! {
+    debug!("initializing audit process for 'random' strategy");
+
+    let mut interval = interval(Duration::from_secs(AUDIT_SELECTION_PERIOD_SECONDS));
+    loop {
+        interval.tick().await;
+        let num_keys = match contentkey::Entity::find().count(&conn).await {
+            // Skip if no keys yet.
+            Ok(0) => continue,
+            Ok(count) => count as u32,
+            Err(err) => {
+                error!(audit.strategy="random", err=?err, "Could not make audit query");
+                continue;
+            }
+        };
+        let mut random_ids: HashSet<u32> = HashSet::new();
+        {
+            // Thread safe block for the rng, which is not `Send`.
+            let mut rng = thread_rng();
+            for _ in 0..KEYS_PER_PERIOD {
+                random_ids.insert(rng.gen_range(0..num_keys));
+            }
+        }
+        let mut content_key_db_entries: Vec<Model> = vec![];
+        for random_id in random_ids {
+            match contentkey::Entity::find()
+                .filter(contentkey::Column::Id.eq(random_id))
+                .all(&conn)
+                .await
+            {
+                Ok(found) => content_key_db_entries.extend(found),
+                Err(err) => {
+                    error!(audit.strategy="random", err=?err, "Could not make audit query");
+                    continue;
+                }
+            };
+        }
+        let item_count = content_key_db_entries.len();
+        debug!(
+            strategy = "random",
+            item_count, "Adding content keys to the audit queue."
+        );
+        add_to_queue(tx.clone(), content_key_db_entries).await;
     }
 }
 
@@ -209,6 +277,37 @@ mod tests {
         let mut checked_ids: HashSet<i32> = HashSet::new();
         // There are 10 correct values: [36, 37, ... 45]
         let expected_key_ids: Vec<i32> = (36..=45).collect();
+        // Await strategy results
+        while let Some(key) = rx.recv().await {
+            let key_model = contentkey::Entity::find()
+                .filter(contentkey::Column::ContentKey.eq(key.to_bytes()))
+                .one(&conn)
+                .await
+                .unwrap()
+                .unwrap();
+            // Check that strategy only yields expected keys.
+            assert!(expected_key_ids.contains(&key_model.id));
+            checked_ids.insert(key_model.id);
+            if checked_ids.len() == KEYS_PER_PERIOD as usize {
+                break;
+            }
+        }
+        // Make sure no key was audited twice by pushing to a hashmap and checking it's length.
+        assert_eq!(checked_ids.len(), KEYS_PER_PERIOD as usize);
+    }
+
+    /// Tests that the `SelectionStrategy::Random` selects the correct values
+    /// from the test database.
+    #[tokio::test]
+    async fn test_random_strategy() {
+        // Orchestration
+        let conn = get_populated_test_audit_db().await.unwrap();
+        let (tx, mut rx) = channel::<HistoryContentKey>(100);
+        // Start strategy
+        tokio::spawn(select_latest_content_for_audit(tx.clone(), conn.clone()));
+        let mut checked_ids: HashSet<i32> = HashSet::new();
+        // There are 45 possible correct values: [1, 2, ... 45]
+        let expected_key_ids: Vec<i32> = (1..=45).collect();
         // Await strategy results
         while let Some(key) = rx.recv().await {
             let key_model = contentkey::Entity::find()

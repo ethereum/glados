@@ -1687,6 +1687,7 @@ dependencies = [
  "glados-core",
  "hex",
  "migration",
+ "rand 0.8.5",
  "sea-orm",
  "tokio",
  "tracing",
