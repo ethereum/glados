@@ -2,28 +2,31 @@ use std::{fmt::Display, path::PathBuf};
 
 use anyhow::Result;
 use ethereum_types::H256;
-use ethportal_api::types::content_key::{
-    BlockBodyKey, BlockHeaderKey, BlockReceiptsKey, HistoryContentKey, OverlayContentKey,
-};
+use ethportal_api::{types::content_key::OverlayContentKey, HistoryContentKey};
 use migration::DbErr;
-use sea_orm::{DatabaseConnection, EntityTrait, QueryOrder, QuerySelect};
-use tokio::{
-    sync::mpsc,
-    time::{interval, Duration},
-};
+use sea_orm::DatabaseConnection;
+use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 
 use entity::{contentaudit, contentkey, executionbody, executionheader, executionreceipts};
 use glados_core::jsonrpc::PortalClient;
 
-pub mod cli;
+use crate::selection::SelectionStrategy;
 
-const AUDIT_PERIOD_SECONDS: u64 = 120;
+pub mod cli;
+pub(crate) mod selection;
 
 pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
-    let (tx, rx) = mpsc::channel(100);
+    let (tx, rx) = mpsc::channel::<HistoryContentKey>(100);
+    let strategies = vec![
+        SelectionStrategy::Latest,
+        SelectionStrategy::Random,
+        SelectionStrategy::Failed,
+    ];
+    for strategy in strategies {
+        tokio::spawn(strategy.start_audit_selection_task(tx.clone(), conn.clone()));
+    }
 
-    tokio::spawn(do_audit_orchestration(tx, conn.clone()));
     tokio::spawn(perform_content_audits(rx, ipc_path, conn));
 
     debug!("setting up CTRL+C listener");
@@ -32,64 +35,6 @@ pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
         .expect("failed to pause until ctrl-c");
 
     info!("got CTRL+C. shutting down...");
-}
-
-async fn do_audit_orchestration(
-    tx: mpsc::Sender<HistoryContentKey>,
-    conn: DatabaseConnection,
-) -> ! {
-    debug!("initializing audit process");
-
-    let mut interval = interval(Duration::from_secs(AUDIT_PERIOD_SECONDS));
-    loop {
-        interval.tick().await;
-        if tx.is_closed() {
-            error!("Channel is closed.");
-            panic!();
-        }
-        // Lookup a content key to be audited
-        let content_key_db_entries = match contentkey::Entity::find()
-            .order_by_desc(contentkey::Column::CreatedAt)
-            .limit(10)
-            .all(&conn)
-            .await
-        {
-            Ok(content_key_db_entries) => content_key_db_entries,
-            Err(err) => {
-                error!("DB Error looking up content key: {err}");
-                continue;
-            }
-        };
-        debug!(
-            "Adding {} content keys to the audit queue.",
-            content_key_db_entries.len()
-        );
-        for content_key_db in content_key_db_entries {
-            // Get the block hash (by removing the first byte from the content key)
-            let hash = H256::from_slice(&content_key_db.content_key[1..33]);
-            let header = HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey {
-                block_hash: hash.to_fixed_bytes(),
-            });
-
-            let body = HistoryContentKey::BlockBody(BlockBodyKey {
-                block_hash: hash.to_fixed_bytes(),
-            });
-
-            let receipts = HistoryContentKey::BlockReceipts(BlockReceiptsKey {
-                block_hash: hash.to_fixed_bytes(),
-            });
-
-            if let Err(e) = tx.send(header).await {
-                debug!(err=?e, "Could not send header for audit, channel might be closed.")
-            }
-            if let Err(e) = tx.send(body).await {
-                debug!(err=?e, "Could not send body for audit, channel might be closed.")
-            }
-            if let Err(e) = tx.send(receipts).await {
-                debug!(err=?e, "Could not send receipts for audit, channel might be closed.")
-            }
-        }
-    }
 }
 
 async fn perform_content_audits<T>(
