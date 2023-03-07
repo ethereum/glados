@@ -77,7 +77,7 @@ The CLI needs a DATABASE_URL to know what relational database to connect to, as 
 > This has only been tested using the `trin` portal network client.
 
 ```
-$ cargo run -p glados-web -- --ipc-path IPC_PATH --database-url DATABASE_URL
+$ cargo run -p glados-web -- --database-url DATABASE_URL
 ```
 
 You should then be able to view the web application at `http://127.0.0.1:3001/` in your browser.
