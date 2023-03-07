@@ -20,7 +20,7 @@ pub enum AuditResult {
 pub struct Model {
     #[sea_orm(primary_key, indexed)]
     pub id: i32,
-    #[sea_orm(unique, indexed)]
+    #[sea_orm(indexed)]
     pub content_key: i32,
     pub created_at: DateTime<Utc>,
     pub result: AuditResult,
