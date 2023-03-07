@@ -78,7 +78,7 @@ where
         // Display audit result with block metadata.
         match fetch_block_metadata(content_key_model.id, &conn).await {
             Ok(Some(b)) => {
-                debug!(
+                info!(
                     content.key=content_key_str,
                     audit.pass=?audit_result,
                     block = b.to_string(),
