@@ -171,10 +171,10 @@ async fn store_content_key<T: OverlayContentKey>(key: &T, name: &str, conn: &Dat
 fn log_record_outcome<T: OverlayContentKey>(key: &T, name: &str, outcome: DbOutcome) {
     let encoded = hex::encode(key.to_bytes());
     match outcome {
-        DbOutcome::Success => debug!(
+        DbOutcome::Success => info!(
             content.key = format!("0x{encoded}"),
             content.kind = name,
-            "Successful record",
+            "Imported new record",
         ),
         DbOutcome::Fail(e) => error!(
             content.key=format!("0x{encoded}"),
