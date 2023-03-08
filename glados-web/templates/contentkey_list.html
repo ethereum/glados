@@ -9,8 +9,8 @@
   <div class="row">
     <div class="col">
       <ul>
-        {% for content_key in contentkey_list %}
-          <li><a href="/content/key/{{content_key.as_hex() }}">{{ content_key.as_hex() }}</a></li>
+        {% for content in contentkey_list %}
+          <li><a href="/content/key/{{content.key_as_hex() }}">{{ content.key_as_hex() }}</a></li>
         {% else %}
           <li>No content keys found</li>
         {% endfor %}

@@ -4,7 +4,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 
-use entity::{contentaudit, contentid, contentkey, node};
+use entity::{content, content_audit, node};
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -19,38 +19,39 @@ pub struct NodeListTemplate {
 #[derive(Template)]
 #[template(path = "content_dashboard.html")]
 pub struct ContentDashboardTemplate {
-    pub contentid_list: Vec<contentid::Model>,
-    pub contentaudit_list: Vec<contentaudit::Model>,
+    pub contentid_list: Vec<content::Model>,
+    pub contentaudit_list: Vec<content_audit::Model>,
+    pub contentaudit_pass_list: Vec<content_audit::Model>,
 }
 
 #[derive(Template)]
 #[template(path = "contentid_list.html")]
 pub struct ContentIdListTemplate {
-    pub contentid_list: Vec<contentid::Model>,
+    pub contentid_list: Vec<content::Model>,
 }
 
 #[derive(Template)]
 #[template(path = "contentid_detail.html")]
 pub struct ContentIdDetailTemplate {
-    pub content_id: contentid::Model,
-    pub contentkey_list: Vec<contentkey::Model>,
+    pub content_id: content::Model,
+    pub contentkey_list: Vec<content::Model>,
 }
 
 #[derive(Template)]
 #[template(path = "contentkey_list.html")]
 pub struct ContentKeyListTemplate {
-    pub contentkey_list: Vec<contentkey::Model>,
+    pub contentkey_list: Vec<content::Model>,
 }
 
 #[derive(Template)]
 #[template(path = "contentkey_detail.html")]
 pub struct ContentKeyDetailTemplate {
-    pub content_key_model: contentkey::Model,
+    pub content_key_model: content::Model,
     pub content_key: String,
     pub content_id: String,
     pub content_kind: String,
     pub block_number: Option<i32>,
-    pub contentaudit_list: Vec<contentaudit::Model>,
+    pub contentaudit_list: Vec<content_audit::Model>,
 }
 
 pub struct HtmlTemplate<T>(pub T);

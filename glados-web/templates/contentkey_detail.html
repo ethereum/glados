@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Content Key: {{ content_key_model.as_hex() }}{% endblock %}
+{% block title %}Content Key: {{ content_key_model.key_as_hex() }}{% endblock %}
 
 {% block content %}
   <div class="row">
-    <h1>Content Key: {{ content_key_model.as_hex() }}</h1>
+    <h1>Content Key: {{ content_key_model.key_as_hex() }}</h1>
   </div>
   <div class="row">
     <div class="col">

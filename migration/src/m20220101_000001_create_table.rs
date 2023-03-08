@@ -41,9 +41,12 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(Record::NodeId).integer().not_null())
-                    //.index(Index::create().name("idx-record-node_id").col(Record::NodeId))
                     .col(ColumnDef::new(Record::Raw).binary().not_null())
-                    .col(ColumnDef::new(Record::CreatedAt).date_time().not_null())
+                    .col(
+                        ColumnDef::new(Record::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(Record::SequenceNumber).integer().not_null())
                     .index(
                         Index::create()

@@ -10,8 +10,8 @@
     <div class="col">
       <h2>Recent Content</h2>
       <ul>
-        {% for contentid in contentid_list %}
-          <li><a href="/content/id/{{contentid.as_hex() }}">{{ contentid.as_hash() }}</a></li>
+        {% for content in contentid_list %}
+          <li><a href="/content/id/{{content.id_as_hex() }}">{{ content.id_as_hash() }}</a></li>
         {% else %}
           <li>No content found</li>
         {% endfor %}
@@ -27,6 +27,16 @@
         {% endfor %}
       </ul>
     </div>
+    <div class="row">
+        <h2>Successful audits</h2>
+        <ul>
+          {% for contentaudit in contentaudit_pass_list %}
+          <li>Audit#={{ contentaudit.content_key }} <span class="badge text-bg-{% if contentaudit.is_success() %}success{% else %}danger{% endif %}">{% if contentaudit.is_success() %}Success{% else %}Fail{% endif %}</span></li>
+          {% else %}
+            <li>No successful audits found</li>
+          {% endfor %}
+        </ul>
+      </div>
   </div>
 </div>
 {% endblock %}

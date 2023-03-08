@@ -11,7 +11,7 @@ use tokio::{fs::read_dir, sync::mpsc, time::sleep};
 use tracing::{debug, error, info, warn};
 use web3::types::{BlockId, H256};
 
-use entity::{contentkey, executionbody, executionheader, executionreceipts};
+use entity::{content, execution_metadata};
 
 pub mod cli;
 
@@ -135,32 +135,31 @@ async fn store_block_keys(block_number: i32, block_hash: &[u8; 32], conn: &Datab
         block_hash: *block_hash,
     });
 
-    // content_keys
-    store_content_key(&header, "block_header", conn).await;
-    match executionheader::get_or_create(&header, block_number, block_hash, conn).await {
-        Ok(_) => log_record_outcome(&header, "header_metadata", DbOutcome::Success),
-        Err(e) => log_record_outcome(&header, "header_metadata", DbOutcome::Fail(e)),
-    }
-
-    store_content_key(&body, "block_body", conn).await;
-    match executionbody::get_or_create(&body, block_number, block_hash, conn).await {
-        Ok(_) => log_record_outcome(&body, "body_metadata", DbOutcome::Success),
-        Err(e) => log_record_outcome(&body, "body_metadata", DbOutcome::Fail(e)),
-    }
-
-    store_content_key(&receipts, "block_receipts", conn).await;
-    match executionreceipts::get_or_create(&receipts, block_number, block_hash, conn).await {
-        Ok(_) => log_record_outcome(&receipts, "receipts_metadata", DbOutcome::Success),
-        Err(e) => log_record_outcome(&receipts, "receipts_metadata", DbOutcome::Fail(e)),
-    }
+    store_content_key(&header, "block_header", block_number, conn).await;
+    store_content_key(&body, "block_body", block_number, conn).await;
+    store_content_key(&receipts, "block_receipts", block_number, conn).await;
 }
 
-/// Accepts a ContentKey and attempts to store it.
+/// Accepts a ContentKey from the Historyand attempts to store it.
 ///
 /// Errors are logged.
-async fn store_content_key<T: OverlayContentKey>(key: &T, name: &str, conn: &DatabaseConnection) {
-    match contentkey::get_or_create(key, conn).await {
-        Ok(_) => log_record_outcome(key, name, DbOutcome::Success),
+async fn store_content_key<T: OverlayContentKey>(
+    key: &T,
+    name: &str,
+    block_number: i32,
+    conn: &DatabaseConnection,
+) {
+    // Store key
+    match content::get_or_create(key, conn).await {
+        Ok(content_model) => {
+            log_record_outcome(key, name, DbOutcome::Success);
+            // Store metadata
+            let metadata_str = format!("{name}_metadata");
+            match execution_metadata::get_or_create(content_model.id, block_number, conn).await {
+                Ok(_) => log_record_outcome(key, metadata_str.as_str(), DbOutcome::Success),
+                Err(e) => log_record_outcome(key, metadata_str.as_str(), DbOutcome::Fail(e)),
+            };
+        }
         Err(e) => log_record_outcome(key, name, DbOutcome::Fail(e)),
     }
 }
@@ -219,7 +218,7 @@ pub async fn import_pre_merge_accumulators(
                                     });
                                 debug!(content_key = %content_key, "Importing");
                                 let content_key_db =
-                                    contentkey::get_or_create(&content_key, &conn).await?;
+                                    content::get_or_create(&content_key, &conn).await?;
                                 info!(content_key = %content_key, database_id = content_key_db.id, "Imported");
                             }
                             Err(_) => info!(

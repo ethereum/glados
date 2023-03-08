@@ -13,8 +13,8 @@ use tokio::{
 use tracing::{debug, error, warn};
 
 use entity::{
-    contentaudit,
-    contentkey::{self, Model},
+    content::{self, Model},
+    content_audit,
 };
 
 /// Interval between audit selections for a particular strategy.
@@ -82,10 +82,10 @@ async fn select_latest_content_for_audit(
             error!("Channel is closed.");
             panic!();
         }
-        let content_key_db_entries = match contentkey::Entity::find()
-            .left_join(entity::contentaudit::Entity)
-            .filter(contentaudit::Column::CreatedAt.is_null())
-            .order_by_desc(contentkey::Column::CreatedAt)
+        let content_key_db_entries = match content::Entity::find()
+            .left_join(entity::content_audit::Entity)
+            .filter(content_audit::Column::CreatedAt.is_null())
+            .order_by_desc(content::Column::FirstAvailableAt)
             .limit(KEYS_PER_PERIOD)
             .all(&conn)
             .await
@@ -131,7 +131,7 @@ async fn select_random_content_for_audit(
     let mut interval = interval(Duration::from_secs(AUDIT_SELECTION_PERIOD_SECONDS));
     loop {
         interval.tick().await;
-        let num_keys = match contentkey::Entity::find().count(&conn).await {
+        let num_keys = match content::Entity::find().count(&conn).await {
             // Skip if no keys yet.
             Ok(0) => continue,
             Ok(count) => count as u32,
@@ -150,8 +150,8 @@ async fn select_random_content_for_audit(
         }
         let mut content_key_db_entries: Vec<Model> = vec![];
         for random_id in random_ids {
-            match contentkey::Entity::find()
-                .filter(contentkey::Column::Id.eq(random_id))
+            match content::Entity::find()
+                .filter(content::Column::Id.eq(random_id))
                 .all(&conn)
                 .await
             {
@@ -176,7 +176,10 @@ mod tests {
     use std::collections::HashSet;
 
     use chrono::Utc;
-    use entity::{contentaudit, contentid, contentkey, AuditResult};
+    use entity::{
+        content::{self, SubProtocol},
+        content_audit::{self, AuditResult},
+    };
     use ethportal_api::{
         types::content_key::{BlockHeaderKey, OverlayContentKey},
         HistoryContentKey,
@@ -188,7 +191,7 @@ mod tests {
     };
     use tokio::sync::mpsc::channel;
 
-    use super::{select_latest_content_for_audit, KEYS_PER_PERIOD};
+    use super::*;
 
     /// Creates a new in-memory SQLite database for a unit test.
     #[allow(dead_code)]
@@ -224,18 +227,13 @@ mod tests {
             let block_hash = [num; 32];
             let content_key =
                 HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey { block_hash });
-            // content_id table
-            let content_id_active_model = contentid::ActiveModel {
+            // content table
+            let content_key_active_model = content::ActiveModel {
                 id: NotSet,
                 content_id: Set(content_key.content_id().to_vec()),
-            };
-            let content_id_model = content_id_active_model.insert(&conn).await?;
-            // content_key table
-            let content_key_active_model = contentkey::ActiveModel {
-                id: NotSet,
-                content_id: Set(content_id_model.id),
                 content_key: Set(content_key.to_bytes()),
-                created_at: Set(Utc::now()),
+                first_available_at: Set(Utc::now().into()),
+                protocol_id: Set(SubProtocol::History),
             };
             let content_key_model = content_key_active_model.insert(&conn).await?;
             // audit table
@@ -244,20 +242,20 @@ mod tests {
                     true => AuditResult::Success,
                     false => AuditResult::Failure,
                 };
-                let content_audit_active_model = contentaudit::ActiveModel {
+                let content_audit_active_model = content_audit::ActiveModel {
                     id: NotSet,
                     content_key: Set(content_key_model.id),
-                    created_at: Set(Utc::now()),
+                    created_at: Set(Utc::now().into()),
                     result: Set(result),
                 };
                 content_audit_active_model.insert(&conn).await?;
             }
         }
-        let test_keys = contentkey::Entity::find().all(&conn).await?;
+        let test_keys = content::Entity::find().all(&conn).await?;
         assert_eq!(test_keys.len(), 45);
 
-        let item_index_18_audit = contentaudit::Entity::find()
-            .filter(contentaudit::Column::ContentKey.eq(18))
+        let item_index_18_audit = content_audit::Entity::find()
+            .filter(content_audit::Column::ContentKey.eq(18))
             .one(&conn)
             .await?
             .unwrap();
@@ -279,8 +277,8 @@ mod tests {
         let expected_key_ids: Vec<i32> = (36..=45).collect();
         // Await strategy results
         while let Some(key) = rx.recv().await {
-            let key_model = contentkey::Entity::find()
-                .filter(contentkey::Column::ContentKey.eq(key.to_bytes()))
+            let key_model = content::Entity::find()
+                .filter(content::Column::ContentKey.eq(key.to_bytes()))
                 .one(&conn)
                 .await
                 .unwrap()
@@ -310,8 +308,8 @@ mod tests {
         let expected_key_ids: Vec<i32> = (1..=45).collect();
         // Await strategy results
         while let Some(key) = rx.recv().await {
-            let key_model = contentkey::Entity::find()
-                .filter(contentkey::Column::ContentKey.eq(key.to_bytes()))
+            let key_model = content::Entity::find()
+                .filter(content::Column::ContentKey.eq(key.to_bytes()))
                 .one(&conn)
                 .await
                 .unwrap()
