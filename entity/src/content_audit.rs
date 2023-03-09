@@ -13,6 +13,15 @@ pub enum AuditResult {
     Success = 1,
 }
 
+impl AuditResult {
+    pub fn as_text(&self) -> String {
+        match self {
+            AuditResult::Failure => "fail".to_string(),
+            AuditResult::Success => "success".to_string(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "content_audit")]
 pub struct Model {
@@ -81,5 +90,8 @@ pub async fn get_audits<T: OverlayContentKey>(
 impl Model {
     pub fn is_success(&self) -> bool {
         self.result == AuditResult::Success
+    }
+    pub fn created_at_local_time(&self) -> String {
+        self.created_at.with_timezone(&chrono::Local).to_rfc2822()
     }
 }

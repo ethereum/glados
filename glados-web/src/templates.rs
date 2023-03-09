@@ -20,8 +20,10 @@ pub struct NodeListTemplate {
 #[template(path = "content_dashboard.html")]
 pub struct ContentDashboardTemplate {
     pub contentid_list: Vec<content::Model>,
-    pub contentaudit_list: Vec<content_audit::Model>,
-    pub contentaudit_pass_list: Vec<content_audit::Model>,
+    pub recent_content: Vec<(content::Model, content_audit::Model)>,
+    pub recent_audits: Vec<(content::Model, content_audit::Model)>,
+    pub recent_audit_successes: Vec<(content::Model, content_audit::Model)>,
+    pub recent_audit_failures: Vec<(content::Model, content_audit::Model)>,
 }
 
 #[derive(Template)]
