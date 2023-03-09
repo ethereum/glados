@@ -2,7 +2,7 @@
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset, Utc};
 use ethereum_types::H256;
-use ethportal_api::types::content_key::OverlayContentKey;
+use ethportal_api::types::content_key::{hex_encode_compact, OverlayContentKey};
 use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
 
 /// Portal network sub-protocol. History, state, transactions etc.
@@ -11,6 +11,15 @@ use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
 pub enum SubProtocol {
     History = 0,
     State = 1,
+}
+
+impl SubProtocol {
+    pub fn as_text(&self) -> String {
+        match self {
+            SubProtocol::History => "History".to_string(),
+            SubProtocol::State => "State".to_string(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
@@ -95,8 +104,26 @@ impl Model {
         format!("0x{hex}")
     }
 
+    pub fn id_as_hex_short(&self) -> String {
+        hex_encode_compact(&self.content_id)
+    }
+
+    pub fn key_as_hash(&self) -> H256 {
+        H256::from_slice(&self.content_key)
+    }
+
     pub fn key_as_hex(&self) -> String {
         let hex = hex::encode(&self.content_key);
         format!("0x{hex}")
+    }
+
+    pub fn key_as_hex_short(&self) -> String {
+        hex_encode_compact(&self.content_key)
+    }
+
+    pub fn available_at_local_time(&self) -> String {
+        self.first_available_at
+            .with_timezone(&chrono::Local)
+            .to_rfc2822()
     }
 }
