@@ -38,6 +38,6 @@ async fn main() -> Result<()> {
 
     let ipc_path: PathBuf = args.ipc_path;
 
-    run_glados_audit(conn, ipc_path).await;
+    run_glados_audit(conn, ipc_path, args.concurrency).await;
     Ok(())
 }
