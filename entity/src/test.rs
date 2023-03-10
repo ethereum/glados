@@ -12,6 +12,7 @@ use sea_orm::{
 use migration::{Migrator, MigratorTrait};
 
 use crate::content::SubProtocol;
+use crate::content_audit::StrategyUsed;
 use crate::{content, content_audit, node};
 
 #[allow(dead_code)]
@@ -209,6 +210,7 @@ async fn test_audit_crud() -> Result<(), DbErr> {
         id: NotSet,
         content_key: Set(searched_content_model.id),
         created_at: Set(Utc::now().into()),
+        strategy_used: Set(Some(StrategyUsed::Random)),
         result: Set(content_audit::AuditResult::Success),
     };
 
@@ -223,6 +225,10 @@ async fn test_audit_crud() -> Result<(), DbErr> {
     assert_eq!(
         searched_content_audit_model.result,
         content_audit::AuditResult::Success
+    );
+    assert_eq!(
+        searched_content_audit_model.strategy_used,
+        Some(content_audit::StrategyUsed::Random)
     );
 
     Ok(())

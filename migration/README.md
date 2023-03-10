@@ -25,7 +25,7 @@ DATABASE_URL=sqlite:////path/to/my-database.sqlite sea-orm-cli migrate up
 
 - Generate a new migration file
     ```sh
-    cargo run -- migrate generate MIGRATION_NAME
+    cargo run -- generate MIGRATION_NAME
     ```
 - Apply all pending migrations
     ```sh

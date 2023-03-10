@@ -14,7 +14,7 @@ use tracing::{debug, error, warn};
 
 use entity::{
     content::{self, Model},
-    content_audit,
+    content_audit::{self, StrategyUsed},
 };
 
 /// Interval between audit selections for a particular strategy.
@@ -24,6 +24,7 @@ const AUDIT_SELECTION_PERIOD_SECONDS: u64 = 120;
 /// [`AUDIT_SELECTION_PERIOD_SECONDS`].
 const KEYS_PER_PERIOD: u64 = 10;
 
+#[derive(Clone, Debug)]
 /// A strategy is responsible for generating audit tasks.
 ///
 /// An audit task is a content key from the the glados database that
@@ -59,6 +60,15 @@ impl SelectionStrategy {
             SelectionStrategy::OldestMissing => {
                 warn!("Need to implement SelectionStrategy::OldestMissing")
             }
+        }
+    }
+    /// A type that is used in the glados database to record what strategy was used
+    pub fn as_strategy_used(&self) -> StrategyUsed {
+        match self {
+            SelectionStrategy::Latest => StrategyUsed::Latest,
+            SelectionStrategy::Random => StrategyUsed::Random,
+            SelectionStrategy::Failed => StrategyUsed::Failed,
+            SelectionStrategy::OldestMissing => StrategyUsed::OldestMissing,
         }
     }
 }
@@ -246,6 +256,7 @@ mod tests {
                     id: NotSet,
                     content_key: Set(content_key_model.id),
                     created_at: Set(Utc::now().into()),
+                    strategy_used: Set(Some(StrategyUsed::Random)),
                     result: Set(result),
                 };
                 content_audit_active_model.insert(&conn).await?;

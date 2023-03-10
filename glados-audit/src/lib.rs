@@ -15,7 +15,6 @@ pub mod cli;
 pub(crate) mod selection;
 
 pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
-    let (tx, rx) = mpsc::channel::<HistoryContentKey>(100);
     let strategies = vec![
         SelectionStrategy::Latest,
         SelectionStrategy::Random,
@@ -23,10 +22,19 @@ pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
         SelectionStrategy::OldestMissing,
     ];
     for strategy in strategies {
-        tokio::spawn(strategy.start_audit_selection_task(tx.clone(), conn.clone()));
+        let (tx, rx) = mpsc::channel::<HistoryContentKey>(100);
+        tokio::spawn(
+            strategy
+                .clone()
+                .start_audit_selection_task(tx.clone(), conn.clone()),
+        );
+        tokio::spawn(perform_content_audits(
+            rx,
+            strategy,
+            ipc_path.clone(),
+            conn.clone(),
+        ));
     }
-
-    tokio::spawn(perform_content_audits(rx, ipc_path, conn));
 
     debug!("setting up CTRL+C listener");
     tokio::signal::ctrl_c()
@@ -36,8 +44,10 @@ pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
     info!("got CTRL+C. shutting down...");
 }
 
+/// Receives content audit tasks created according to some strategy.
 async fn perform_content_audits<T>(
     mut rx: mpsc::Receiver<T>,
+    strategy: SelectionStrategy,
     ipc_path: PathBuf,
     conn: DatabaseConnection,
 ) -> Result<()>
@@ -72,7 +82,13 @@ where
                 continue;
             }
         };
-        content_audit::create(content_key_model.id, audit_result, &conn).await?;
+        content_audit::create(
+            content_key_model.id,
+            audit_result,
+            strategy.as_strategy_used(),
+            &conn,
+        )
+        .await?;
 
         // Display audit result with block metadata.
         match execution_metadata::get(content_key_model.id, &conn).await {
