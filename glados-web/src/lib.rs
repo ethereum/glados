@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::{net::SocketAddr, path::Path};
 
 use anyhow::{bail, Result};
+use axum::http::StatusCode;
 use axum::{
     extract::Extension,
     routing::{get, get_service},
@@ -42,9 +43,17 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
         .fallback_service(serve_dir)
         .layer(Extension(config));
 
+    let app = app.fallback(handler_404);
+
     let socket: SocketAddr = SOCKET.parse()?;
     info!("Serving glados-web at {}", socket);
     Ok(axum::Server::bind(&socket)
         .serve(app.into_make_service())
         .await?)
+}
+
+/// Global routing error handler to prevent panics.
+async fn handler_404() -> StatusCode {
+    tracing::error!("404: Non-existent page visited");
+    StatusCode::NOT_FOUND
 }

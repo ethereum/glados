@@ -56,7 +56,7 @@ pub struct ContentKeyDetailTemplate {
     pub contentaudit_list: Vec<content_audit::Model>,
 }
 
-pub struct HtmlTemplate<T>(pub T);
+pub struct HtmlTemplate<T: Template>(pub T);
 
 impl<T> IntoResponse for HtmlTemplate<T>
 where
