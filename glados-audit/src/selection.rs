@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use ethportal_api::types::content_key::HistoryContentKey;
 use rand::{thread_rng, Rng};
 use sea_orm::{
@@ -35,8 +36,8 @@ pub async fn start_audit_selection_task(
         SelectionStrategy::Latest => select_latest_content_for_audit(tx, conn).await,
         SelectionStrategy::Random => select_random_content_for_audit(tx, conn).await,
         SelectionStrategy::Failed => warn!("Need to implement SelectionStrategy::Failed"),
-        SelectionStrategy::OldestMissing => {
-            warn!("Need to implement SelectionStrategy::OldestMissing")
+        SelectionStrategy::SelectOldestUnaudited => {
+            select_oldest_unaudited_content_for_audit(tx, conn).await
         }
     }
 }
@@ -174,6 +175,75 @@ async fn select_random_content_for_audit(
     }
 }
 
+/// Finds and sends audit tasks for [SelectionStrategy::SelectOldestUnaudited].
+///
+/// Strategy achieved by:
+/// 1. Find oldest content
+/// 2. Filter for content with no audits
+/// 3. As audits are sent, gradually select more recent content
+async fn select_oldest_unaudited_content_for_audit(
+    tx: mpsc::Sender<AuditTask>,
+    conn: DatabaseConnection,
+) {
+    debug!("initializing audit process for 'select oldest unaudited' strategy");
+
+    let mut interval = interval(Duration::from_secs(AUDIT_SELECTION_PERIOD_SECONDS));
+
+    // Memory of which audits have been sent using their timestamp.
+    let mut timestamp_too_old_threshold: DateTime<FixedOffset> =
+        match Utc.timestamp_millis_opt(0i64) {
+            chrono::LocalResult::Single(time) => time.into(),
+            _ => {
+                error!("Could not convert starting for timestamp");
+                return;
+            }
+        };
+
+    loop {
+        interval.tick().await;
+        if tx.is_closed() {
+            error!("Channel is closed.");
+            panic!();
+        }
+        let search_result: Vec<(content::Model, Vec<content_audit::Model>)> =
+            match content::Entity::find()
+                .filter(content::Column::FirstAvailableAt.gt(timestamp_too_old_threshold))
+                .order_by_asc(content::Column::FirstAvailableAt)
+                .find_with_related(entity::content_audit::Entity)
+                .filter(content_audit::Column::CreatedAt.is_null())
+                .limit(KEYS_PER_PERIOD)
+                .all(&conn)
+                .await
+            {
+                Ok(content_key_db_entries) => content_key_db_entries,
+                Err(err) => {
+                    error!(audit.strategy="latest", err=?err, "Could not make audit query");
+                    continue;
+                }
+            };
+        let content_key_db_entries: Vec<content::Model> = search_result
+            .into_iter()
+            .map(|(content, _audits)| {
+                if content.first_available_at > timestamp_too_old_threshold {
+                    timestamp_too_old_threshold = content.first_available_at
+                }
+                content
+            })
+            .collect();
+        let item_count = content_key_db_entries.len();
+        debug!(
+            strategy = "select oldest unaudited",
+            item_count, "Adding content keys to the audit queue."
+        );
+        add_to_queue(
+            tx.clone(),
+            SelectionStrategy::SelectOldestUnaudited,
+            content_key_db_entries,
+        )
+        .await;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
@@ -207,12 +277,13 @@ mod tests {
     /// Creates a database and fills it with entries for testing with
     /// different strategies.
     ///
-    /// Populated in three sections (old, middle, new) of 15, given
+    /// Populated in three sections (old, middle, new) of ~15, given
     /// that audit strategies are performed on blocks of KEYS_PER_PERIOD (=10).
     ///
     /// Properties:
     /// - 45 total
-    ///     - 1-15 "old" never audited
+    ///     - 1 audited, result fail
+    ///     - 2-15 "old" never audited
     ///     - 16-30 "middle" audited
     ///         - Odd = audit result is fail
     ///         - Even = audit result is pass
@@ -239,8 +310,8 @@ mod tests {
                 protocol_id: Set(SubProtocol::History),
             };
             let content_key_model = content_key_active_model.insert(&conn).await?;
-            // audit table
-            if (16..=30).contains(&num) {
+            // audit table.
+            if (16..=30).contains(&num) || num == 1 {
                 let result = match num % 2 == 0 {
                     true => AuditResult::Success,
                     false => AuditResult::Failure,
@@ -279,6 +350,40 @@ mod tests {
         let mut checked_ids: HashSet<i32> = HashSet::new();
         // There are 10 correct values: [36, 37, ... 45]
         let expected_key_ids: Vec<i32> = (36..=45).collect();
+        // Await strategy results
+        while let Some(task) = rx.recv().await {
+            let key_model = content::Entity::find()
+                .filter(content::Column::ContentKey.eq(task.content_key.to_bytes()))
+                .one(&conn)
+                .await
+                .unwrap()
+                .unwrap();
+            // Check that strategy only yields expected keys.
+            assert!(expected_key_ids.contains(&key_model.id));
+            checked_ids.insert(key_model.id);
+            if checked_ids.len() == KEYS_PER_PERIOD as usize {
+                break;
+            }
+        }
+        // Make sure no key was audited twice by pushing to a hashmap and checking it's length.
+        assert_eq!(checked_ids.len(), KEYS_PER_PERIOD as usize);
+    }
+
+    /// Tests that the `SelectionStrategy::SelectOldestUnaudited` selects the correct values
+    /// from the test database.
+    #[tokio::test]
+    async fn test_select_oldest_unaudited_strategy() {
+        // Orchestration
+        let conn = get_populated_test_audit_db().await.unwrap();
+        let (tx, mut rx) = channel::<AuditTask>(100);
+        // Start strategy
+        tokio::spawn(select_oldest_unaudited_content_for_audit(
+            tx.clone(),
+            conn.clone(),
+        ));
+        let mut checked_ids: HashSet<i32> = HashSet::new();
+        // There are 10 correct values: [2, ..., 11]
+        let expected_key_ids: Vec<i32> = (2..=11).collect();
         // Await strategy results
         while let Some(task) = rx.recv().await {
             let key_model = content::Entity::find()

@@ -30,7 +30,7 @@ pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
         SelectionStrategy::Latest,
         SelectionStrategy::Random,
         SelectionStrategy::Failed,
-        SelectionStrategy::OldestMissing,
+        SelectionStrategy::SelectOldestUnaudited,
     ];
     for strategy in strategies {
         tokio::spawn(start_audit_selection_task(
