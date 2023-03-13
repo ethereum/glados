@@ -14,7 +14,7 @@ use tracing::{debug, error, warn};
 
 use entity::{
     content::{self, Model},
-    content_audit::{self, StrategyUsed},
+    content_audit::{self, SelectionStrategy},
 };
 
 use crate::AuditTask;
@@ -26,51 +26,17 @@ const AUDIT_SELECTION_PERIOD_SECONDS: u64 = 120;
 /// [`AUDIT_SELECTION_PERIOD_SECONDS`].
 const KEYS_PER_PERIOD: u64 = 10;
 
-#[derive(Clone, Debug)]
-/// A strategy is responsible for generating audit tasks.
-///
-/// An audit task is a content key from the the glados database that
-/// is expected to be in a portal node.
-pub enum SelectionStrategy {
-    /// Content that is:
-    /// 1. Not yet audited
-    /// 2. Sorted by date entered into glados database (newest first).
-    Latest,
-    /// Randomly selected content.
-    Random,
-    /// Content that looks for failed audits and checks whether the data is still missing.
-    /// 1. Key was audited previously
-    /// 2. Latest audit for the key failed (data absent)
-    /// 3. Keys sorted by date audited (keys with oldest failed audit first)
-    Failed,
-    /// Content that is:
-    /// 1. Not yet audited.
-    /// 2. Sorted by date entered into glados database (oldest first).
-    OldestMissing,
-}
-
-impl SelectionStrategy {
-    pub async fn start_audit_selection_task(
-        self,
-        tx: mpsc::Sender<AuditTask>,
-        conn: DatabaseConnection,
-    ) {
-        match self {
-            SelectionStrategy::Latest => select_latest_content_for_audit(tx, conn).await,
-            SelectionStrategy::Random => select_random_content_for_audit(tx, conn).await,
-            SelectionStrategy::Failed => warn!("Need to implement SelectionStrategy::Failed"),
-            SelectionStrategy::OldestMissing => {
-                warn!("Need to implement SelectionStrategy::OldestMissing")
-            }
-        }
-    }
-    /// A type that is used in the glados database to record what strategy was used
-    pub fn as_strategy_used(&self) -> StrategyUsed {
-        match self {
-            SelectionStrategy::Latest => StrategyUsed::Latest,
-            SelectionStrategy::Random => StrategyUsed::Random,
-            SelectionStrategy::Failed => StrategyUsed::Failed,
-            SelectionStrategy::OldestMissing => StrategyUsed::OldestMissing,
+pub async fn start_audit_selection_task(
+    strategy: SelectionStrategy,
+    tx: mpsc::Sender<AuditTask>,
+    conn: DatabaseConnection,
+) {
+    match strategy {
+        SelectionStrategy::Latest => select_latest_content_for_audit(tx, conn).await,
+        SelectionStrategy::Random => select_random_content_for_audit(tx, conn).await,
+        SelectionStrategy::Failed => warn!("Need to implement SelectionStrategy::Failed"),
+        SelectionStrategy::OldestMissing => {
+            warn!("Need to implement SelectionStrategy::OldestMissing")
         }
     }
 }
@@ -283,7 +249,7 @@ mod tests {
                     id: NotSet,
                     content_key: Set(content_key_model.id),
                     created_at: Set(Utc::now().into()),
-                    strategy_used: Set(Some(StrategyUsed::Random)),
+                    strategy_used: Set(Some(SelectionStrategy::Random)),
                     result: Set(result),
                 };
                 content_audit_active_model.insert(&conn).await?;

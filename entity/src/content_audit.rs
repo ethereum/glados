@@ -13,17 +13,27 @@ pub enum AuditResult {
     Success = 1,
 }
 
-/// The audit strategy used for the given result
-///
-/// This enum shadows the glados-audit::selection::SelectionStrategy.
-/// SelectionStrategy itself cannot be used because it creates a cyclic
-/// dependency.
 #[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
-pub enum StrategyUsed {
+/// A strategy is responsible for generating audit tasks.
+///
+/// An audit task is a content key from the the glados database that
+/// is expected to be in a portal node.
+pub enum SelectionStrategy {
+    /// Content that is:
+    /// 1. Not yet audited
+    /// 2. Sorted by date entered into glados database (newest first).
     Latest = 0,
+    /// Randomly selected content.
     Random = 1,
+    /// Content that looks for failed audits and checks whether the data is still missing.
+    /// 1. Key was audited previously
+    /// 2. Latest audit for the key failed (data absent)
+    /// 3. Keys sorted by date audited (keys with oldest failed audit first)
     Failed = 2,
+    /// Content that is:
+    /// 1. Not yet audited.
+    /// 2. Sorted by date entered into glados database (oldest first).
     OldestMissing = 3,
 }
 
@@ -43,7 +53,7 @@ pub struct Model {
     pub id: i32,
     pub content_key: i32,
     pub created_at: DateTime<FixedOffset>,
-    pub strategy_used: Option<StrategyUsed>,
+    pub strategy_used: Option<SelectionStrategy>,
     pub result: AuditResult,
 }
 
@@ -70,7 +80,7 @@ impl ActiveModelBehavior for ActiveModel {}
 pub async fn create(
     content_key_model_id: i32,
     query_successful: bool,
-    strategy_used: StrategyUsed,
+    strategy_used: SelectionStrategy,
     conn: &DatabaseConnection,
 ) -> Result<Model> {
     // If no record exists, create one and return it
@@ -104,13 +114,18 @@ pub async fn get_audits<T: OverlayContentKey>(
         .await?)
 }
 
-impl StrategyUsed {
+impl SelectionStrategy {
+    /// This performs the function of Display, which is not able to be implemented
+    /// for this enum.
+    ///
+    /// SelectionStrategy derive macro DeriveActiveEnum introduces a conflicting
+    /// Display implementation.
     pub fn as_text(&self) -> String {
         match self {
-            StrategyUsed::Latest => "Latest".to_string(),
-            StrategyUsed::Random => "Random".to_string(),
-            StrategyUsed::Failed => "Failed".to_string(),
-            StrategyUsed::OldestMissing => "Oldest Missing".to_string(),
+            SelectionStrategy::Latest => "Latest".to_string(),
+            SelectionStrategy::Random => "Random".to_string(),
+            SelectionStrategy::Failed => "Failed".to_string(),
+            SelectionStrategy::OldestMissing => "Oldest Missing".to_string(),
         }
     }
 }

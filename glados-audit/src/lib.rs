@@ -6,10 +6,14 @@ use sea_orm::DatabaseConnection;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 
-use entity::{content, content_audit, execution_metadata};
+use entity::{
+    content,
+    content_audit::{self, SelectionStrategy},
+    execution_metadata,
+};
 use glados_core::jsonrpc::PortalClient;
 
-use crate::selection::SelectionStrategy;
+use crate::selection::start_audit_selection_task;
 
 pub mod cli;
 pub(crate) mod selection;
@@ -29,11 +33,11 @@ pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
         SelectionStrategy::OldestMissing,
     ];
     for strategy in strategies {
-        tokio::spawn(
-            strategy
-                .clone()
-                .start_audit_selection_task(tx.clone(), conn.clone()),
-        );
+        tokio::spawn(start_audit_selection_task(
+            strategy,
+            tx.clone(),
+            conn.clone(),
+        ));
     }
     tokio::spawn(perform_content_audits(rx, ipc_path.clone(), conn.clone()));
     debug!("setting up CTRL+C listener");
@@ -78,13 +82,7 @@ async fn perform_content_audits(
                 continue;
             }
         };
-        content_audit::create(
-            content_key_model.id,
-            audit_result,
-            task.strategy.as_strategy_used(),
-            &conn,
-        )
-        .await?;
+        content_audit::create(content_key_model.id, audit_result, task.strategy, &conn).await?;
 
         // Display audit result with block metadata.
         match execution_metadata::get(content_key_model.id, &conn).await {
