@@ -14,7 +14,14 @@ use crate::selection::SelectionStrategy;
 pub mod cli;
 pub(crate) mod selection;
 
+#[derive(Clone, Debug)]
+pub struct AuditTask {
+    pub strategy: SelectionStrategy,
+    pub content_key: HistoryContentKey,
+}
+
 pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
+    let (tx, rx) = mpsc::channel::<AuditTask>(100);
     let strategies = vec![
         SelectionStrategy::Latest,
         SelectionStrategy::Random,
@@ -22,20 +29,13 @@ pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
         SelectionStrategy::OldestMissing,
     ];
     for strategy in strategies {
-        let (tx, rx) = mpsc::channel::<HistoryContentKey>(100);
         tokio::spawn(
             strategy
                 .clone()
                 .start_audit_selection_task(tx.clone(), conn.clone()),
         );
-        tokio::spawn(perform_content_audits(
-            rx,
-            strategy,
-            ipc_path.clone(),
-            conn.clone(),
-        ));
     }
-
+    tokio::spawn(perform_content_audits(rx, ipc_path.clone(), conn.clone()));
     debug!("setting up CTRL+C listener");
     tokio::signal::ctrl_c()
         .await
@@ -45,29 +45,25 @@ pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf) {
 }
 
 /// Receives content audit tasks created according to some strategy.
-async fn perform_content_audits<T>(
-    mut rx: mpsc::Receiver<T>,
-    strategy: SelectionStrategy,
+async fn perform_content_audits(
+    mut rx: mpsc::Receiver<AuditTask>,
     ipc_path: PathBuf,
     conn: DatabaseConnection,
-) -> Result<()>
-where
-    T: OverlayContentKey,
-{
+) -> Result<()> {
     let mut client = PortalClient::from_ipc(&ipc_path).expect("Could not connect to portal node.");
 
-    while let Some(content_key) = rx.recv().await {
-        let content_key_str = format!("0x{}", hex::encode(content_key.to_bytes()));
+    while let Some(task) = rx.recv().await {
+        let content_key_str = format!("0x{}", hex::encode(task.content_key.to_bytes()));
         debug!(content.key = content_key_str, "auditing content",);
-        let content = client.get_content(&content_key)?;
+        let content = client.get_content(&task.content_key)?;
 
         let raw_data = content.raw;
         let audit_result = raw_data.len() > 2;
-        let content_key_model = match content::get(&content_key, &conn).await {
+        let content_key_model = match content::get(&task.content_key, &conn).await {
             Ok(Some(m)) => m,
             Ok(None) => {
                 error!(
-                    content.key=?content_key,
+                    content.key=?task.content_key,
                     audit.pass=?audit_result,
                     "Content_key not found in db."
                 );
@@ -75,7 +71,7 @@ where
             }
             Err(e) => {
                 error!(
-                    content.key=?content_key,
+                    content.key=?task.content_key,
                     err=?e,
                     "Could not look up content_key in db."
                 );
@@ -85,7 +81,7 @@ where
         content_audit::create(
             content_key_model.id,
             audit_result,
-            strategy.as_strategy_used(),
+            task.strategy.as_strategy_used(),
             &conn,
         )
         .await?;
