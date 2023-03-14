@@ -15,10 +15,7 @@ pub enum AuditResult {
 
 #[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
-/// A strategy is responsible for generating audit tasks.
-///
-/// An audit task is a content key from the the glados database that
-/// is expected to be in a portal node.
+/// Each strategy is responsible for selecting which content key(s) to begin audits for. 
 pub enum SelectionStrategy {
     /// Content that is:
     /// 1. Not yet audited
