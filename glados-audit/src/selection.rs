@@ -14,8 +14,10 @@ use tracing::{debug, error, warn};
 
 use entity::{
     content::{self, Model},
-    content_audit,
+    content_audit::{self, SelectionStrategy},
 };
+
+use crate::AuditTask;
 
 /// Interval between audit selections for a particular strategy.
 const AUDIT_SELECTION_PERIOD_SECONDS: u64 = 120;
@@ -24,41 +26,17 @@ const AUDIT_SELECTION_PERIOD_SECONDS: u64 = 120;
 /// [`AUDIT_SELECTION_PERIOD_SECONDS`].
 const KEYS_PER_PERIOD: u64 = 10;
 
-/// A strategy is responsible for generating audit tasks.
-///
-/// An audit task is a content key from the the glados database that
-/// is expected to be in a portal node.
-pub enum SelectionStrategy {
-    /// Content that is:
-    /// 1. Not yet audited
-    /// 2. Sorted by date entered into glados database (newest first).
-    Latest,
-    /// Randomly selected content.
-    Random,
-    /// Content that looks for failed audits and checks whether the data is still missing.
-    /// 1. Key was audited previously
-    /// 2. Latest audit for the key failed (data absent)
-    /// 3. Keys sorted by date audited (keys with oldest failed audit first)
-    Failed,
-    /// Content that is:
-    /// 1. Not yet audited.
-    /// 2. Sorted by date entered into glados database (oldest first).
-    OldestMissing,
-}
-
-impl SelectionStrategy {
-    pub async fn start_audit_selection_task(
-        self,
-        tx: mpsc::Sender<HistoryContentKey>,
-        conn: DatabaseConnection,
-    ) {
-        match self {
-            SelectionStrategy::Latest => select_latest_content_for_audit(tx, conn).await,
-            SelectionStrategy::Random => select_random_content_for_audit(tx, conn).await,
-            SelectionStrategy::Failed => warn!("Need to implement SelectionStrategy::Failed"),
-            SelectionStrategy::OldestMissing => {
-                warn!("Need to implement SelectionStrategy::OldestMissing")
-            }
+pub async fn start_audit_selection_task(
+    strategy: SelectionStrategy,
+    tx: mpsc::Sender<AuditTask>,
+    conn: DatabaseConnection,
+) {
+    match strategy {
+        SelectionStrategy::Latest => select_latest_content_for_audit(tx, conn).await,
+        SelectionStrategy::Random => select_random_content_for_audit(tx, conn).await,
+        SelectionStrategy::Failed => warn!("Need to implement SelectionStrategy::Failed"),
+        SelectionStrategy::OldestMissing => {
+            warn!("Need to implement SelectionStrategy::OldestMissing")
         }
     }
 }
@@ -70,7 +48,7 @@ impl SelectionStrategy {
 /// 2. Filter for null audits (Exclude any item with an existing audit).
 /// 3. Sort ascending to have most recently added content keys first.
 async fn select_latest_content_for_audit(
-    tx: mpsc::Sender<HistoryContentKey>,
+    tx: mpsc::Sender<AuditTask>,
     conn: DatabaseConnection,
 ) -> ! {
     debug!("initializing audit process for 'latest' strategy");
@@ -101,17 +79,37 @@ async fn select_latest_content_for_audit(
             strategy = "latest",
             item_count, "Adding content keys to the audit queue."
         );
-        add_to_queue(tx.clone(), content_key_db_entries).await;
+        add_to_queue(
+            tx.clone(),
+            SelectionStrategy::Latest,
+            content_key_db_entries,
+        )
+        .await;
     }
 }
 
 /// Adds Glados database History sub-protocol search results
 /// to a channel for auditing against a Portal Node.
-async fn add_to_queue(tx: mpsc::Sender<HistoryContentKey>, items: Vec<Model>) {
+async fn add_to_queue(
+    tx: mpsc::Sender<AuditTask>,
+    strategy: SelectionStrategy,
+    items: Vec<content::Model>,
+) {
     for content_key_model in items {
-        let key = HistoryContentKey::try_from(content_key_model.content_key).unwrap();
-        if let Err(e) = tx.send(key).await {
-            debug!(err=?e, "Could not send key for audit, channel might be full or closed.")
+        // Create key from database bytes.
+        let content_key = match HistoryContentKey::try_from(content_key_model.content_key) {
+            Ok(key) => key,
+            Err(err) => {
+                error!(database.id=?content_key_model.id, err=?err, "Could not decode content key from database record");
+                continue;
+            }
+        };
+        let task = AuditTask {
+            strategy: strategy.clone(),
+            content_key,
+        };
+        if let Err(e) = tx.send(task).await {
+            debug!(audit.strategy=?strategy, err=?e, "Could not send key for audit, channel might be full or closed.")
         }
     }
 }
@@ -123,7 +121,7 @@ async fn add_to_queue(tx: mpsc::Sender<HistoryContentKey>, items: Vec<Model>) {
 /// 2. Generating random ids.
 /// 3. Looking up each one separately, then sending them all in the channel.
 async fn select_random_content_for_audit(
-    tx: mpsc::Sender<HistoryContentKey>,
+    tx: mpsc::Sender<AuditTask>,
     conn: DatabaseConnection,
 ) -> ! {
     debug!("initializing audit process for 'random' strategy");
@@ -167,7 +165,12 @@ async fn select_random_content_for_audit(
             strategy = "random",
             item_count, "Adding content keys to the audit queue."
         );
-        add_to_queue(tx.clone(), content_key_db_entries).await;
+        add_to_queue(
+            tx.clone(),
+            SelectionStrategy::Random,
+            content_key_db_entries,
+        )
+        .await;
     }
 }
 
@@ -246,6 +249,7 @@ mod tests {
                     id: NotSet,
                     content_key: Set(content_key_model.id),
                     created_at: Set(Utc::now().into()),
+                    strategy_used: Set(Some(SelectionStrategy::Random)),
                     result: Set(result),
                 };
                 content_audit_active_model.insert(&conn).await?;
@@ -269,16 +273,16 @@ mod tests {
     async fn test_latest_strategy() {
         // Orchestration
         let conn = get_populated_test_audit_db().await.unwrap();
-        let (tx, mut rx) = channel::<HistoryContentKey>(100);
+        let (tx, mut rx) = channel::<AuditTask>(100);
         // Start strategy
         tokio::spawn(select_latest_content_for_audit(tx.clone(), conn.clone()));
         let mut checked_ids: HashSet<i32> = HashSet::new();
         // There are 10 correct values: [36, 37, ... 45]
         let expected_key_ids: Vec<i32> = (36..=45).collect();
         // Await strategy results
-        while let Some(key) = rx.recv().await {
+        while let Some(task) = rx.recv().await {
             let key_model = content::Entity::find()
-                .filter(content::Column::ContentKey.eq(key.to_bytes()))
+                .filter(content::Column::ContentKey.eq(task.content_key.to_bytes()))
                 .one(&conn)
                 .await
                 .unwrap()
@@ -300,16 +304,16 @@ mod tests {
     async fn test_random_strategy() {
         // Orchestration
         let conn = get_populated_test_audit_db().await.unwrap();
-        let (tx, mut rx) = channel::<HistoryContentKey>(100);
+        let (tx, mut rx) = channel::<AuditTask>(100);
         // Start strategy
         tokio::spawn(select_latest_content_for_audit(tx.clone(), conn.clone()));
         let mut checked_ids: HashSet<i32> = HashSet::new();
         // There are 45 possible correct values: [1, 2, ... 45]
         let expected_key_ids: Vec<i32> = (1..=45).collect();
         // Await strategy results
-        while let Some(key) = rx.recv().await {
+        while let Some(task) = rx.recv().await {
             let key_model = content::Entity::find()
-                .filter(content::Column::ContentKey.eq(key.to_bytes()))
+                .filter(content::Column::ContentKey.eq(task.content_key.to_bytes()))
                 .one(&conn)
                 .await
                 .unwrap()

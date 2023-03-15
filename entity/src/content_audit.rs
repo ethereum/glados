@@ -13,6 +13,27 @@ pub enum AuditResult {
     Success = 1,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
+#[sea_orm(rs_type = "i32", db_type = "Integer")]
+/// Each strategy is responsible for selecting which content key(s) to begin audits for. 
+pub enum SelectionStrategy {
+    /// Content that is:
+    /// 1. Not yet audited
+    /// 2. Sorted by date entered into glados database (newest first).
+    Latest = 0,
+    /// Randomly selected content.
+    Random = 1,
+    /// Content that looks for failed audits and checks whether the data is still missing.
+    /// 1. Key was audited previously
+    /// 2. Latest audit for the key failed (data absent)
+    /// 3. Keys sorted by date audited (keys with oldest failed audit first)
+    Failed = 2,
+    /// Content that is:
+    /// 1. Not yet audited.
+    /// 2. Sorted by date entered into glados database (oldest first).
+    OldestMissing = 3,
+}
+
 impl AuditResult {
     pub fn as_text(&self) -> String {
         match self {
@@ -29,6 +50,7 @@ pub struct Model {
     pub id: i32,
     pub content_key: i32,
     pub created_at: DateTime<FixedOffset>,
+    pub strategy_used: Option<SelectionStrategy>,
     pub result: AuditResult,
 }
 
@@ -55,6 +77,7 @@ impl ActiveModelBehavior for ActiveModel {}
 pub async fn create(
     content_key_model_id: i32,
     query_successful: bool,
+    strategy_used: SelectionStrategy,
     conn: &DatabaseConnection,
 ) -> Result<Model> {
     // If no record exists, create one and return it
@@ -69,6 +92,7 @@ pub async fn create(
         content_key: Set(content_key_model_id),
         created_at: Set(chrono::offset::Utc::now().into()),
         result: Set(audit_result),
+        strategy_used: Set(Some(strategy_used)),
     };
     Ok(content_audit.insert(conn).await?)
 }
@@ -87,11 +111,36 @@ pub async fn get_audits<T: OverlayContentKey>(
         .await?)
 }
 
+impl SelectionStrategy {
+    /// This performs the function of Display, which is not able to be implemented
+    /// for this enum.
+    ///
+    /// SelectionStrategy derive macro DeriveActiveEnum introduces a conflicting
+    /// Display implementation.
+    pub fn as_text(&self) -> String {
+        match self {
+            SelectionStrategy::Latest => "Latest".to_string(),
+            SelectionStrategy::Random => "Random".to_string(),
+            SelectionStrategy::Failed => "Failed".to_string(),
+            SelectionStrategy::OldestMissing => "Oldest Missing".to_string(),
+        }
+    }
+}
+
 impl Model {
     pub fn is_success(&self) -> bool {
         self.result == AuditResult::Success
     }
     pub fn created_at_local_time(&self) -> String {
         self.created_at.with_timezone(&chrono::Local).to_rfc2822()
+    }
+    /// A convenience method for displaying the strategy.
+    ///
+    /// A few early databse entries do not have a recorded strategy.
+    pub fn strategy_as_text(&self) -> String {
+        match &self.strategy_used {
+            Some(s) => s.as_text(),
+            None => "No strategy recorded".to_string(),
+        }
     }
 }
