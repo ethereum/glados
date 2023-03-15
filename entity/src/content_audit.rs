@@ -15,7 +15,7 @@ pub enum AuditResult {
 
 #[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
-/// Each strategy is responsible for selecting which content key(s) to begin audits for. 
+/// Each strategy is responsible for selecting which content key(s) to begin audits for.
 pub enum SelectionStrategy {
     /// Content that is:
     /// 1. Not yet audited
