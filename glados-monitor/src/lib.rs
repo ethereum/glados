@@ -214,7 +214,7 @@ pub async fn import_pre_merge_accumulators(
                             Ok(content_key_raw) => {
                                 let content_key =
                                     HistoryContentKey::EpochAccumulator(EpochAccumulatorKey {
-                                        epoch_hash: H256::from_slice(&content_key_raw[1..]),
+                                        epoch_hash: H256::from_slice(&content_key_raw),
                                     });
                                 debug!(content_key = %content_key, "Importing");
                                 let content_key_db =
