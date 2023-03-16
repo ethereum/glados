@@ -31,7 +31,7 @@ pub enum SelectionStrategy {
     /// Content that is:
     /// 1. Not yet audited.
     /// 2. Sorted by date entered into glados database (oldest first).
-    OldestMissing = 3,
+    SelectOldestUnaudited = 3,
 }
 
 impl AuditResult {
@@ -122,7 +122,7 @@ impl SelectionStrategy {
             SelectionStrategy::Latest => "Latest".to_string(),
             SelectionStrategy::Random => "Random".to_string(),
             SelectionStrategy::Failed => "Failed".to_string(),
-            SelectionStrategy::OldestMissing => "Oldest Missing".to_string(),
+            SelectionStrategy::SelectOldestUnaudited => "Select Oldest Unaudited".to_string(),
         }
     }
 }
