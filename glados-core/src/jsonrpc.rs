@@ -1,5 +1,6 @@
 #[cfg(unix)]
 use std::os::unix::net::UnixStream;
+use trin_utils::bytes::hex_decode;
 #[cfg(windows)]
 use uds_windows::UnixStream;
 
@@ -196,14 +197,12 @@ where
     }
 
     pub fn get_content<T: OverlayContentKey>(&mut self, content_key: &T) -> Result<Content> {
-        let encoded = hex::encode(content_key.to_bytes());
-        let content_key_string = format!("0x{encoded}");
-        let params = Some(vec![to_raw_value(&content_key_string).unwrap()]);
+        let params = Some(vec![to_raw_value(&content_key.to_hex())?]);
         let req = self.build_request("portal_historyRecursiveFindContent", &params);
         let resp = self.make_request(req)?;
 
         let content_as_hex: String = serde_json::from_value(resp.result)?;
-        let content_raw = hex::decode(&content_as_hex[2..])?;
+        let content_raw = hex_decode(&content_as_hex)?;
 
         Ok(Content { raw: content_raw })
     }

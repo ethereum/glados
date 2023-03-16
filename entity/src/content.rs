@@ -2,8 +2,9 @@
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset, Utc};
 use ethereum_types::H256;
-use ethportal_api::types::content_key::{hex_encode_compact, OverlayContentKey};
+use ethportal_api::types::content_key::OverlayContentKey;
 use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
+use trin_utils::bytes::{hex_encode, hex_encode_compact};
 
 /// Portal network sub-protocol. History, state, transactions etc.
 #[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
@@ -100,8 +101,7 @@ impl Model {
     }
 
     pub fn id_as_hex(&self) -> String {
-        let hex = hex::encode(&self.content_id);
-        format!("0x{hex}")
+        hex_encode(&self.content_id)
     }
 
     pub fn id_as_hex_short(&self) -> String {
@@ -113,8 +113,7 @@ impl Model {
     }
 
     pub fn key_as_hex(&self) -> String {
-        let hex = hex::encode(&self.content_key);
-        format!("0x{hex}")
+        hex_encode(&self.content_key)
     }
 
     pub fn key_as_hex_short(&self) -> String {

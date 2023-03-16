@@ -12,7 +12,6 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 anyhow = "1.0.68"
 discv5 = "0.1.0"
 ethereum-types = "0.14.0"
-hex = "0.4.3"
 jsonrpc = "0.13.0"
 serde = "1.0.147"
 serde_json = "1.0.87"
@@ -20,4 +19,5 @@ sha2 = "0.10.6"
 thiserror = "1.0.37"
 env_logger = "0.9.3"
 tracing = "0.1.37"
-ethportal-api = "0.1.6"
+ethportal-api = { git = "https://github.com/ethereum/trin" }
+trin-utils = {git = "https://github.com/ethereum/trin" }

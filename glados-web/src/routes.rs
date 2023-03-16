@@ -15,6 +15,7 @@ use entity::{
     execution_metadata, node,
 };
 use tracing::error;
+use trin_utils::bytes::{hex_decode, hex_encode};
 
 use crate::state::State;
 use crate::templates::{
@@ -201,7 +202,7 @@ pub async fn contentid_detail(
     Path(content_id_hex): Path<String>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<HtmlTemplate<ContentIdDetailTemplate>, StatusCode> {
-    let content_id_raw = hex::decode(&content_id_hex[2..]).map_err(|e| {
+    let content_id_raw = hex_decode(&content_id_hex).map_err(|e| {
         error!(content.id=content_id_hex, err=?e, "Could not decode up id bytes");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
@@ -258,7 +259,7 @@ pub async fn contentkey_detail(
     Path(content_key_hex): Path<String>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<HtmlTemplate<ContentKeyDetailTemplate>, StatusCode> {
-    let content_key_raw = hex::decode(&content_key_hex[2..]).map_err(|e| {
+    let content_key_raw = hex_decode(&content_key_hex).map_err(|e| {
         error!(content.key=content_key_hex, err=?e, "Could not decode up key bytes");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
@@ -299,7 +300,7 @@ pub async fn contentkey_detail(
         })?;
     let block_number = metadata_model.map(|m| m.block_number);
 
-    let content_id = format!("0x{}", hex::encode(content_key.content_id()));
+    let content_id = hex_encode(content_key.content_id());
     let content_kind = content_key.to_string();
     let template = ContentKeyDetailTemplate {
         content_key: content_key_hex,
