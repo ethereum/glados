@@ -57,8 +57,7 @@ async fn perform_content_audits(
     let mut client = PortalClient::from_ipc(&ipc_path).expect("Could not connect to portal node.");
 
     while let Some(task) = rx.recv().await {
-        let content_key_str = format!("0x{}", hex::encode(task.content_key.to_bytes()));
-        debug!(content.key = content_key_str, "auditing content",);
+        debug!(content.key = task.content_key.to_hex(), "auditing content",);
         let content = client.get_content(&task.content_key)?;
 
         let raw_data = content.raw;
@@ -88,20 +87,20 @@ async fn perform_content_audits(
         match execution_metadata::get(content_key_model.id, &conn).await {
             Ok(Some(b)) => {
                 info!(
-                    content.key=content_key_str,
+                    content.key=task.content_key.to_hex(),
                     audit.pass=?audit_result,
                     block = b.block_number,
                 );
             }
             Ok(None) => {
                 error!(
-                    content.key=?content_key_str,
+                    content.key=task.content_key.to_hex(),
                     audit.pass=?audit_result,
                     "Block metadata absent for key."
                 );
             }
             Err(e) => error!(
-                    content.key=?content_key_str,
+                    content.key=task.content_key.to_hex(),
                     err=?e,
                     "Problem getting block metadata."),
         };

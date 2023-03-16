@@ -9,6 +9,7 @@ use ethportal_api::types::content_key::{
 use sea_orm::DatabaseConnection;
 use tokio::{fs::read_dir, sync::mpsc, time::sleep};
 use tracing::{debug, error, info, warn};
+use trin_utils::bytes::hex_decode;
 use web3::types::{BlockId, H256};
 
 use entity::{content, execution_metadata};
@@ -168,15 +169,14 @@ async fn store_content_key<T: OverlayContentKey>(
 ///
 /// Helper function for common error pattern to be logged.
 fn log_record_outcome<T: OverlayContentKey>(key: &T, name: &str, outcome: DbOutcome) {
-    let encoded = hex::encode(key.to_bytes());
     match outcome {
         DbOutcome::Success => info!(
-            content.key = format!("0x{encoded}"),
+            content.key = key.to_hex(),
             content.kind = name,
             "Imported new record",
         ),
         DbOutcome::Fail(e) => error!(
-            content.key=format!("0x{encoded}"),
+            content.key=key.to_hex(),
             content.kind=name,
             err=?e,
             "Failed to create database record",
@@ -210,7 +210,7 @@ pub async fn import_pre_merge_accumulators(
                         continue;
                     }
                     match &file_stem_str[..2] {
-                        "0x" => match hex::decode(&file_stem_str[2..]) {
+                        "0x" => match hex_decode(file_stem_str) {
                             Ok(content_key_raw) => {
                                 let content_key =
                                     HistoryContentKey::EpochAccumulator(EpochAccumulatorKey {
