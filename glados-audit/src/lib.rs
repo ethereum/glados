@@ -104,7 +104,7 @@ async fn perform_content_audits(
 
 /// Performs an audit against a Portal node.
 ///
-/// After auditing finishes the thread counter is deprecated. This
+/// After auditing finishes the thread counter is decremented. This
 /// applies even if the audit process encounters an error.
 async fn perform_single_audit(
     active_threads: Arc<AtomicU8>,
