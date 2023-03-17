@@ -4,6 +4,7 @@ pub mod prelude;
 
 pub mod content;
 pub mod content_audit;
+pub mod content_gossip;
 pub mod execution_metadata;
 pub mod key_value;
 pub mod node;

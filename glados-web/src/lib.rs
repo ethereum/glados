@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::{net::SocketAddr, path::Path};
 
 use anyhow::{bail, Result};
+use axum::routing::post;
 use axum::{
     extract::Extension,
     routing::{get, get_service},
@@ -37,6 +38,11 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
         .route(
             "/content/key/:content_key_hex",
             get(routes::contentkey_detail),
+        )
+        .route("/gossip", post(routes::create_gossip_record))
+        .route(
+            "/gossip/:content_id_hex",
+            get(routes::get_gossip_records_for_content),
         )
         .nest_service("/static/", serve_dir.clone())
         .fallback_service(serve_dir)

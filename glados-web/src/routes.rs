@@ -233,3 +233,11 @@ pub async fn contentkey_detail(
     };
     HtmlTemplate(template)
 }
+
+pub async fn create_gossip_record(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {}
+
+pub async fn get_gossip_records_for_content(
+    Path(content_key_hex): Path<String>,
+    Extension(state): Extension<Arc<State>>,
+) -> impl IntoResponse {
+}

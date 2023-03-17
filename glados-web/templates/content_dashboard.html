@@ -16,25 +16,28 @@
     <div class="col">
         <ul>
             <h2> Recent content with audits</h2>
-            <table>
+            <table class="table">
                 <tr>
-                    <td>|  Result </td>
-                    <td>|  Sub-protocol </td>
-                    <td>|  Strategy</td>
-                    <td>|  Content Key</td>
-                    <td>|  Content ID</td>
-                    <td>|  Content first available</td>
-                    <td>|  Audited at</td>
+                    <thead>
+                        <th scope="col">Result </td>
+                        <th scope="col">Sub-protocol </td>
+                        <th scope="col">Strategy</td>
+                        <th scope="col">Content Key</td>
+                        <th scope="col">Content ID</td>
+                        <th scope="col">Content first available</td>
+                        <th scope="col">Audited at</td>
+                    </thead>
                 </tr>
                 {% for (content, audit) in recent_content %}
                 <tr>
-                    <td>|  <span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{% if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
-                    <td>|  {{ content.protocol_id.as_text() }} </td>
-                    <td>|  {{ audit.strategy_as_text() }}</td>
-                    <td>|  <a href="/content/key/{{content.key_as_hex()}}">{{ content.key_as_hex_short() }}</a></td>
-                    <td>|  <a href="/content/id/{{content.id_as_hex()}}">{{  content.id_as_hex_short() }}</a></td>
-                    <td>|  {{ content.available_at_local_time() }}</td>
-                    <td>|  {{ audit.created_at_local_time() }}</td>
+                    <td><span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
+                            if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
+                    <td>{{ content.protocol_id.as_text() }} </td>
+                    <td>{{ audit.strategy_as_text() }}</td>
+                    <td><a href="/content/key/{{content.key_as_hex()}}">{{ content.key_as_hex_short() }}</a></td>
+                    <td><a href="/content/id/{{content.id_as_hex()}}">{{ content.id_as_hex_short() }}</a></td>
+                    <td>{{ content.available_at_local_time() }}</td>
+                    <td>{{ audit.created_at_local_time() }}</td>
                 </tr>
                 {% endfor %}
             </table>
@@ -44,22 +47,22 @@
 <div class="row">
     <div class="col">
         <ul>
-        <h2>Recent Content</h2>
-        <table>
-            <tr>
-                <td>|  Sub-protocol </td>
-                <td>|  Content Key</td>
-                <td>|  Content ID</td>
-                <td>|  Content first available</td>
-            </tr>
-            {% for content in contentid_list %}
-            <tr>
-                <td>|  {{ content.protocol_id.as_text() }} </td>
-                <td>|  <a href="/content/key/{{content.key_as_hex() }}">{{ content.key_as_hex_short() }}</a></td>
-                <td>|  <a href="/content/id/{{content.id_as_hex() }}">{{ content.id_as_hex_short() }}</a></td>
-                <td>|  {{ content.available_at_local_time() }}</td>
-            </tr>
-            {% endfor %}
+            <h2>Recent Content</h2>
+            <table class="table-sm">
+                <tr>
+                    <td>| Sub-protocol </td>
+                    <td>| Content Key</td>
+                    <td>| Content ID</td>
+                    <td>| Content first available</td>
+                </tr>
+                {% for content in contentid_list %}
+                <tr>
+                    <td>| {{ content.protocol_id.as_text() }} </td>
+                    <td>| <a href="/content/key/{{content.key_as_hex() }}">{{ content.key_as_hex_short() }}</a></td>
+                    <td>| <a href="/content/id/{{content.id_as_hex() }}">{{ content.id_as_hex_short() }}</a></td>
+                    <td>| {{ content.available_at_local_time() }}</td>
+                </tr>
+                {% endfor %}
             </table>
         </ul>
     </div>
@@ -70,23 +73,24 @@
             <h2> Recent audits</h2>
             <table>
                 <tr>
-                    <td>|  Result </td>
-                    <td>|  Sub-protocol </td>
-                    <td>|  Strategy</td>
-                    <td>|  Content Key</td>
-                    <td>|  Content ID</td>
-                    <td>|  Content first available</td>
-                    <td>|  Audited at</td>
+                    <td>| Result </td>
+                    <td>| Sub-protocol </td>
+                    <td>| Strategy</td>
+                    <td>| Content Key</td>
+                    <td>| Content ID</td>
+                    <td>| Content first available</td>
+                    <td>| Audited at</td>
                 </tr>
                 {% for (content, audit) in recent_audits %}
                 <tr>
-                    <td>|  <span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{% if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
-                    <td>|  {{ content.protocol_id.as_text() }} </td>
-                    <td>|  {{ audit.strategy_as_text() }}</td>
-                    <td>|  <a href="/content/key/{{content.key_as_hex()}}">{{ content.key_as_hex_short() }}</a></td>
-                    <td>|  <a href="/content/id/{{content.id_as_hex()}}">{{  content.id_as_hex_short() }}</a></td>
-                    <td>|  {{ content.available_at_local_time() }}</td>
-                    <td>|  {{ audit.created_at_local_time() }}</td>
+                    <td>| <span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
+                            if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
+                    <td>| {{ content.protocol_id.as_text() }} </td>
+                    <td>| {{ audit.strategy_as_text() }}</td>
+                    <td>| <a href="/content/key/{{content.key_as_hex()}}">{{ content.key_as_hex_short() }}</a></td>
+                    <td>| <a href="/content/id/{{content.id_as_hex()}}">{{ content.id_as_hex_short() }}</a></td>
+                    <td>| {{ content.available_at_local_time() }}</td>
+                    <td>| {{ audit.created_at_local_time() }}</td>
                 </tr>
                 {% endfor %}
             </table>
@@ -99,23 +103,24 @@
             <h2> Recent audit successes</h2>
             <table>
                 <tr>
-                    <td>|  Result </td>
-                    <td>|  Sub-protocol </td>
-                    <td>|  Strategy</td>
-                    <td>|  Content Key</td>
-                    <td>|  Content ID</td>
-                    <td>|  Content first available</td>
-                    <td>|  Audited at</td>
+                    <td>| Result </td>
+                    <td>| Sub-protocol </td>
+                    <td>| Strategy</td>
+                    <td>| Content Key</td>
+                    <td>| Content ID</td>
+                    <td>| Content first available</td>
+                    <td>| Audited at</td>
                 </tr>
                 {% for (content, audit) in recent_audit_successes %}
                 <tr>
-                    <td>|  <span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{% if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
-                    <td>|  {{ content.protocol_id.as_text() }} </td>
-                    <td>|  {{ audit.strategy_as_text() }}</td>
-                    <td>|  <a href="/content/key/{{content.key_as_hex()}}">{{ content.key_as_hex_short() }}</a></td>
-                    <td>|  <a href="/content/id/{{content.id_as_hex()}}">{{  content.id_as_hex_short() }}</a></td>
-                    <td>|  {{ content.available_at_local_time() }}</td>
-                    <td>|  {{ audit.created_at_local_time() }}</td>
+                    <td>| <span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
+                            if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
+                    <td>| {{ content.protocol_id.as_text() }} </td>
+                    <td>| {{ audit.strategy_as_text() }}</td>
+                    <td>| <a href="/content/key/{{content.key_as_hex()}}">{{ content.key_as_hex_short() }}</a></td>
+                    <td>| <a href="/content/id/{{content.id_as_hex()}}">{{ content.id_as_hex_short() }}</a></td>
+                    <td>| {{ content.available_at_local_time() }}</td>
+                    <td>| {{ audit.created_at_local_time() }}</td>
                 </tr>
                 {% endfor %}
             </table>
@@ -128,23 +133,24 @@
             <h2> Recent audit failures</h2>
             <table>
                 <tr>
-                    <td>|  Result </td>
-                    <td>|  Sub-protocol </td>
-                    <td>|  Strategy</td>
-                    <td>|  Content Key</td>
-                    <td>|  Content ID</td>
-                    <td>|  Content first available</td>
-                    <td>|  Audited at</td>
+                    <td>| Result </td>
+                    <td>| Sub-protocol </td>
+                    <td>| Strategy</td>
+                    <td>| Content Key</td>
+                    <td>| Content ID</td>
+                    <td>| Content first available</td>
+                    <td>| Audited at</td>
                 </tr>
                 {% for (content, audit) in recent_audit_failures %}
                 <tr>
-                    <td>|  <span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{% if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
-                    <td>|  {{ content.protocol_id.as_text() }} </td>
-                    <td>|  {{ audit.strategy_as_text() }}</td>
-                    <td>|  <a href="/content/key/{{content.key_as_hex()}}">{{ content.key_as_hex_short() }}</a></td>
-                    <td>|  <a href="/content/id/{{content.id_as_hex()}}">{{  content.id_as_hex_short() }}</a></td>
-                    <td>|  {{ content.available_at_local_time() }}</td>
-                    <td>|  {{ audit.created_at_local_time() }}</td>
+                    <td>| <span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
+                            if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
+                    <td>| {{ content.protocol_id.as_text() }} </td>
+                    <td>| {{ audit.strategy_as_text() }}</td>
+                    <td>| <a href="/content/key/{{content.key_as_hex()}}">{{ content.key_as_hex_short() }}</a></td>
+                    <td>| <a href="/content/id/{{content.id_as_hex()}}">{{ content.id_as_hex_short() }}</a></td>
+                    <td>| {{ content.available_at_local_time() }}</td>
+                    <td>| {{ audit.created_at_local_time() }}</td>
                 </tr>
                 {% endfor %}
             </table>
