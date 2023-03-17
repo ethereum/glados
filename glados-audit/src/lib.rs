@@ -38,6 +38,8 @@ pub struct AuditConfig {
     pub database_url: String,
     /// For communication with a Portal Network node.
     pub transport: TransportConfig,
+    /// Specific strategies to run.
+    pub strategies: Vec<SelectionStrategy>,
 }
 
 impl AuditConfig {
@@ -71,10 +73,22 @@ impl AuditConfig {
                 "Selected concurrency set."
             )
         }
+        let strategies = match args.strategy {
+            Some(s) => s,
+            None => {
+                vec![
+                    SelectionStrategy::Latest,
+                    SelectionStrategy::Random,
+                    SelectionStrategy::Failed,
+                    SelectionStrategy::SelectOldestUnaudited,
+                ]
+            }
+        };
         Ok(AuditConfig {
             concurrency: args.concurrency,
             database_url: args.database_url,
             transport,
+            strategies,
         })
     }
 }
@@ -87,15 +101,10 @@ pub struct AuditTask {
 
 pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
     let (tx, rx) = mpsc::channel::<AuditTask>(100);
-    let strategies = vec![
-        SelectionStrategy::Latest,
-        SelectionStrategy::Random,
-        SelectionStrategy::Failed,
-        SelectionStrategy::SelectOldestUnaudited,
-    ];
-    for strategy in strategies {
+
+    for strategy in &config.strategies {
         tokio::spawn(start_audit_selection_task(
-            strategy,
+            strategy.clone(),
             tx.clone(),
             conn.clone(),
         ));
