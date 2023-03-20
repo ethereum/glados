@@ -6,6 +6,8 @@ use axum::{
 
 use entity::{content, content_audit, node};
 
+use crate::routes::Stats;
+
 #[derive(Template)]
 #[template(path = "index.html")]
 pub struct IndexTemplate {}
@@ -19,6 +21,7 @@ pub struct NodeListTemplate {
 #[derive(Template)]
 #[template(path = "content_dashboard.html")]
 pub struct ContentDashboardTemplate {
+    pub stats: [Stats; 3],
     pub contentid_list: Vec<content::Model>,
     pub recent_content: Vec<(content::Model, content_audit::Model)>,
     pub recent_audits: Vec<(content::Model, content_audit::Model)>,

@@ -7,7 +7,33 @@
     <div class="col">
         <ul>
             <h1>Content Dashboard</h1>
-            <div>Audit stats: TODO</div>
+            <div>
+                <h2>Audit stats</h2>
+                <table>
+                    <tr>
+                        <td>|  Period </td>
+                        <td>|  New content </td>
+                        <td>|  Total audits</td>
+                        <td>|  Total audit passes</td>
+                        <td>|  Total audit failures</td>
+                        <td>|  <span class="badge text-bg-success">Pass rate</span> (%) </td>
+                        <td>|  <span class="badge text-bg-danger">Failure rate</span> (%) </td>
+                        <td>|</td>
+                    </tr>
+                    {% for stat in stats %}
+                    <tr>
+                        <td>|  {{ stat.period.to_string() }} </td>
+                        <td>|  {{ stat.new_content }}</td>
+                        <td>|  {{ stat.total_audits }}</td>
+                        <td>|  {{ stat.total_passes }}</td>
+                        <td>|  {{ stat.total_failures }}</td>
+                        <td>|  {{ stat.passes_per_100 }}</td>
+                        <td>|  {{ stat.failures_per_100 }}</td>
+                        <td>|</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
         </ul>
 
     </div>
@@ -25,6 +51,7 @@
                     <td>|  Content ID</td>
                     <td>|  Content first available</td>
                     <td>|  Audited at</td>
+                    <td>|</td>
                 </tr>
                 {% for (content, audit) in recent_content %}
                 <tr>
@@ -35,6 +62,7 @@
                     <td>|  <a href="/content/id/{{content.id_as_hex()}}">{{  content.id_as_hex_short() }}</a></td>
                     <td>|  {{ content.available_at_local_time() }}</td>
                     <td>|  {{ audit.created_at_local_time() }}</td>
+                    <td>|</td>
                 </tr>
                 {% endfor %}
             </table>
@@ -51,6 +79,7 @@
                 <td>|  Content Key</td>
                 <td>|  Content ID</td>
                 <td>|  Content first available</td>
+                <td>|</td>
             </tr>
             {% for content in contentid_list %}
             <tr>
@@ -58,6 +87,7 @@
                 <td>|  <a href="/content/key/{{content.key_as_hex() }}">{{ content.key_as_hex_short() }}</a></td>
                 <td>|  <a href="/content/id/{{content.id_as_hex() }}">{{ content.id_as_hex_short() }}</a></td>
                 <td>|  {{ content.available_at_local_time() }}</td>
+                <td>|</td>
             </tr>
             {% endfor %}
             </table>
@@ -77,6 +107,7 @@
                     <td>|  Content ID</td>
                     <td>|  Content first available</td>
                     <td>|  Audited at</td>
+                    <td>|</td>
                 </tr>
                 {% for (content, audit) in recent_audits %}
                 <tr>
@@ -87,6 +118,7 @@
                     <td>|  <a href="/content/id/{{content.id_as_hex()}}">{{  content.id_as_hex_short() }}</a></td>
                     <td>|  {{ content.available_at_local_time() }}</td>
                     <td>|  {{ audit.created_at_local_time() }}</td>
+                    <td>|</td>
                 </tr>
                 {% endfor %}
             </table>
@@ -106,6 +138,7 @@
                     <td>|  Content ID</td>
                     <td>|  Content first available</td>
                     <td>|  Audited at</td>
+                    <td>|</td>
                 </tr>
                 {% for (content, audit) in recent_audit_successes %}
                 <tr>
@@ -116,6 +149,7 @@
                     <td>|  <a href="/content/id/{{content.id_as_hex()}}">{{  content.id_as_hex_short() }}</a></td>
                     <td>|  {{ content.available_at_local_time() }}</td>
                     <td>|  {{ audit.created_at_local_time() }}</td>
+                    <td>|</td>
                 </tr>
                 {% endfor %}
             </table>
@@ -135,6 +169,7 @@
                     <td>|  Content ID</td>
                     <td>|  Content first available</td>
                     <td>|  Audited at</td>
+                    <td>|</td>
                 </tr>
                 {% for (content, audit) in recent_audit_failures %}
                 <tr>
@@ -145,6 +180,7 @@
                     <td>|  <a href="/content/id/{{content.id_as_hex()}}">{{  content.id_as_hex_short() }}</a></td>
                     <td>|  {{ content.available_at_local_time() }}</td>
                     <td>|  {{ audit.created_at_local_time() }}</td>
+                    <td>|</td>
                 </tr>
                 {% endfor %}
             </table>

@@ -1,18 +1,20 @@
-use std::io;
 use std::sync::Arc;
+use std::{fmt::Display, io};
 
 use axum::{
     extract::{Extension, Path},
     http::StatusCode,
     response::IntoResponse,
 };
-use ethportal_api::{types::content_key::OverlayContentKey, HistoryContentKey};
-use sea_orm::{ColumnTrait, EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect};
-
+use chrono::{DateTime, Duration, Utc};
 use entity::{
     content,
     content_audit::{self, AuditResult},
     execution_metadata, node,
+};
+use ethportal_api::{types::content_key::OverlayContentKey, HistoryContentKey};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 use tracing::error;
 use trin_utils::bytes::{hex_decode, hex_encode};
@@ -119,6 +121,11 @@ pub async fn content_dashboard(
             })?;
 
     let template = ContentDashboardTemplate {
+        stats: [
+            get_audit_stats(Period::Hour, &state.database_connection).await?,
+            get_audit_stats(Period::Day, &state.database_connection).await?,
+            get_audit_stats(Period::Week, &state.database_connection).await?,
+        ],
         contentid_list,
         recent_content: content_model_to_display(recent_content_model)?,
         recent_audits: audit_model_to_display(recent_audits_model)?,
@@ -144,7 +151,7 @@ fn content_model_to_display(
                 .rev()
                 .next()
                 // We know there will beat least one audit because we filtered nulls out after joining.
-                .ok_or({
+                .ok_or_else(|| {
                     error!("Expected content to have at least one associated audit.");
                     StatusCode::INTERNAL_SERVER_ERROR
                 });
@@ -169,7 +176,7 @@ fn audit_model_to_display(
                 .into_iter()
                 .next()
                 // We know there will be one content because audits only have one one content foreign key.
-                .ok_or({
+                .ok_or_else(|| {
                     error!("Expected audit to have at least one associated content.");
                     StatusCode::INTERNAL_SERVER_ERROR
                 });
@@ -214,7 +221,7 @@ pub async fn contentid_detail(
             error!(content.id=content_id_hex, err=?e, "Could not look up id");
             StatusCode::INTERNAL_SERVER_ERROR
         })?
-        .ok_or({
+        .ok_or_else(|| {
             error!(content.id = content_id_hex, "No data for id");
             StatusCode::NOT_FOUND
         })?;
@@ -271,7 +278,7 @@ pub async fn contentkey_detail(
             error!(content.key=content_key_hex, err=?e, "Could not look up key");
             StatusCode::INTERNAL_SERVER_ERROR
         })?
-        .ok_or({
+        .ok_or_else(|| {
             error!(content.key = content_key_hex, "No data for key");
             StatusCode::NOT_FOUND
         })?;
@@ -311,4 +318,93 @@ pub async fn contentkey_detail(
         block_number,
     };
     Ok(HtmlTemplate(template))
+}
+
+pub enum Period {
+    Hour,
+    Day,
+    Week,
+}
+
+impl Display for Period {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let time_period = match self {
+            Period::Hour => "hour",
+            Period::Day => "day",
+            Period::Week => "week",
+        };
+        write!(f, "Last {time_period}")
+    }
+}
+impl Period {
+    fn cutoff_time(&self) -> DateTime<Utc> {
+        let duration = match self {
+            Period::Hour => Duration::hours(1),
+            Period::Day => Duration::days(1),
+            Period::Week => Duration::weeks(1),
+        };
+        Utc::now() - duration
+    }
+}
+
+pub struct Stats {
+    pub period: Period,
+    pub new_content: u32,
+    pub total_audits: u32,
+    pub total_passes: u32,
+    pub passes_per_100: u32,
+    pub total_failures: u32,
+    pub failures_per_100: u32,
+}
+
+async fn get_audit_stats(period: Period, conn: &DatabaseConnection) -> Result<Stats, StatusCode> {
+    let cutoff = period.cutoff_time();
+    let new_content = content::Entity::find()
+        .filter(content::Column::FirstAvailableAt.gt(cutoff))
+        .all(conn)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Could not look up audit stats");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .len() as u32;
+
+    let total_audits = content_audit::Entity::find()
+        .filter(content_audit::Column::CreatedAt.gt(cutoff))
+        .all(conn)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Could not look up audit stats");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .len() as u32;
+
+    let total_passes = content_audit::Entity::find()
+        .filter(content_audit::Column::CreatedAt.gt(cutoff))
+        .filter(content_audit::Column::Result.eq(AuditResult::Success))
+        .all(conn)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Could not look up audit stats");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .len() as u32;
+    let total_failures = total_audits - total_passes;
+    Ok(Stats {
+        period,
+        new_content,
+        total_audits,
+        total_passes,
+        passes_per_100: rate(total_passes, total_audits),
+        total_failures,
+        failures_per_100: rate(total_failures, total_audits),
+    })
+}
+
+/// Returns rate as integer. E.g., 5% as 5u32
+fn rate(dividend: u32, divisor: u32) -> u32 {
+    match dividend.checked_div(divisor) {
+        Some(fraction) => 100 * fraction,
+        None => 0,
+    }
 }
