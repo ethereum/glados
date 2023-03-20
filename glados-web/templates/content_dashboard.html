@@ -12,25 +12,27 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <th scope="col">Period </td>
-                            <th scope="col">New content </td>
-                            <th scope="col">Total audits</td>
-                            <th scope="col">Total audit passes</td>
-                            <th scope="col">Total audit failures</td>
-                            <th scope="col"><span class="badge text-bg-success">Pass rate</span> (%) </td>
-                            <th scope="col"><span class="badge text-bg-danger">Failure rate</span> (%) </td>
+                            <th scope="col">Period </th>
+                            <th scope="col">New content </th>
+                            <th scope="col">Total audits</th>
+                            <th scope="col">Total audit passes</th>
+                            <th scope="col">Total audit failures</th>
+                            <th scope="col"><span class="badge text-bg-success">Pass rate</span> (%) </th>
+                            <th scope="col"><span class="badge text-bg-danger">Failure rate</span> (%) </th>
+                            <th scope="col">Audits per minute</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for stat in stats %}
                         <tr>
-                            <th scope="row">{{ stat.period.to_string() }} </td>
+                            <th scope="row">{{ stat.period.to_string() }} </th>
                             <td>{{ stat.new_content }}</td>
                             <td>{{ stat.total_audits }}</td>
                             <td>{{ stat.total_passes }}</td>
                             <td>{{ stat.total_failures }}</td>
                             <td>{{ stat.passes_per_100 }}%</td>
                             <td>{{ stat.failures_per_100 }}%</td>
+                            <td>{{ stat.audits_per_minute }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -47,13 +49,13 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th scope="col">Result </td>
-                        <th scope="col">Sub-protocol </td>
-                        <th scope="col">Strategy</td>
-                        <th scope="col">Content Key</td>
-                        <th scope="col">Content ID</td>
-                        <th scope="col">Content first available</td>
-                        <th scope="col">Audited at</td>
+                        <th scope="col">Result </th>
+                        <th scope="col">Sub-protocol </th>
+                        <th scope="col">Strategy</th>
+                        <th scope="col">Content Key</th>
+                        <th scope="col">Content ID</th>
+                        <th scope="col">Content first available</th>
+                        <th scope="col">Audited at</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -80,10 +82,10 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th scope="col">Sub-protocol </td>
-                        <th scope="col">Content Key</td>
-                        <th scope="col">Content ID</td>
-                        <th scope="col">Content first available</td>
+                        <th scope="col">Sub-protocol </th>
+                        <th scope="col">Content Key</th>
+                        <th scope="col">Content ID</th>
+                        <th scope="col">Content first available</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -107,13 +109,13 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th scope="col">Result </td>
-                        <th scope="col">Sub-protocol </td>
-                        <th scope="col">Strategy</td>
-                        <th scope="col">Content Key</td>
-                        <th scope="col">Content ID</td>
-                        <th scope="col">Content first available</td>
-                        <th scope="col">Audited at</td>
+                        <th scope="col">Result </th>
+                        <th scope="col">Sub-protocol </th>
+                        <th scope="col">Strategy</th>
+                        <th scope="col">Content Key</th>
+                        <th scope="col">Content ID</th>
+                        <th scope="col">Content first available</th>
+                        <th scope="col">Audited at</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -140,13 +142,13 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th scope="col">Result </td>
-                        <th scope="col">Sub-protocol </td>
-                        <th scope="col">Strategy</td>
-                        <th scope="col">Content Key</td>
-                        <th scope="col">Content ID</td>
-                        <th scope="col">Content first available</td>
-                        <th scope="col">Audited at</td>
+                        <th scope="col">Result </th>
+                        <th scope="col">Sub-protocol </th>
+                        <th scope="col">Strategy</th>
+                        <th scope="col">Content Key</th>
+                        <th scope="col">Content ID</th>
+                        <th scope="col">Content first available</th>
+                        <th scope="col">Audited at</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -173,13 +175,13 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th scope="col">Result </td>
-                        <th scope="col">Sub-protocol </td>
-                        <th scope="col">Strategy</td>
-                        <th scope="col">Content Key</td>
-                        <th scope="col">Content ID</td>
-                        <th scope="col">Content first available</td>
-                        <th scope="col">Audited at</td>
+                        <th scope="col">Result </th>
+                        <th scope="col">Sub-protocol </th>
+                        <th scope="col">Strategy</th>
+                        <th scope="col">Content Key</th>
+                        <th scope="col">Content ID</th>
+                        <th scope="col">Content first available</th>
+                        <th scope="col">Audited at</th>
                     </tr>
                 </thead>
                 <tbody>
