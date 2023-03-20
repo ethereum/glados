@@ -395,16 +395,10 @@ async fn get_audit_stats(period: Period, conn: &DatabaseConnection) -> Result<St
         new_content,
         total_audits,
         total_passes,
-        passes_per_100: rate(total_passes, total_audits),
+        passes_per_100: (100 * total_passes).checked_div(total_audits).unwrap_or(0),
         total_failures,
-        failures_per_100: rate(total_failures, total_audits),
+        failures_per_100: (100 * total_failures)
+            .checked_div(total_audits)
+            .unwrap_or(0),
     })
-}
-
-/// Returns rate as integer. E.g., 5% as 5u32
-fn rate(dividend: u32, divisor: u32) -> u32 {
-    match dividend.checked_div(divisor) {
-        Some(fraction) => 100 * fraction,
-        None => 0,
-    }
 }
