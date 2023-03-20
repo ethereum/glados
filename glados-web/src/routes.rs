@@ -403,8 +403,8 @@ async fn get_audit_stats(period: Period, conn: &DatabaseConnection) -> Result<St
 
 /// Returns rate as integer. E.g., 5% as 5u32
 fn rate(dividend: u32, divisor: u32) -> u32 {
-    match dividend.checked_div(divisor) {
-        Some(fraction) => 100 * fraction,
+    match (100 * dividend).checked_div(divisor) {
+        Some(fraction) => fraction,
         None => 0,
     }
 }
