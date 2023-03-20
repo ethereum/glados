@@ -397,6 +397,8 @@ async fn get_audit_stats(period: Period, conn: &DatabaseConnection) -> Result<St
         total_passes,
         passes_per_100: (100 * total_passes).checked_div(total_audits).unwrap_or(0),
         total_failures,
-        failures_per_100: (100 * total_failures).checked_div(total_audits).unwrap_or(0),
+        failures_per_100: (100 * total_failures)
+            .checked_div(total_audits)
+            .unwrap_or(0),
     })
 }
