@@ -345,6 +345,14 @@ impl Period {
         };
         Utc::now() - duration
     }
+
+    fn total_seconds(&self) -> u32 {
+        match self {
+            Period::Hour => 360,
+            Period::Day => 86400,
+            Period::Week => 604800,
+        }
+    }
 }
 
 pub struct Stats {
@@ -355,6 +363,7 @@ pub struct Stats {
     pub passes_per_100: u32,
     pub total_failures: u32,
     pub failures_per_100: u32,
+    pub audits_per_minute: u32,
 }
 
 async fn get_audit_stats(period: Period, conn: &DatabaseConnection) -> Result<Stats, StatusCode> {
@@ -390,15 +399,21 @@ async fn get_audit_stats(period: Period, conn: &DatabaseConnection) -> Result<St
         })?
         .len() as u32;
     let total_failures = total_audits - total_passes;
+    let audits_per_minute = (60 * total_audits)
+        .checked_div(period.total_seconds())
+        .unwrap_or(0);
+    let passes_per_100 = (100 * total_passes).checked_div(total_audits).unwrap_or(0);
+    let failures_per_100 = (100 * total_failures)
+        .checked_div(total_audits)
+        .unwrap_or(0);
     Ok(Stats {
         period,
         new_content,
         total_audits,
         total_passes,
-        passes_per_100: (100 * total_passes).checked_div(total_audits).unwrap_or(0),
+        passes_per_100,
         total_failures,
-        failures_per_100: (100 * total_failures)
-            .checked_div(total_audits)
-            .unwrap_or(0),
+        failures_per_100,
+        audits_per_minute,
     })
 }
