@@ -348,7 +348,7 @@ impl Period {
 
     fn total_seconds(&self) -> u32 {
         match self {
-            Period::Hour => 360,
+            Period::Hour => 3600,
             Period::Day => 86400,
             Period::Week => 604800,
         }
