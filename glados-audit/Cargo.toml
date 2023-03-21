@@ -24,3 +24,4 @@ trin-utils = {git = "https://github.com/ethereum/trin" }
 ethportal-api = { git = "https://github.com/ethereum/trin" }
 chrono = "0.4.23"
 rand = "0.8.5"
+url = "2.3.1"

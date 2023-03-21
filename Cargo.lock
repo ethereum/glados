@@ -1883,6 +1883,7 @@ dependencies = [
  "tokio",
  "tracing",
  "trin-utils",
+ "url",
  "web3",
 ]
 
@@ -1896,12 +1897,17 @@ dependencies = [
  "ethereum-types 0.14.0",
  "ethportal-api",
  "jsonrpc",
+ "jsonrpsee",
+ "jsonrpsee-core",
+ "jsonrpsee-types",
+ "rustc-hex",
  "serde",
  "serde_json",
  "sha2 0.10.6",
  "thiserror",
  "tracing",
  "trin-utils",
+ "url",
 ]
 
 [[package]]

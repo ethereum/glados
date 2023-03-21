@@ -1,30 +1,83 @@
 use std::{
-    path::PathBuf,
     sync::{
         atomic::{AtomicU8, Ordering},
         Arc,
     },
+    thread::available_parallelism,
 };
 
+use anyhow::{bail, Result};
+use clap::Parser;
+use cli::Args;
 use ethportal_api::{types::content_key::OverlayContentKey, HistoryContentKey};
 use sea_orm::DatabaseConnection;
 use tokio::{
     sync::mpsc,
     time::{sleep, Duration},
 };
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use entity::{
     content,
     content_audit::{self, SelectionStrategy},
     execution_metadata,
 };
-use glados_core::jsonrpc::PortalClient;
+use glados_core::jsonrpc::{PortalClient, TransportConfig};
 
-use crate::selection::start_audit_selection_task;
+use crate::{cli::TransportType, selection::start_audit_selection_task};
 
 pub mod cli;
 pub(crate) mod selection;
+
+/// Configuration created from CLI arguments.
+#[derive(Clone, Debug)]
+pub struct AuditConfig {
+    /// Maximum amount of threads that audits will be performed with.
+    pub concurrency: u8,
+    /// For Glados-related data.
+    pub database_url: String,
+    /// For communication with a Portal Network node.
+    pub transport: TransportConfig,
+}
+
+impl AuditConfig {
+    pub fn from_args() -> Result<AuditConfig> {
+        let args = Args::parse();
+        let transport: TransportConfig = match args.transport {
+            TransportType::IPC => match args.ipc_path {
+                Some(p) => TransportConfig::IPC(p),
+                None => {
+                    bail!("The '--ipc-path' flag is required if '--transport ipc' variant is selected.")
+                }
+            },
+            TransportType::HTTP => match args.http_url {
+                Some(h) => TransportConfig::HTTP(h),
+                None => {
+                    bail!("The '--http-url' flag is required if '--transport http' variant is selected.");
+                }
+            },
+        };
+        let parallelism = available_parallelism()?.get() as u8;
+        if args.concurrency > parallelism {
+            warn!(
+                selected.concurrency = args.concurrency,
+                system.concurrency = parallelism,
+                "Selected concurrency greater than system concurrency."
+            )
+        } else {
+            info!(
+                selected.concurrency = args.concurrency,
+                system.concurrency = parallelism,
+                "Selected concurrency set."
+            )
+        }
+        Ok(AuditConfig {
+            concurrency: args.concurrency,
+            database_url: args.database_url,
+            transport,
+        })
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct AuditTask {
@@ -32,8 +85,7 @@ pub struct AuditTask {
     pub content_key: HistoryContentKey,
 }
 
-pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf, max_concurrency: u8) {
-    info!(max.concurrency = max_concurrency, "starting glados audit.");
+pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
     let (tx, rx) = mpsc::channel::<AuditTask>(100);
     let strategies = vec![
         SelectionStrategy::Latest,
@@ -49,8 +101,7 @@ pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf, max_c
         ));
     }
 
-    tokio::spawn(perform_content_audits(max_concurrency, rx, ipc_path, conn));
-
+    tokio::spawn(perform_content_audits(config, rx, conn.clone()));
     debug!("setting up CTRL+C listener");
     tokio::signal::ctrl_c()
         .await
@@ -60,28 +111,27 @@ pub async fn run_glados_audit(conn: DatabaseConnection, ipc_path: PathBuf, max_c
 }
 
 async fn perform_content_audits(
-    max_concurrency: u8,
+    config: AuditConfig,
     mut rx: mpsc::Receiver<AuditTask>,
-    ipc_path: PathBuf,
     conn: DatabaseConnection,
 ) {
     let active_threads = Arc::new(AtomicU8::new(0));
     loop {
         let active_count = active_threads.load(Ordering::Relaxed);
-        if active_count >= max_concurrency {
+        if active_count >= config.concurrency {
             // Each audit is performed in new thread if enough concurrency is available.
             debug!(
                 active.threads = active_count,
-                max.threads = max_concurrency,
-                "Max concurrency reached. Sleeping..."
+                max.threads = config.concurrency,
+                "Waiting for responses on all audit threads... Sleeping..."
             );
-            sleep(Duration::from_millis(1000)).await;
+            sleep(Duration::from_millis(5000)).await;
             continue;
         }
 
         debug!(
             active.threads = active_count,
-            max.threads = max_concurrency,
+            max.threads = config.concurrency,
             "Checking Rx channel for audits"
         );
 
@@ -91,7 +141,7 @@ async fn perform_content_audits(
                 tokio::spawn(perform_single_audit(
                     active_threads.clone(),
                     task,
-                    ipc_path.clone(),
+                    config.clone(),
                     conn.clone(),
                 ))
             }
@@ -104,15 +154,15 @@ async fn perform_content_audits(
 
 /// Performs an audit against a Portal node.
 ///
-/// After auditing finishes the thread counter is decremented. This
+/// After auditing finishes the thread counter is deprecated. This
 /// applies even if the audit process encounters an error.
 async fn perform_single_audit(
     active_threads: Arc<AtomicU8>,
     task: AuditTask,
-    ipc_path: PathBuf,
+    config: AuditConfig,
     conn: DatabaseConnection,
 ) {
-    let mut client = match PortalClient::from_ipc(&ipc_path) {
+    let client = match PortalClient::from_config(&config.transport) {
         Ok(c) => c,
         Err(e) => {
             error!(
@@ -126,21 +176,20 @@ async fn perform_single_audit(
     };
 
     debug!(content.key = task.content_key.to_hex(), "auditing content",);
-    let content = match client.get_content(&task.content_key) {
+    let content = match client.get_content(&task.content_key).await {
         Ok(c) => c,
         Err(e) => {
             error!(
-                content.key=?task.content_key,
+                content.key=?task.content_key.to_hex(),
                 err=?e,
-                "Could not get content from Portal node."
+                "Problem requesting content from Portal node."
             );
             active_threads.fetch_sub(1, Ordering::Relaxed);
             return;
         }
     };
 
-    let raw_data = content.raw;
-    let audit_result = raw_data.len() > 2;
+    let audit_result = content.is_some();
     let content_key_model = match content::get(&task.content_key, &conn).await {
         Ok(Some(m)) => m,
         Ok(None) => {

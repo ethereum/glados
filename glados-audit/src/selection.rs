@@ -96,6 +96,13 @@ async fn add_to_queue(
     strategy: SelectionStrategy,
     items: Vec<content::Model>,
 ) {
+    let capacity = tx.capacity();
+    let max_capacity = tx.max_capacity();
+    debug!(
+        channel.availability = capacity,
+        channel.size = max_capacity,
+        "Adding items to audit task channel."
+    );
     for content_key_model in items {
         // Create key from database bytes.
         let content_key = match HistoryContentKey::try_from(content_key_model.content_key) {
