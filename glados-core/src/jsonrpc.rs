@@ -7,7 +7,7 @@ use std::str::FromStr;
 use discv5::enr::CombinedKey;
 use ethereum_types::{H256, U256};
 use ethportal_api::types::content_key::OverlayContentKey;
-use jsonrpc::{error::RpcError, Request};
+use jsonrpc::Request;
 use jsonrpsee::{
     core::{client::ClientT, params::ArrayParams},
     http_client::{HttpClient, HttpClientBuilder},
@@ -62,9 +62,6 @@ pub enum JsonRpcError {
 
     #[error("HTTP client error")]
     HttpClient(#[from] jsonrpsee_core::Error),
-
-    #[error("received HTTP error code {source_err:?}")]
-    HttpResponse { source_err: RpcError }, // This source doesn't implement Error
 
     /// Portal network defines "0x" as the response for absent content.
     #[error("expected special 0x 'content absent' message for content request, received HTTP response with None result")]
