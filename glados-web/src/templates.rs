@@ -4,7 +4,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 
-use entity::{content, content_audit, node};
+use entity::{content, content_audit, content_gossip, node};
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -54,6 +54,7 @@ pub struct ContentKeyDetailTemplate {
     pub content_kind: String,
     pub block_number: Option<i32>,
     pub contentaudit_list: Vec<content_audit::Model>,
+    pub gossip_records: Vec<content_gossip::Model>,
 }
 
 pub struct HtmlTemplate<T>(pub T);

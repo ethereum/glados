@@ -42,6 +42,8 @@ pub enum Relation {
     ContentAudit,
     #[sea_orm(has_many = "super::execution_metadata::Entity")]
     ExecutionMetadata,
+    #[sea_orm(has_many = "super::content_gossip::Entity")]
+    ContentGossip,
 }
 
 impl Related<super::content_audit::Entity> for Entity {
@@ -53,6 +55,12 @@ impl Related<super::content_audit::Entity> for Entity {
 impl Related<super::execution_metadata::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::ExecutionMetadata.def()
+    }
+}
+
+impl Related<super::content_gossip::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ContentGossip.def()
     }
 }
 

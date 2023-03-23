@@ -2,17 +2,18 @@ use std::io;
 use std::sync::Arc;
 
 use axum::{
-    extract::{Extension, Path},
+    extract::{Extension, Json, Path},
     http::StatusCode,
     response::IntoResponse,
 };
 use ethportal_api::{types::content_key::OverlayContentKey, HistoryContentKey};
 use sea_orm::{ColumnTrait, EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect};
+use serde::Deserialize;
 
 use entity::{
     content,
     content_audit::{self, AuditResult},
-    execution_metadata, node,
+    content_gossip, execution_metadata, node,
 };
 
 use crate::state::State;
@@ -221,6 +222,12 @@ pub async fn contentkey_detail(
         .expect("No content found");
     let block_number = metadata_model.map(|m| m.block_number);
 
+    let gossip_records = content_key_model
+        .find_related(content_gossip::Entity)
+        .all(&state.database_connection)
+        .await
+        .expect("Failed to look up gossip records");
+
     let content_id = format!("0x{}", hex::encode(content_key.content_id()));
     let content_kind = content_key.to_string();
     let template = ContentKeyDetailTemplate {
@@ -230,14 +237,28 @@ pub async fn contentkey_detail(
         content_id,
         content_kind,
         block_number,
+        gossip_records,
     };
     HtmlTemplate(template)
 }
 
-pub async fn create_gossip_record(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {}
-
-pub async fn get_gossip_records_for_content(
-    Path(content_key_hex): Path<String>,
+pub async fn create_gossip_record(
+    Json(gossip_data): Json<NewGossipData>,
     Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
+    let gossip = content_gossip::create(
+        gossip_data.sending_node,
+        gossip_data.receiving_node,
+        gossip_data.content_key,
+        &state.database_connection,
+    )
+    .await
+    .expect("Failed to create gossip record");
+}
+
+#[derive(Deserialize)]
+pub struct NewGossipData {
+    receiving_node: String,
+    sending_node: String,
+    content_key: String,
 }
