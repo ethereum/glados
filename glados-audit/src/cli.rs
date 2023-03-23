@@ -20,6 +20,51 @@ pub struct Args {
     pub concurrency: u8,
     #[arg(short, long, action(ArgAction::Append), value_enum, default_value = None, help = "Specific strategy to use. Default is to use all available strategies. May be passed multiple times for multiple strategies (--strategy latest --strategy random). Duplicates are permitted (--strategy random --strategy random).")]
     pub strategy: Option<Vec<SelectionStrategy>>,
+    #[arg(
+        short,
+        long,
+        default_value = "1",
+        help = "relative weight of the 'latest' strategy"
+    )]
+    pub latest_strategy_weight: u8,
+    #[arg(
+        short,
+        long,
+        default_value = "1",
+        help = "relative weight of the 'failed' strategy"
+    )]
+    pub failed_strategy_weight: u8,
+    #[arg(
+        short,
+        long,
+        default_value = "1",
+        help = "relative weight of the 'select oldest unaudited' strategy"
+    )]
+    pub oldest_strategy_weight: u8,
+    #[arg(
+        short,
+        long,
+        default_value = "1",
+        help = "relative weight of the 'random' strategy"
+    )]
+    pub random_strategy_weight: u8,
+}
+
+impl Default for Args {
+    fn default() -> Self {
+        Self {
+            database_url: DEFAULT_DB_URL.to_string(),
+            ipc_path: Default::default(),
+            http_url: Default::default(),
+            transport: TransportType::HTTP,
+            concurrency: 4,
+            latest_strategy_weight: 1,
+            failed_strategy_weight: 1,
+            oldest_strategy_weight: 1,
+            random_strategy_weight: 1,
+            strategy: None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -34,10 +79,8 @@ mod test {
         let expected = Args {
             database_url: DEFAULT_DB_URL.to_string(),
             ipc_path: Some(PathBuf::from(IPC_PATH)),
-            concurrency: 4,
-            http_url: None,
             transport: TransportType::IPC,
-            strategy: None,
+            ..Default::default()
         };
         assert_eq!(result, expected);
     }
@@ -50,16 +93,15 @@ mod test {
             "ipc",
             "--ipc-path",
             IPC_PATH,
-            "--concurrency",
+            "--latest-strategy-weight",
             "3",
         ]);
         let expected = Args {
-            database_url: DEFAULT_DB_URL.to_string(),
-            ipc_path: Some(PathBuf::from(IPC_PATH)),
-            concurrency: 3,
-            http_url: None,
             transport: TransportType::IPC,
             strategy: None,
+            ipc_path: Some(PathBuf::from(IPC_PATH)),
+            latest_strategy_weight: 3,
+            ..Default::default()
         };
         assert_eq!(result, expected);
     }
@@ -84,6 +126,7 @@ mod test {
             ipc_path: Some(PathBuf::from(IPC_PATH)),
             concurrency: 4,
             strategy: Some(vec![SelectionStrategy::Latest]),
+            ..Default::default()
         };
         assert_eq!(result, expected);
     }
@@ -117,6 +160,7 @@ mod test {
                 SelectionStrategy::Latest,
                 SelectionStrategy::Random,
             ]),
+            ..Default::default()
         };
         assert_eq!(result, expected);
     }

@@ -20,13 +20,6 @@ use entity::{
 
 use crate::AuditTask;
 
-/// Interval between audit selections for a particular strategy.
-const AUDIT_SELECTION_PERIOD_SECONDS: u64 = 120;
-
-/// Number of content keys to audit per
-/// [`AUDIT_SELECTION_PERIOD_SECONDS`].
-const KEYS_PER_PERIOD: u64 = 10;
-
 pub async fn start_audit_selection_task(
     strategy: SelectionStrategy,
     tx: mpsc::Sender<AuditTask>,
@@ -48,24 +41,34 @@ pub async fn start_audit_selection_task(
 /// 1. Left joining contentkey table to the contentaudit table to find audits per key.
 /// 2. Filter for null audits (Exclude any item with an existing audit).
 /// 3. Sort ascending to have most recently added content keys first.
+/// 4. Filter for content that is older than n seconds to allow the network a chance to propogate the content.
+///
+/// At regular intervals the channel capacity is assessed and new tasks are added to reach capacity.
 async fn select_latest_content_for_audit(
     tx: mpsc::Sender<AuditTask>,
     conn: DatabaseConnection,
 ) -> ! {
     debug!("initializing audit process for 'latest' strategy");
+    let mut interval = interval(Duration::from_secs(10));
 
-    let mut interval = interval(Duration::from_secs(AUDIT_SELECTION_PERIOD_SECONDS));
     loop {
         interval.tick().await;
         if tx.is_closed() {
             error!("Channel is closed.");
             panic!();
         }
+        let keys_required = tx.capacity();
+        if keys_required == 0 {
+            continue;
+        };
         let content_key_db_entries = match content::Entity::find()
             .left_join(entity::content_audit::Entity)
             .filter(content_audit::Column::CreatedAt.is_null())
+            .filter(
+                content::Column::FirstAvailableAt.lt(Utc::now() - chrono::Duration::seconds(10)),
+            )
             .order_by_desc(content::Column::FirstAvailableAt)
-            .limit(KEYS_PER_PERIOD)
+            .limit(keys_required as u64)
             .all(&conn)
             .await
         {
@@ -128,15 +131,18 @@ async fn add_to_queue(
 /// 1. Checking number of keys in DB.
 /// 2. Generating random ids.
 /// 3. Looking up each one separately, then sending them all in the channel.
+///
+/// At regular intervals the channel capacity is assessed and new tasks are added to reach capacity.
 async fn select_random_content_for_audit(
     tx: mpsc::Sender<AuditTask>,
     conn: DatabaseConnection,
 ) -> ! {
     debug!("initializing audit process for 'random' strategy");
 
-    let mut interval = interval(Duration::from_secs(AUDIT_SELECTION_PERIOD_SECONDS));
+    let mut interval = interval(Duration::from_secs(10));
     loop {
         interval.tick().await;
+
         let num_keys = match content::Entity::find().count(&conn).await {
             // Skip if no keys yet.
             Ok(0) => continue,
@@ -146,11 +152,15 @@ async fn select_random_content_for_audit(
                 continue;
             }
         };
+        let keys_required = tx.capacity();
+        if keys_required == 0 {
+            continue;
+        };
         let mut random_ids: HashSet<u32> = HashSet::new();
         {
             // Thread safe block for the rng, which is not `Send`.
             let mut rng = thread_rng();
-            for _ in 0..KEYS_PER_PERIOD {
+            for _ in 0..keys_required {
                 random_ids.insert(rng.gen_range(0..num_keys));
             }
         }
@@ -188,13 +198,14 @@ async fn select_random_content_for_audit(
 /// 1. Find oldest content
 /// 2. Filter for content with no audits
 /// 3. As audits are sent, gradually select more recent content
+///
+/// At regular intervals the channel capacity is assessed and new tasks are added to reach capacity.
 async fn select_oldest_unaudited_content_for_audit(
     tx: mpsc::Sender<AuditTask>,
     conn: DatabaseConnection,
 ) {
     debug!("initializing audit process for 'select oldest unaudited' strategy");
-
-    let mut interval = interval(Duration::from_secs(AUDIT_SELECTION_PERIOD_SECONDS));
+    let mut interval = interval(Duration::from_secs(10));
 
     // Memory of which audits have been sent using their timestamp.
     let mut timestamp_too_old_threshold: DateTime<FixedOffset> =
@@ -212,13 +223,17 @@ async fn select_oldest_unaudited_content_for_audit(
             error!("Channel is closed.");
             panic!();
         }
+        let keys_required = tx.capacity();
+        if keys_required == 0 {
+            continue;
+        };
         let search_result: Vec<(content::Model, Vec<content_audit::Model>)> =
             match content::Entity::find()
                 .filter(content::Column::FirstAvailableAt.gt(timestamp_too_old_threshold))
                 .order_by_asc(content::Column::FirstAvailableAt)
                 .find_with_related(entity::content_audit::Entity)
                 .filter(content_audit::Column::CreatedAt.is_null())
-                .limit(KEYS_PER_PERIOD)
+                .limit(keys_required as u64)
                 .all(&conn)
                 .await
             {
@@ -310,7 +325,7 @@ mod tests {
                 id: NotSet,
                 content_id: Set(content_key.content_id().to_vec()),
                 content_key: Set(content_key.to_bytes()),
-                first_available_at: Set(Utc::now().into()),
+                first_available_at: Set((Utc::now() - chrono::Duration::minutes(10)).into()),
                 protocol_id: Set(SubProtocol::History),
             };
             let content_key_model = content_key_active_model.insert(&conn).await?;
@@ -348,7 +363,8 @@ mod tests {
     async fn test_latest_strategy() {
         // Orchestration
         let conn = get_populated_test_audit_db().await.unwrap();
-        let (tx, mut rx) = channel::<AuditTask>(100);
+        const CHANNEL_SIZE: usize = 10;
+        let (tx, mut rx) = channel::<AuditTask>(CHANNEL_SIZE);
         // Start strategy
         tokio::spawn(select_latest_content_for_audit(tx.clone(), conn.clone()));
         let mut checked_ids: HashSet<i32> = HashSet::new();
@@ -365,12 +381,12 @@ mod tests {
             // Check that strategy only yields expected keys.
             assert!(expected_key_ids.contains(&key_model.id));
             checked_ids.insert(key_model.id);
-            if checked_ids.len() == KEYS_PER_PERIOD as usize {
+            if checked_ids.len() == CHANNEL_SIZE as usize {
                 break;
             }
         }
         // Make sure no key was audited twice by pushing to a hashmap and checking it's length.
-        assert_eq!(checked_ids.len(), KEYS_PER_PERIOD as usize);
+        assert_eq!(checked_ids.len(), CHANNEL_SIZE as usize);
     }
 
     /// Tests that the `SelectionStrategy::SelectOldestUnaudited` selects the correct values
@@ -379,7 +395,8 @@ mod tests {
     async fn test_select_oldest_unaudited_strategy() {
         // Orchestration
         let conn = get_populated_test_audit_db().await.unwrap();
-        let (tx, mut rx) = channel::<AuditTask>(100);
+        const CHANNEL_SIZE: usize = 10;
+        let (tx, mut rx) = channel::<AuditTask>(CHANNEL_SIZE);
         // Start strategy
         tokio::spawn(select_oldest_unaudited_content_for_audit(
             tx.clone(),
@@ -399,12 +416,12 @@ mod tests {
             // Check that strategy only yields expected keys.
             assert!(expected_key_ids.contains(&key_model.id));
             checked_ids.insert(key_model.id);
-            if checked_ids.len() == KEYS_PER_PERIOD as usize {
+            if checked_ids.len() == CHANNEL_SIZE as usize {
                 break;
             }
         }
         // Make sure no key was audited twice by pushing to a hashmap and checking it's length.
-        assert_eq!(checked_ids.len(), KEYS_PER_PERIOD as usize);
+        assert_eq!(checked_ids.len(), CHANNEL_SIZE as usize);
     }
 
     /// Tests that the `SelectionStrategy::Random` selects the correct values
@@ -413,7 +430,8 @@ mod tests {
     async fn test_random_strategy() {
         // Orchestration
         let conn = get_populated_test_audit_db().await.unwrap();
-        let (tx, mut rx) = channel::<AuditTask>(100);
+        const CHANNEL_SIZE: usize = 10;
+        let (tx, mut rx) = channel::<AuditTask>(CHANNEL_SIZE);
         // Start strategy
         tokio::spawn(select_latest_content_for_audit(tx.clone(), conn.clone()));
         let mut checked_ids: HashSet<i32> = HashSet::new();
@@ -430,11 +448,12 @@ mod tests {
             // Check that strategy only yields expected keys.
             assert!(expected_key_ids.contains(&key_model.id));
             checked_ids.insert(key_model.id);
-            if checked_ids.len() == KEYS_PER_PERIOD as usize {
+            println!("ids checked {}", checked_ids.len());
+            if checked_ids.len() == CHANNEL_SIZE as usize {
                 break;
             }
         }
         // Make sure no key was audited twice by pushing to a hashmap and checking it's length.
-        assert_eq!(checked_ids.len(), KEYS_PER_PERIOD as usize);
+        assert_eq!(checked_ids.len(), CHANNEL_SIZE as usize);
     }
 }

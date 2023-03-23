@@ -1,9 +1,9 @@
 use std::{
+    collections::HashMap,
     sync::{
         atomic::{AtomicU8, Ordering},
         Arc,
     },
-    thread::available_parallelism,
 };
 
 use anyhow::{bail, Result};
@@ -12,7 +12,7 @@ use cli::Args;
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use sea_orm::DatabaseConnection;
 use tokio::{
-    sync::mpsc,
+    sync::mpsc::{self, Receiver},
     time::{sleep, Duration},
 };
 use tracing::{debug, error, info, warn};
@@ -35,14 +35,16 @@ pub(crate) mod validation;
 /// Configuration created from CLI arguments.
 #[derive(Clone, Debug)]
 pub struct AuditConfig {
-    /// Maximum amount of threads that audits will be performed with.
-    pub concurrency: u8,
     /// For Glados-related data.
     pub database_url: String,
     /// For communication with a Portal Network node.
     pub transport: TransportConfig,
     /// Specific strategies to run.
     pub strategies: Vec<SelectionStrategy>,
+    /// Weight for each strategy.
+    pub weights: HashMap<SelectionStrategy, u8>,
+    /// Number requests to a Portal node active at the same time.
+    pub concurrency: u8,
 }
 
 impl AuditConfig {
@@ -62,20 +64,6 @@ impl AuditConfig {
                 }
             },
         };
-        let parallelism = available_parallelism()?.get() as u8;
-        if args.concurrency > parallelism {
-            warn!(
-                selected.concurrency = args.concurrency,
-                system.concurrency = parallelism,
-                "Selected concurrency greater than system concurrency."
-            )
-        } else {
-            info!(
-                selected.concurrency = args.concurrency,
-                system.concurrency = parallelism,
-                "Selected concurrency set."
-            )
-        }
         let strategies = match args.strategy {
             Some(s) => s,
             None => {
@@ -87,11 +75,22 @@ impl AuditConfig {
                 ]
             }
         };
+        let mut weights: HashMap<SelectionStrategy, u8> = HashMap::new();
+        for strat in &strategies {
+            let weight = match strat {
+                SelectionStrategy::Latest => args.latest_strategy_weight,
+                SelectionStrategy::Random => args.random_strategy_weight,
+                SelectionStrategy::Failed => args.failed_strategy_weight,
+                SelectionStrategy::SelectOldestUnaudited => args.oldest_strategy_weight,
+            };
+            weights.insert(strat.clone(), weight);
+        }
         Ok(AuditConfig {
-            concurrency: args.concurrency,
             database_url: args.database_url,
             transport,
             strategies,
+            weights,
+            concurrency: args.concurrency,
         })
     }
 }
@@ -102,18 +101,48 @@ pub struct AuditTask {
     pub content_key: HistoryContentKey,
 }
 
-pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
-    let (tx, rx) = mpsc::channel::<AuditTask>(100);
+// Associates strategies with their channels and weights.
+#[derive(Debug)]
+pub struct TaskChannels {
+    strategy: SelectionStrategy,
+    weight: u8,
+    channel_recv: Receiver<AuditTask>,
+}
 
-    for strategy in &config.strategies {
+pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
+    let mut task_channels: Vec<TaskChannels> = vec![];
+    let mut total_weight: u8 = 0;
+    for strategy in config.strategies {
+        // Each strategy sends tasks to a separate channel.
+        let (tx, rx) = mpsc::channel::<AuditTask>(100);
+        let Some(weight) = config.weights.get(&strategy) else {
+            warn!(strategy=?strategy, "no weight for strategy");
+            return
+        };
+        total_weight += weight;
+        let task_channel = TaskChannels {
+            strategy: strategy.clone(),
+            weight: *weight,
+            channel_recv: rx,
+        };
+        task_channels.push(task_channel);
+        // Strategies generate tasks in their own thread for their own channel.
         tokio::spawn(start_audit_selection_task(
             strategy.clone(),
             tx.clone(),
             conn.clone(),
         ));
     }
-
-    tokio::spawn(perform_content_audits(config, rx, conn.clone()));
+    // Collation of generated tasks, taken proportional to weights.
+    let (collation_tx, collation_rx) = mpsc::channel::<AuditTask>(100);
+    tokio::spawn(start_collation(collation_tx, task_channels, total_weight));
+    // Perform collated audit tasks.
+    tokio::spawn(perform_content_audits(
+        config.transport,
+        config.concurrency,
+        collation_rx,
+        conn,
+    ));
     debug!("setting up CTRL+C listener");
     tokio::signal::ctrl_c()
         .await
@@ -122,19 +151,50 @@ pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
     info!("got CTRL+C. shutting down...");
 }
 
+/// Listens to tasks coming on different strategy channels and selects
+/// according to strategy weight. Collated audit tasks are sent in a single
+/// channel for completion.
+///
+/// ### Weighting algorithm
+/// 1. Start loop and check how much capacity the rx side has.
+/// 2. Divide available capacity using weight for each strategy to get quota.
+/// 3. For each strategy, move generated tasks to collation channel as per quota.
+/// 4. Incomplete quotas are capacity left for the next loop.
+async fn start_collation(
+    collation_tx: mpsc::Sender<AuditTask>,
+    mut task_channels: Vec<TaskChannels>,
+    total_weight: u8,
+) {
+    loop {
+        let cap = collation_tx.capacity() as u8;
+        for tasks in task_channels.iter_mut() {
+            let quota = tasks.weight * cap / total_weight;
+            debug!(strategy=?tasks.strategy, quota=quota, "collating strategies");
+            for _ in 0..quota {
+                let Some(task) = tasks.channel_recv.recv().await else {continue};
+                if let Err(err) = collation_tx.send(task).await {
+                    error!(err=?err, strategy=?tasks.strategy, "could not move task for collation")
+                }
+            }
+        }
+        sleep(Duration::from_millis(5000)).await;
+    }
+}
+
 async fn perform_content_audits(
-    config: AuditConfig,
+    transport: TransportConfig,
+    concurrency: u8,
     mut rx: mpsc::Receiver<AuditTask>,
     conn: DatabaseConnection,
 ) {
     let active_threads = Arc::new(AtomicU8::new(0));
     loop {
         let active_count = active_threads.load(Ordering::Relaxed);
-        if active_count >= config.concurrency {
+        if active_count >= concurrency {
             // Each audit is performed in new thread if enough concurrency is available.
             debug!(
                 active.threads = active_count,
-                max.threads = config.concurrency,
+                max.threads = concurrency,
                 "Waiting for responses on all audit threads... Sleeping..."
             );
             sleep(Duration::from_millis(5000)).await;
@@ -143,7 +203,7 @@ async fn perform_content_audits(
 
         debug!(
             active.threads = active_count,
-            max.threads = config.concurrency,
+            max.threads = concurrency,
             "Checking Rx channel for audits"
         );
 
@@ -153,7 +213,7 @@ async fn perform_content_audits(
                 tokio::spawn(perform_single_audit(
                     active_threads.clone(),
                     task,
-                    config.clone(),
+                    transport.clone(),
                     conn.clone(),
                 ))
             }
@@ -171,10 +231,10 @@ async fn perform_content_audits(
 async fn perform_single_audit(
     active_threads: Arc<AtomicU8>,
     task: AuditTask,
-    config: AuditConfig,
+    transport: TransportConfig,
     conn: DatabaseConnection,
 ) {
-    let client = match PortalClient::from_config(&config.transport) {
+    let client = match PortalClient::from_config(&transport) {
         Ok(c) => c,
         Err(e) => {
             error!(
