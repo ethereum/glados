@@ -24,6 +24,12 @@ pub enum Commands {
         provider_url: String,
     },
 
+    FollowHeadPandaops {
+        // Pandaops web3 provider
+        #[arg(short, long)]
+        provider_url: String,
+    },
+
     /// does testing things
     ImportPreMergeAccumulators {
         /// lists test values
