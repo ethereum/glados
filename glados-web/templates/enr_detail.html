@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}ENR Detail{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col">
+        <h1>ENR Details: {{ node.node_id_as_hex() }}</h1>
+    </div>
+</div>
+<div class="row">
+    <div class="col">
+        <ul>
+          <li><a href="/network/node/{{ node.node_id_as_hex() }}/enr/{{ enr.sequence_number }}/">Detail View</a></li>
+          <li>Sequence Number: {{ enr.sequence_number }}</li>
+          <li>Base64: {{ enr.raw }}</li>
+        </ul>
+        <h3>Key/Value Pairs</h3>
+        <ul>
+          {% for key_value in key_value_list %}
+            <li><pre>{{ key_value.key_as_hex() }}</pre>: <pre>{{ key_value.value_as_hex() }}</pre></li>
+          {% else %}
+            <li>No Key/Value Pairs Found</li>
+          {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

@@ -10,11 +10,12 @@ use chrono::{DateTime, Duration, Utc};
 use entity::{
     content,
     content_audit::{self, AuditResult},
-    execution_metadata, node,
+    execution_metadata, key_value, node, record,
 };
 use ethportal_api::{types::content_key::OverlayContentKey, HistoryContentKey};
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
+    ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect,
 };
 use tracing::error;
 use trin_utils::bytes::{hex_decode, hex_encode};
@@ -22,8 +23,8 @@ use trin_utils::bytes::{hex_decode, hex_encode};
 use crate::state::State;
 use crate::templates::{
     ContentDashboardTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
-    ContentKeyDetailTemplate, ContentKeyListTemplate, HtmlTemplate, IndexTemplate,
-    NodeListTemplate,
+    ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate, HtmlTemplate,
+    IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate,
 };
 
 //
@@ -38,20 +39,166 @@ pub async fn root(Extension(_state): Extension<Arc<State>>) -> impl IntoResponse
     HtmlTemplate(template)
 }
 
-pub async fn node_list(
+pub async fn network_dashboard(
     Extension(state): Extension<Arc<State>>,
-) -> Result<HtmlTemplate<NodeListTemplate>, StatusCode> {
-    const KEY_COUNT: u64 = 50;
-    let nodes: Vec<node::Model> = node::Entity::find()
-        .order_by_asc(node::Column::NodeId)
+) -> Result<HtmlTemplate<NetworkDashboardTemplate>, StatusCode> {
+    const KEY_COUNT: u64 = 20;
+
+    let recent_node_list = node::Entity::find()
+        .order_by_desc(node::Column::Id)
         .limit(KEY_COUNT)
         .all(&state.database_connection)
         .await
         .map_err(|e| {
-            error!(key.count=KEY_COUNT, err=?e, "Could not look up database node ids");
+            error!(key.count=KEY_COUNT, err=?e, "Could not look up recent nodes");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-    let template = NodeListTemplate { nodes };
+    let total_node_count = node::Entity::find()
+        .count(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Error looking up total Node count");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let recent_enr_list: Vec<(record::Model, node::Model)> = record::Entity::find()
+        .order_by_desc(record::Column::Id)
+        .find_also_related(node::Entity)
+        .limit(KEY_COUNT)
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(key.count=KEY_COUNT, err=?e, "Could not look up recent ENR records");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
+        .unwrap()
+        .iter()
+        .filter_map(|(r, n)| {
+            n.as_ref()
+                .map(|enr_node| (r.to_owned(), enr_node.to_owned()))
+        })
+        .collect();
+
+    let total_enr_count = record::Entity::find()
+        .count(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Error looking up total ENR count");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let template = NetworkDashboardTemplate {
+        total_node_count,
+        total_enr_count,
+        recent_node_list,
+        recent_enr_list,
+    };
+    Ok(HtmlTemplate(template))
+}
+
+pub async fn node_detail(
+    Path(node_id_hex): Path<String>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<HtmlTemplate<NodeDetailTemplate>, StatusCode> {
+    const KEY_COUNT: u64 = 50;
+    let node_id = hex_decode(&node_id_hex).map_err(|e| {
+        error!(node_id=node_id_hex, err=?e, "Could not decode proved node_id");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let node_model = node::Entity::find()
+        .filter(node::Column::NodeId.eq(node_id))
+        .one(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(node_id=node_id_hex, err=?e, "No record found for node_id");
+            StatusCode::NOT_FOUND
+        })
+        .unwrap()
+        .unwrap();
+    let enr_list = record::Entity::find()
+        .filter(record::Column::NodeId.eq(node_model.node_id.to_owned()))
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(node.node_id=node_id_hex, node.db_id=node_model.id, err=?e, "Error looking up ENRs");
+            StatusCode::NOT_FOUND
+        })?;
+    let latest_enr = record::Entity::find()
+        .filter(record::Column::NodeId.eq(node_model.id))
+        .order_by_desc(record::Column::SequenceNumber)
+        .one(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(node_id=node_id_hex, err=?e, "No record found for node_id");
+            StatusCode::NOT_FOUND
+        })?;
+    let latest_enr_key_value_list = match &latest_enr {
+        Some(enr) => Some(
+            key_value::Entity::find()
+                .filter(key_value::Column::RecordId.eq(enr.id))
+                .order_by_asc(key_value::Column::Key)
+                .all(&state.database_connection)
+                .await
+                .map_err(|e| {
+                    error!(enr.id=enr.id, err=?e, "Error looking up key_value pairs");
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?,
+        ),
+        None => None,
+    };
+    let template = NodeDetailTemplate {
+        node: node_model,
+        latest_enr,
+        latest_enr_key_value_list,
+        enr_list,
+    };
+    Ok(HtmlTemplate(template))
+}
+
+pub async fn enr_detail(
+    Path((node_id_hex, enr_seq)): Path<(String, u64)>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<HtmlTemplate<EnrDetailTemplate>, StatusCode> {
+    const KEY_COUNT: u64 = 50;
+    let node_id = hex_decode(&node_id_hex).map_err(|e| {
+        error!(node_id=node_id_hex, err=?e, "Could not decode proved node_id");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let node_model = node::Entity::find()
+        .filter(node::Column::NodeId.eq(node_id))
+        .one(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(node_id=node_id_hex, err=?e, "No record found for node_id");
+            StatusCode::NOT_FOUND
+        })
+        .unwrap()
+        .unwrap();
+    let enr = record::Entity::find()
+        .filter(record::Column::NodeId.eq(node_model.id.to_owned()))
+        .filter(record::Column::SequenceNumber.eq(enr_seq))
+        .one(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(enr.node_id=node_id_hex, enr.seq=enr_seq, err=?e, "No record found for node_id and sequence_number");
+            StatusCode::NOT_FOUND
+        })
+        .unwrap()
+        .unwrap();
+    let key_value_list = key_value::Entity::find()
+        .filter(key_value::Column::RecordId.eq(enr.id))
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(enr.id=enr.id, enr.node_id=node_id_hex, err=?e, "Error looking up key_value pairs");
+            StatusCode::NOT_FOUND
+        })?;
+
+    let template = EnrDetailTemplate {
+        node: node_model,
+        enr,
+        key_value_list,
+    };
     Ok(HtmlTemplate(template))
 }
 
