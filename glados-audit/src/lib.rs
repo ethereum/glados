@@ -1,4 +1,5 @@
 use std::{
+    env,
     sync::{
         atomic::{AtomicU8, Ordering},
         Arc,
@@ -6,23 +7,26 @@ use std::{
     thread::available_parallelism,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail};
 use clap::Parser;
 use cli::Args;
+use entity::{
+    content,
+    content_audit::{self, SelectionStrategy},
+    execution_metadata,
+};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
+use glados_core::jsonrpc::{PortalClient, TransportConfig};
+use reqwest::header::{HeaderMap, HeaderValue};
 use sea_orm::DatabaseConnection;
 use tokio::{
     sync::mpsc,
     time::{sleep, Duration},
 };
 use tracing::{debug, error, info, warn};
-
-use entity::{
-    content,
-    content_audit::{self, SelectionStrategy},
-    execution_metadata,
-};
-use glados_core::jsonrpc::{PortalClient, TransportConfig};
+use url::Url;
+use validation::Provider;
+use web3::{transports::Http, Web3};
 
 use crate::{
     cli::TransportType, selection::start_audit_selection_task, validation::content_is_valid,
@@ -43,10 +47,13 @@ pub struct AuditConfig {
     pub transport: TransportConfig,
     /// Specific strategies to run.
     pub strategies: Vec<SelectionStrategy>,
+    /// An Ethereum execution node to validate content received from
+    /// the Portal node against.
+    pub trusted_provider: Provider,
 }
 
 impl AuditConfig {
-    pub fn from_args() -> Result<AuditConfig> {
+    pub fn from_args() -> anyhow::Result<AuditConfig> {
         let args = Args::parse();
         let transport: TransportConfig = match args.transport {
             TransportType::IPC => match args.ipc_path {
@@ -87,11 +94,50 @@ impl AuditConfig {
                 ]
             }
         };
+        let trusted_provider: Provider = match args.trusted_provider {
+            cli::TrustedProvider::HTTP => {
+                match args.provider_http_url{
+                    Some(url) => {
+                        let transport = Http::new(url.as_str())?;
+                        let w3 = Web3::new(transport);
+                        Provider::Http(w3)
+                    },
+                    None => bail!("The '--provider-http-url' flag is required if 'http' is selected for the '--trusted-provider'"),
+                }
+            },
+            cli::TrustedProvider::Pandaops => {
+                match args.provider_pandaops {
+                    Some(provider_url) => {
+                        let mut headers = HeaderMap::new();
+                        let client_id = env::var("PANDAOPS_CLIENT_ID")
+                            .map_err(|_| anyhow!("PANDAOPS_CLIENT_ID env var not set."))?;
+                        let client_id = HeaderValue::from_str(&client_id);
+                        let client_secret = env::var("PANDAOPS_CLIENT_SECRET")
+                            .map_err(|_| anyhow!("PANDAOPS_CLIENT_SECRET env var not set."))?;
+                        let client_secret = HeaderValue::from_str(&client_secret);
+                        headers.insert("CF-Access-Client-Id", client_id?);
+                        headers.insert("CF-Access-Client-Secret", client_secret?);
+
+                        let client = reqwest::Client::builder()
+                            .default_headers(headers)
+                            .build()?;
+                        let url = Url::parse(&provider_url)?;
+                        let transport = Http::with_client(client, url);
+                        let w3 = Web3::new(transport);
+                        Provider::Pandaops(w3)
+                    },
+                    None => bail!("The '--provider-pandaops' flag is required if 'pandaops' is selected for the '--trusted-provider'"),
+                }
+            }
+        }
+        ;
+
         Ok(AuditConfig {
             concurrency: args.concurrency,
             database_url: args.database_url,
             transport,
             strategies,
+            trusted_provider,
         })
     }
 }
@@ -201,9 +247,21 @@ async fn perform_single_audit(
         }
     };
 
-    // If content was absent audit result is 'fail'.
+    // If content was absent or invalid the audit result is 'fail'.
     let audit_result = match content_response {
-        Some(content_bytes) => content_is_valid(&task.content_key, &content_bytes.raw),
+        Some(content_bytes) => {
+            match content_is_valid(&config, &task.content_key, &content_bytes.raw).await {
+                Ok(res) => res,
+                Err(e) => {
+                    error!(
+                        content.key=?task.content_key.to_hex(),
+                        err=?e,
+                        "Problem requesting validation from Trusted provider node.");
+                    active_threads.fetch_sub(1, Ordering::Relaxed);
+                    return;
+                }
+            }
+        }
         None => false,
     };
 
