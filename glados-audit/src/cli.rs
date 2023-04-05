@@ -8,18 +8,32 @@ const DEFAULT_DB_URL: &str = "sqlite::memory:";
 #[derive(Parser, Debug, Eq, PartialEq)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
+    /// Database connection URL, such as SQLite or PostgreSQL.
     #[arg(short, long, default_value = DEFAULT_DB_URL)]
     pub database_url: String,
+
+    /// IPC Path for connection to Portal node.
     #[arg(short, long, requires = "transport")]
     pub ipc_path: Option<PathBuf>,
+
+    /// HTTP URL for connection to Portal node.
     #[arg(short = 'u', long, requires = "transport")]
     pub http_url: Option<Url>,
+
+    /// Portal node connection mode.
     #[arg(short, long)]
     pub transport: TransportType,
+
     #[arg(short, long, default_value = "4", help = "number of auditing threads")]
     pub concurrency: u8,
-    #[arg(short, long, action(ArgAction::Append), value_enum, default_value = None, help = "Specific strategy to use. Default is to use all available strategies. May be passed multiple times for multiple strategies (--strategy latest --strategy random). Duplicates are permitted (--strategy random --strategy random).")]
+
+    /// Specific strategy to use. Default is to use all available strategies.
+    /// May be passed multiple times for multiple strategies
+    /// (--strategy latest --strategy random).
+    /// Duplicates are permitted (--strategy random --strategy random).
+    #[arg(short, long, action(ArgAction::Append), value_enum, default_value = None)]
     pub strategy: Option<Vec<SelectionStrategy>>,
+
     #[arg(
         short,
         long,
@@ -48,14 +62,24 @@ pub struct Args {
         help = "relative weight of the 'random' strategy"
     )]
     pub random_strategy_weight: u8,
+
+    /// Non-portal Ethereum execution node for validating data against.
+    #[arg(long, default_value = "http")]
+    pub trusted_provider: TrustedProvider,
+
+    /// HTTP URL for connection to non-portal Ethereum execution node.
+    #[arg(long, requires = "trusted_provider")]
+    pub provider_http_url: Option<Url>,
+
+    /// Pandaops URL for connection to non-portal Ethereum execution node.
+    #[arg(long, requires = "trusted_provider")]
+    pub provider_pandaops: Option<String>,
 }
 
 impl Default for Args {
     fn default() -> Self {
         Self {
             database_url: DEFAULT_DB_URL.to_string(),
-            ipc_path: Default::default(),
-            http_url: Default::default(),
             transport: TransportType::HTTP,
             concurrency: 4,
             latest_strategy_weight: 1,
@@ -63,6 +87,11 @@ impl Default for Args {
             oldest_strategy_weight: 1,
             random_strategy_weight: 1,
             strategy: None,
+            ipc_path: None,
+            http_url: None,
+            trusted_provider: TrustedProvider::HTTP,
+            provider_http_url: None,
+            provider_pandaops: None,
         }
     }
 }
@@ -168,9 +197,22 @@ mod test {
 
 /// Used by a user to specify the intended form of transport
 /// to connect to a Portal node.
-#[derive(Debug, Clone, Eq, PartialEq, ValueEnum)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, ValueEnum)]
 #[clap(rename_all = "snake_case")]
 pub enum TransportType {
-    IPC,
+    #[default]
     HTTP,
+    IPC,
+}
+
+/// Used by a user to specify the intended form of transport
+/// to connect to a Portal node.
+#[derive(Debug, Default, Clone, Eq, PartialEq, ValueEnum)]
+#[clap(rename_all = "snake_case")]
+pub enum TrustedProvider {
+    #[default]
+    /// An HTTP-based provider.
+    HTTP,
+    /// A Trin operations provider.
+    Pandaops,
 }
