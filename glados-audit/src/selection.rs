@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
-use ethportal_api::types::content_key::HistoryContentKey;
+use ethportal_api::HistoryContentKey;
 use rand::{thread_rng, Rng};
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
@@ -260,10 +260,7 @@ mod tests {
         content::{self, SubProtocol},
         content_audit::{self, AuditResult},
     };
-    use ethportal_api::{
-        types::content_key::{BlockHeaderKey, OverlayContentKey},
-        HistoryContentKey,
-    };
+    use ethportal_api::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
     use migration::{DbErr, Migrator, MigratorTrait};
     use sea_orm::{
         ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, Database, DbConn, EntityTrait,
