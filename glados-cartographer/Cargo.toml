@@ -1,0 +1,21 @@
+[package]
+name = "glados-cartographer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.70"
+clap = { version = "4.0.24", features = ["derive"] }
+glados-core = { path = "../glados-core" }
+migration = { path = "../migration" }
+entity = { path = "../entity" }
+env_logger = "0.10.0"
+ethportal-api = "0.1.6"
+sea-orm = "0.10.3"
+tokio = { version = "1.27.0", features = ["signal"] }
+tracing = "0.1.37"
+url = "2.3.1"
+enr = "0.8.0"
+ethereum-types = "0.14.1"
