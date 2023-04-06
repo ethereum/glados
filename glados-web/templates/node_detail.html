@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Node Detail{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col">
+        <h1>Node Details: {{ node.node_id_as_hex() }}</h1>
+    </div>
+</div>
+<div class="row">
+    <div class="col">
+        {% match latest_enr %}
+          {% when Some with (enr) %}
+            <h2>Latest ENR</h2>
+            <ul>
+              <li><a href="/network/node/{{ node.node_id_as_hex() }}/enr/{{ enr.sequence_number }}/">Detail View</a></li>
+              <li>Sequence Number: {{ enr.sequence_number }}</li>
+            </ul>
+            <pre>{{ enr.raw }}</pre>
+            {% match latest_enr_key_value_list %}
+              {% when Some with (key_value_list) %}
+                <h3>Key/Value Pairs</h3>
+                <ul>
+                  {% for key_value in key_value_list %}
+                    <li><pre>{{ key_value.key_as_hex() }}</pre>: <pre>{{ key_value.value_as_hex() }}</pre></li>
+                  {% else %}
+                    <li>No Key/Value Pairs Found</li>
+                  {% endfor %}
+                </ul>
+              {% when None %}
+                <p>This shouldn't happen</p>
+            {% endmatch %}
+          {% when None %}
+            <p>No lastest ENR found</p>
+        {% endmatch %}
+    </div>
+</div>
+<div class="row">
+    <div class="col">
+          <h2> ENR List</h2>
+          <table class="table">
+              <thead>
+                  <tr>
+                      <th scope="col">Sequence Number</th>
+                  </tr>
+              </thead>
+              <tbody>
+              {% for record in enr_list %}
+                  <tr>
+                      <td>
+                          <a href="/network/node/{{ node.node_id_as_hex() }}/enr/{{ record.sequence_number }}/">{{ record.sequence_number }}</a>
+                      </td>
+                  </tr>
+              {% else %}
+                  <tr>
+                      <td>No known ENRs</td>
+                  </tr>
+              {% endfor %}
+              </tbody>
+          </table>
+    </div>
+</div>
+{% endblock %}

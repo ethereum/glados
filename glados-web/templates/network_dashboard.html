@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Network Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col">
+        <h1>Network Dashboard</h1>
+        <ul>
+          <li>Total Nodes: {{ total_node_count }}</li>
+          <li>Total ENR: {{ total_enr_count }}</li>
+        </ul>
+    </div>
+</div>
+<div class="row">
+    <div class="col">
+        <ul>
+            <h2> Recent nodes</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Node-id </th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for node in recent_node_list %}
+                    <tr>
+                        <td>
+                            <a href="/network/node/{{ node.node_id_as_hex() }}/">{{ node.node_id_as_hex() }}</a>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td>No records</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </ul>
+    </div>
+</div>
+<div class="row">
+    <div class="col">
+        <ul>
+            <h2>Recent ENR records</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Node-Id</th>
+                        <th scope="col">Sequence Number</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for (record, node) in recent_enr_list %}
+                    <tr>
+                        <td>
+                            <a href="/network/node/{{ node.node_id_as_hex() }}/">{{ node.node_id_as_hex() }}</a>
+                        </td>
+                        <td>
+                            <a href="/network/node/{{ node.node_id_as_hex() }}/enr/{{ record.sequence_number }}/">{{ record.sequence_number }}</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td>No records found</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </ul>
+    </div>
+</div>
+{% endblock %}

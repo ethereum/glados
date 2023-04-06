@@ -4,7 +4,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 
-use entity::{content, content_audit, node};
+use entity::{content, content_audit, key_value, node, record};
 
 use crate::routes::Stats;
 
@@ -13,9 +13,29 @@ use crate::routes::Stats;
 pub struct IndexTemplate {}
 
 #[derive(Template)]
-#[template(path = "node_list.html")]
-pub struct NodeListTemplate {
-    pub nodes: Vec<node::Model>,
+#[template(path = "network_dashboard.html")]
+pub struct NetworkDashboardTemplate {
+    pub total_node_count: u64,
+    pub total_enr_count: u64,
+    pub recent_node_list: Vec<node::Model>,
+    pub recent_enr_list: Vec<(record::Model, node::Model)>,
+}
+
+#[derive(Template)]
+#[template(path = "node_detail.html")]
+pub struct NodeDetailTemplate {
+    pub node: node::Model,
+    pub latest_enr: Option<record::Model>,
+    pub latest_enr_key_value_list: Option<Vec<key_value::Model>>,
+    pub enr_list: Vec<record::Model>,
+}
+
+#[derive(Template)]
+#[template(path = "enr_detail.html")]
+pub struct EnrDetailTemplate {
+    pub node: node::Model,
+    pub enr: record::Model,
+    pub key_value_list: Vec<key_value::Model>,
 }
 
 #[derive(Template)]

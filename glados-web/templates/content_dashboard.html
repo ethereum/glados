@@ -64,8 +64,8 @@
                         <td><span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{% if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
                         <td>{{ content.protocol_id.as_text() }} </td>
                         <td>{{ audit.strategy_as_text() }}</td>
-                        <td><a href="/content/key/{{content.key_as_hex()}}">{{ content.key_as_hex_short() }}</a></td>
-                        <td><a href="/content/id/{{content.id_as_hex()}}">{{  content.id_as_hex_short() }}</a></td>
+                        <td><a href="/content/key/{{content.key_as_hex()}}/">{{ content.key_as_hex_short() }}</a></td>
+                        <td><a href="/content/id/{{content.id_as_hex()}}/">{{  content.id_as_hex_short() }}</a></td>
                         <td>{{ content.available_at_local_time() }}</td>
                         <td>{{ audit.created_at_local_time() }}</td>
                     </tr>
@@ -92,8 +92,8 @@
                     {% for content in contentid_list %}
                     <tr>
                         <td>{{ content.protocol_id.as_text() }} </td>
-                        <td><a href="/content/key/{{content.key_as_hex() }}">{{ content.key_as_hex_short() }}</a></td>
-                        <td><a href="/content/id/{{content.id_as_hex() }}">{{ content.id_as_hex_short() }}</a></td>
+                        <td><a href="/content/key/{{content.key_as_hex() }}/">{{ content.key_as_hex_short() }}</a></td>
+                        <td><a href="/content/id/{{content.id_as_hex() }}/">{{ content.id_as_hex_short() }}</a></td>
                         <td>{{ content.available_at_local_time() }}</td>
                     </tr>
                     {% endfor %}
@@ -124,8 +124,8 @@
                         <td><span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{% if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
                         <td>{{ content.protocol_id.as_text() }} </td>
                         <td>{{ audit.strategy_as_text() }}</td>
-                        <td><a href="/content/key/{{content.key_as_hex()}}">{{ content.key_as_hex_short() }}</a></td>
-                        <td><a href="/content/id/{{content.id_as_hex()}}">{{  content.id_as_hex_short() }}</a></td>
+                        <td><a href="/content/key/{{content.key_as_hex()}}/">{{ content.key_as_hex_short() }}</a></td>
+                        <td><a href="/content/id/{{content.id_as_hex()}}/">{{  content.id_as_hex_short() }}</a></td>
                         <td>{{ content.available_at_local_time() }}</td>
                         <td>{{ audit.created_at_local_time() }}</td>
                     </tr>
@@ -157,8 +157,8 @@
                         <td><span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{% if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
                         <td>{{ content.protocol_id.as_text() }} </td>
                         <td>{{ audit.strategy_as_text() }}</td>
-                        <td><a href="/content/key/{{content.key_as_hex()}}">{{ content.key_as_hex_short() }}</a></td>
-                        <td><a href="/content/id/{{content.id_as_hex()}}">{{  content.id_as_hex_short() }}</a></td>
+                        <td><a href="/content/key/{{content.key_as_hex()}}/">{{ content.key_as_hex_short() }}</a></td>
+                        <td><a href="/content/id/{{content.id_as_hex()}}/">{{  content.id_as_hex_short() }}</a></td>
                         <td>{{ content.available_at_local_time() }}</td>
                         <td>{{ audit.created_at_local_time() }}</td>
                     </tr>
@@ -190,8 +190,8 @@
                         <td><span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{% if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
                         <td>{{ content.protocol_id.as_text() }} </td>
                         <td>{{ audit.strategy_as_text() }}</td>
-                        <td><a href="/content/key/{{content.key_as_hex()}}">{{ content.key_as_hex_short() }}</a></td>
-                        <td><a href="/content/id/{{content.id_as_hex()}}">{{  content.id_as_hex_short() }}</a></td>
+                        <td><a href="/content/key/{{content.key_as_hex()}}/">{{ content.key_as_hex_short() }}</a></td>
+                        <td><a href="/content/id/{{content.id_as_hex()}}/">{{  content.id_as_hex_short() }}</a></td>
                         <td>{{ content.available_at_local_time() }}</td>
                         <td>{{ audit.created_at_local_time() }}</td>
                     </tr>
