@@ -116,22 +116,17 @@ pub async fn node_detail(
         .unwrap()
         .unwrap();
     let enr_list = record::Entity::find()
-        .filter(record::Column::NodeId.eq(node_model.node_id.to_owned()))
+        .filter(record::Column::NodeId.eq(node_model.id))
+        .order_by_desc(record::Column::SequenceNumber)
         .all(&state.database_connection)
         .await
         .map_err(|e| {
             error!(node.node_id=node_id_hex, node.db_id=node_model.id, err=?e, "Error looking up ENRs");
             StatusCode::NOT_FOUND
         })?;
-    let latest_enr = record::Entity::find()
-        .filter(record::Column::NodeId.eq(node_model.id))
-        .order_by_desc(record::Column::SequenceNumber)
-        .one(&state.database_connection)
-        .await
-        .map_err(|e| {
-            error!(node_id=node_id_hex, err=?e, "No record found for node_id");
-            StatusCode::NOT_FOUND
-        })?;
+
+    let latest_enr = enr_list.get(0).cloned();
+
     let latest_enr_key_value_list = match &latest_enr {
         Some(enr) => Some(
             key_value::Entity::find()
