@@ -1,4 +1,6 @@
-use ethportal_api::{BlockHeaderKey, HistoryContentKey, HistoryContentValue, OverlayContentKey};
+use ethportal_api::{
+    BlockHeaderKey, ContentValue, HistoryContentKey, HistoryContentValue, OverlayContentKey,
+};
 use tracing::warn;
 use trin_utils::bytes::hex_encode;
 
@@ -6,9 +8,7 @@ use trin_utils::bytes::hex_encode;
 /// content value.
 pub fn content_is_valid(content_key: &HistoryContentKey, content_bytes: &[u8]) -> bool {
     // check deserialization is valid
-    let content: HistoryContentValue = match serde_json::from_value::<HistoryContentValue>(
-        content_bytes.into(),
-    ) {
+    let content: HistoryContentValue = match HistoryContentValue::decode(content_bytes) {
         Ok(c) => c,
         Err(e) => {
             warn!(content.value=hex_encode(content_bytes), err=?e, "could not deserialize content bytes");
