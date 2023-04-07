@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use discv5::enr::CombinedKey;
 use ethereum_types::{H256, U256};
-use ethportal_api::types::content_key::OverlayContentKey;
+use ethportal_api::OverlayContentKey;
 use jsonrpc::Request;
 use jsonrpsee::{
     core::{client::ClientT, params::ArrayParams},
@@ -21,7 +21,7 @@ use serde_json::{
 };
 use thiserror::Error;
 use tracing::error;
-use trin_utils::bytes::hex_decode;
+use trin_utils::bytes::{hex_decode, ByteUtilsError};
 #[cfg(windows)]
 use uds_windows::UnixStream;
 use url::Url;
@@ -98,9 +98,8 @@ pub enum JsonRpcError {
     #[error("received malformed response: {0}")]
     Malformed(serde_json::Error),
 
-    // todo remove once trin utils stops using nyhow.
-    #[error("Opaque error encountered")]
-    AnyhowError(#[from] anyhow::Error),
+    #[error("unable to use byte utils {0}")]
+    ByteUtils(#[from] ByteUtilsError),
 
     #[error("unable to serialize/deserialize")]
     Serialization(#[from] serde_json::Error),

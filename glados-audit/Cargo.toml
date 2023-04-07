@@ -10,18 +10,20 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 
 [dependencies]
 anyhow = "1.0.68"
+chrono = "0.4.23"
+clap = { version = "4.0.24", features = ["derive"] }
+entity = { path = "../entity" }
+env_logger = "0.9.3"
+ethereum-types = "0.14.0"
+ethportal-api = { git = "https://github.com/ethereum/trin" }
 glados-core = { path = "../glados-core" }
 migration = { path = "../migration" }
-entity = { path = "../entity" }
-clap = { version = "4.0.24", features = ["derive"] }
-web3 = "0.18.0"
-tokio = "1.21.2"
+rand = "0.8.5"
 sea-orm = "0.10.3"
-ethereum-types = "0.14.0"
-env_logger = "0.9.3"
+serde_json = "1.0.95"
+tokio = "1.21.2"
 tracing = "0.1.37"
 trin-utils = {git = "https://github.com/ethereum/trin" }
-ethportal-api = { git = "https://github.com/ethereum/trin" }
-chrono = "0.4.23"
-rand = "0.8.5"
 url = "2.3.1"
+web3 = "0.18.0"
+

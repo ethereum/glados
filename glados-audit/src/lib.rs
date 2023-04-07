@@ -9,7 +9,7 @@ use std::{
 use anyhow::{bail, Result};
 use clap::Parser;
 use cli::Args;
-use ethportal_api::{types::content_key::OverlayContentKey, HistoryContentKey};
+use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use sea_orm::DatabaseConnection;
 use tokio::{
     sync::mpsc,
@@ -24,10 +24,13 @@ use entity::{
 };
 use glados_core::jsonrpc::{PortalClient, TransportConfig};
 
-use crate::{cli::TransportType, selection::start_audit_selection_task};
+use crate::{
+    cli::TransportType, selection::start_audit_selection_task, validation::content_is_valid,
+};
 
 pub mod cli;
 pub(crate) mod selection;
+pub(crate) mod validation;
 
 /// Configuration created from CLI arguments.
 #[derive(Clone, Debug)]
@@ -185,7 +188,7 @@ async fn perform_single_audit(
     };
 
     debug!(content.key = task.content_key.to_hex(), "auditing content",);
-    let content = match client.get_content(&task.content_key).await {
+    let content_response = match client.get_content(&task.content_key).await {
         Ok(c) => c,
         Err(e) => {
             error!(
@@ -198,7 +201,12 @@ async fn perform_single_audit(
         }
     };
 
-    let audit_result = content.is_some();
+    // If content was absent audit result is 'fail'.
+    let audit_result = match content_response {
+        Some(content_bytes) => content_is_valid(&task.content_key, &content_bytes.raw),
+        None => false,
+    };
+
     let content_key_model = match content::get(&task.content_key, &conn).await {
         Ok(Some(m)) => m,
         Ok(None) => {

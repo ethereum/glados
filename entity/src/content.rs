@@ -2,7 +2,7 @@
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset, Utc};
 use ethereum_types::H256;
-use ethportal_api::types::content_key::OverlayContentKey;
+use ethportal_api::OverlayContentKey;
 use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
 use trin_utils::bytes::{hex_encode, hex_encode_compact};
 
