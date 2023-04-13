@@ -1701,7 +1701,7 @@ checksum = "0198b9d0078e0f30dedc7acbb21c974e838fc8fae3ee170128658a98cb2c1c04"
 [[package]]
 name = "ethportal-api"
 version = "0.2.0"
-source = "git+https://github.com/ethereum/trin#e2e96adc8ceee16774289f834681f8c4b4704e31"
+source = "git+https://github.com/ethereum/trin#6f4e9539952c0f167eb45494c1da74cfd98a787a"
 dependencies = [
  "bytes",
  "discv5 0.2.2",
@@ -5353,7 +5353,7 @@ dependencies = [
 [[package]]
 name = "trin-types"
 version = "0.1.0"
-source = "git+https://github.com/ethereum/trin#e2e96adc8ceee16774289f834681f8c4b4704e31"
+source = "git+https://github.com/ethereum/trin#6f4e9539952c0f167eb45494c1da74cfd98a787a"
 dependencies = [
  "anyhow",
  "base64 0.13.1",
@@ -5391,7 +5391,7 @@ dependencies = [
 [[package]]
 name = "trin-utils"
 version = "0.1.0"
-source = "git+https://github.com/ethereum/trin#e2e96adc8ceee16774289f834681f8c4b4704e31"
+source = "git+https://github.com/ethereum/trin#6f4e9539952c0f167eb45494c1da74cfd98a787a"
 dependencies = [
  "ansi_term",
  "atty",
