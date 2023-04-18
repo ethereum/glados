@@ -2,6 +2,8 @@
 
 pub mod prelude;
 
+pub mod census;
+pub mod census_node;
 pub mod client_info;
 pub mod content;
 pub mod content_audit;
