@@ -62,7 +62,8 @@
                 <tbody>
                     {% for (content, audit) in recent_content %}
                     <tr>
-                        <td><a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a></td>
+                        <td>{% if audit.trace != "" %}<a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a>{% else %}
+                            {{ audit.id }}{% endif %}</td>
                         <td><span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
                                 if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
                         <td>{{ content.protocol_id.as_text() }} </td>
@@ -125,7 +126,8 @@
                 <tbody>
                     {% for (content, audit) in recent_audits %}
                     <tr>
-                        <td><a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a></td>
+                        <td>{% if audit.trace != "" %}<a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a>{% else %}
+                            {{ audit.id }}{% endif %}</td>
                         <td><span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
                                 if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
                         <td>{{ content.protocol_id.as_text() }} </td>
@@ -161,7 +163,8 @@
                 <tbody>
                     {% for (content, audit) in recent_audit_successes %}
                     <tr>
-                        <td><a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a></td>
+                        <td>{% if audit.trace != "" %}<a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a>{% else %}
+                            {{ audit.id }}{% endif %}</td>
                         <td><span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
                                 if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
                         <td>{{ content.protocol_id.as_text() }} </td>
@@ -197,7 +200,8 @@
                 <tbody>
                     {% for (content, audit) in recent_audit_failures %}
                     <tr>
-                        <td><a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a></td>
+                        <td>{% if audit.trace != "" %}<a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a>{% else %}
+                            {{ audit.id }}{% endif %}</td>
                         <td><span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
                                 if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
                         <td>{{ content.protocol_id.as_text() }} </td>
