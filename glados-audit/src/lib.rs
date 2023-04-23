@@ -13,7 +13,7 @@ use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use sea_orm::DatabaseConnection;
 use tokio::{
     sync::mpsc::{self, Receiver},
-    time::{sleep, Duration},
+    time::{self, sleep, Duration},
 };
 use tracing::{debug, error, info, warn};
 
@@ -165,7 +165,9 @@ async fn start_collation(
     mut task_channels: Vec<TaskChannels>,
     total_weight: u8,
 ) {
+    let mut interval = time::interval(Duration::from_millis(5000));
     loop {
+        interval.tick().await;
         let cap = collation_tx.capacity() as u8;
         for tasks in task_channels.iter_mut() {
             let quota = tasks.weight * cap / total_weight;
@@ -177,7 +179,6 @@ async fn start_collation(
                 }
             }
         }
-        sleep(Duration::from_millis(5000)).await;
     }
 }
 
