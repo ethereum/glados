@@ -13,9 +13,9 @@ use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use sea_orm::DatabaseConnection;
 use tokio::{
     sync::mpsc::{self, Receiver},
-    time::{self, sleep, Duration},
+    time::{sleep, Duration},
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 use entity::{
     content,
@@ -103,39 +103,37 @@ pub struct AuditTask {
 
 // Associates strategies with their channels and weights.
 #[derive(Debug)]
-pub struct TaskChannels {
+pub struct TaskChannel {
     strategy: SelectionStrategy,
     weight: u8,
-    channel_recv: Receiver<AuditTask>,
+    rx: Receiver<AuditTask>,
 }
 
 pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
-    let mut task_channels: Vec<TaskChannels> = vec![];
-    let mut total_weight: u8 = 0;
+    let mut task_channels: Vec<TaskChannel> = vec![];
     for strategy in config.strategies {
         // Each strategy sends tasks to a separate channel.
         let (tx, rx) = mpsc::channel::<AuditTask>(100);
         let Some(weight) = config.weights.get(&strategy) else {
-            warn!(strategy=?strategy, "no weight for strategy");
+            error!(strategy=?strategy, "no weight for strategy");
             return
         };
-        total_weight += weight;
-        let task_channel = TaskChannels {
+        let task_channel = TaskChannel {
             strategy: strategy.clone(),
             weight: *weight,
-            channel_recv: rx,
+            rx,
         };
         task_channels.push(task_channel);
         // Strategies generate tasks in their own thread for their own channel.
         tokio::spawn(start_audit_selection_task(
             strategy.clone(),
-            tx.clone(),
+            tx,
             conn.clone(),
         ));
     }
     // Collation of generated tasks, taken proportional to weights.
     let (collation_tx, collation_rx) = mpsc::channel::<AuditTask>(100);
-    tokio::spawn(start_collation(collation_tx, task_channels, total_weight));
+    tokio::spawn(start_collation(collation_tx, task_channels));
     // Perform collated audit tasks.
     tokio::spawn(perform_content_audits(
         config.transport,
@@ -154,28 +152,20 @@ pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
 /// Listens to tasks coming on different strategy channels and selects
 /// according to strategy weight. Collated audit tasks are sent in a single
 /// channel for completion.
-///
-/// ### Weighting algorithm
-/// 1. Start loop and check how much capacity the rx side has.
-/// 2. Divide available capacity using weight for each strategy to get quota.
-/// 3. For each strategy, move generated tasks to collation channel as per quota.
-/// 4. Incomplete quotas are capacity left for the next loop.
 async fn start_collation(
     collation_tx: mpsc::Sender<AuditTask>,
-    mut task_channels: Vec<TaskChannels>,
-    total_weight: u8,
+    mut task_channels: Vec<TaskChannel>,
 ) {
-    let mut interval = time::interval(Duration::from_millis(5000));
     loop {
-        interval.tick().await;
-        let cap = collation_tx.capacity() as u8;
         for tasks in task_channels.iter_mut() {
-            let quota = tasks.weight * cap / total_weight;
-            debug!(strategy=?tasks.strategy, quota=quota, "collating strategies");
-            for _ in 0..quota {
-                let Some(task) = tasks.channel_recv.recv().await else {continue};
-                if let Err(err) = collation_tx.send(task).await {
-                    error!(err=?err, strategy=?tasks.strategy, "could not move task for collation")
+            debug!(strategy=?tasks.strategy, max=tasks.weight, "collating");
+            for _ in 0..tasks.weight {
+                match tasks.rx.try_recv() {
+                    Ok(task) => collation_tx
+                        .send(task)
+                        .await
+                        .expect("Unable to collate task"),
+                    Err(_) => break,
                 }
             }
         }
