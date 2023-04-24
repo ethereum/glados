@@ -1,4 +1,7 @@
 #![allow(unused_imports)]
+use std::str::FromStr;
+
+#[cfg(test)]
 use chrono::prelude::*;
 use ethereum_types::{H256, U256};
 use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
@@ -15,7 +18,7 @@ use trin_utils::bytes::hex_encode;
 
 use crate::content::SubProtocol;
 use crate::content_audit::SelectionStrategy;
-use crate::{content, content_audit, node};
+use crate::{client_info, content, content_audit, node, record};
 
 #[allow(dead_code)]
 async fn setup_database() -> Result<DbConn, DbErr> {
@@ -206,6 +209,16 @@ async fn test_audit_crud() -> Result<(), DbErr> {
     assert_eq!(searched_content_model.content_id, key.content_id());
     assert_eq!(searched_content_model.content_key, key.to_bytes());
 
+    let client_info_active_model = client_info::ActiveModel {
+        id: NotSet,
+        version_info: Set("trin v0.1.0".to_owned()),
+    };
+    let client_info_model = client_info_active_model.insert(&conn).await?;
+
+    let node_id = NodeId::random();
+
+    let node = node::get_or_create(node_id, &conn).await.unwrap();
+
     // setup the content_audit
     let content_audit_active_model = content_audit::ActiveModel {
         id: NotSet,
@@ -214,6 +227,8 @@ async fn test_audit_crud() -> Result<(), DbErr> {
         strategy_used: Set(Some(SelectionStrategy::Random)),
         result: Set(content_audit::AuditResult::Success),
         trace: Set("".to_owned()),
+        client_info: Set(Some(client_info_model.id)),
+        node: Set(Some(node.id)),
     };
 
     let content_audit_model = content_audit_active_model.insert(&conn).await?;

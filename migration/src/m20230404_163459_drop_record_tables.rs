@@ -9,12 +9,15 @@ impl MigrationTrait for Migration {
         manager
             .drop_table(Table::drop().table(KeyValue::Table).to_owned())
             .await?;
-        manager
-            .drop_table(Table::drop().table(Record::Table).to_owned())
-            .await?;
-        manager
-            .drop_table(Table::drop().table(Node::Table).to_owned())
-            .await?;
+
+        if manager.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
+            manager
+                .drop_table(Table::drop().table(Record::Table).to_owned())
+                .await?;
+            manager
+                .drop_table(Table::drop().table(Node::Table).to_owned())
+                .await?;
+        }
 
         Ok(())
     }

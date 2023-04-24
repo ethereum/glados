@@ -6,48 +6,50 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .create_table(
-                Table::create()
-                    .table(Node::Table)
-                    .if_not_exists()
-                    .col(
-                        ColumnDef::new(Node::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
-                    )
-                    .col(ColumnDef::new(Node::NodeId).binary_len(32).not_null())
-                    .to_owned(),
-            )
-            .await?;
-        manager
-            .create_table(
-                Table::create()
-                    .table(Record::Table)
-                    .if_not_exists()
-                    .col(
-                        ColumnDef::new(Record::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
-                    )
-                    .col(ColumnDef::new(Record::NodeId).integer().not_null())
-                    .col(ColumnDef::new(Record::Raw).text().not_null())
-                    .col(ColumnDef::new(Record::SequenceNumber).integer().not_null())
-                    .foreign_key(
-                        ForeignKey::create()
-                            .name("fk-enr_id-node_id")
-                            .from(Record::Table, Record::NodeId)
-                            .to(Node::Table, Node::Id)
-                            .on_delete(ForeignKeyAction::Cascade)
-                            .on_update(ForeignKeyAction::Cascade),
-                    )
-                    .to_owned(),
-            )
-            .await?;
+        if manager.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
+            manager
+                .create_table(
+                    Table::create()
+                        .table(Node::Table)
+                        .if_not_exists()
+                        .col(
+                            ColumnDef::new(Node::Id)
+                                .integer()
+                                .not_null()
+                                .auto_increment()
+                                .primary_key(),
+                        )
+                        .col(ColumnDef::new(Node::NodeId).binary_len(32).not_null())
+                        .to_owned(),
+                )
+                .await?;
+            manager
+                .create_table(
+                    Table::create()
+                        .table(Record::Table)
+                        .if_not_exists()
+                        .col(
+                            ColumnDef::new(Record::Id)
+                                .integer()
+                                .not_null()
+                                .auto_increment()
+                                .primary_key(),
+                        )
+                        .col(ColumnDef::new(Record::NodeId).integer().not_null())
+                        .col(ColumnDef::new(Record::Raw).text().not_null())
+                        .col(ColumnDef::new(Record::SequenceNumber).integer().not_null())
+                        .foreign_key(
+                            ForeignKey::create()
+                                .name("fk-enr_id-node_id")
+                                .from(Record::Table, Record::NodeId)
+                                .to(Node::Table, Node::Id)
+                                .on_delete(ForeignKeyAction::Cascade)
+                                .on_update(ForeignKeyAction::Cascade),
+                        )
+                        .to_owned(),
+                )
+                .await?;
+        }
         manager
             .create_table(
                 Table::create()

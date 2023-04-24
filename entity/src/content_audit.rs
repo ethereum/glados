@@ -51,6 +51,8 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub content_key: i32,
+    pub client_info: Option<i32>,
+    pub node: Option<i32>,
     pub created_at: DateTime<FixedOffset>,
     pub strategy_used: Option<SelectionStrategy>,
     pub result: AuditResult,
@@ -67,6 +69,22 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Content,
+    #[sea_orm(
+        belongs_to = "super::client_info::Entity",
+        from = "Column::ClientInfo",
+        to = "super::client_info::Column::Id",
+        on_update = "Cascade",
+        on_delete = "Cascade"
+    )]
+    ClientInfo,
+    #[sea_orm(
+        belongs_to = "super::node::Entity",
+        from = "Column::Node",
+        to = "super::node::Column::Id",
+        on_update = "Cascade",
+        on_delete = "Cascade"
+    )]
+    Node,
 }
 
 impl Related<super::content::Entity> for Entity {
@@ -75,10 +93,18 @@ impl Related<super::content::Entity> for Entity {
     }
 }
 
+impl Related<super::client_info::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ClientInfo.def()
+    }
+}
+
 impl ActiveModelBehavior for ActiveModel {}
 
 pub async fn create(
     content_key_model_id: i32,
+    client_info_id: i32,
+    node_id: i32,
     query_successful: bool,
     strategy_used: SelectionStrategy,
     trace_string: String,
@@ -94,6 +120,8 @@ pub async fn create(
     let content_audit = ActiveModel {
         id: NotSet,
         content_key: Set(content_key_model_id),
+        client_info: Set(Some(client_info_id)),
+        node: Set(Some(node_id)),
         created_at: Set(chrono::offset::Utc::now().into()),
         result: Set(audit_result),
         strategy_used: Set(Some(strategy_used)),

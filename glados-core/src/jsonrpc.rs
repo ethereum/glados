@@ -4,7 +4,6 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use discv5::enr::CombinedKey;
 use ethereum_types::{H256, U256};
 use ethportal_api::types::content_key::OverlayContentKey;
 use jsonrpc::Request;
@@ -28,7 +27,7 @@ use trin_utils::bytes::{hex_decode, ByteUtilsError};
 use uds_windows::UnixStream;
 use url::Url;
 
-type Enr = discv5::enr::Enr<CombinedKey>;
+use ethportal_api::types::discv5::Enr;
 
 /// Configuration details for connection to a Portal network node.
 #[derive(Clone, Debug)]
@@ -38,9 +37,21 @@ pub enum TransportConfig {
 }
 
 /// Details for a Connection to a Portal network node over different transports.
-pub enum PortalClient {
+pub enum Transport {
     HTTP(HttpClientManager),
     IPC(IpcClientManager),
+}
+
+#[derive(Clone, Debug)]
+pub struct PortalApi {
+    pub client_url: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct PortalClient {
+    pub api: PortalApi,
+    pub client_info: String,
+    pub enr: Enr,
 }
 
 /// HTTP-based transport for connecting to a Portal network node.
@@ -99,6 +110,9 @@ pub enum JsonRpcError {
 
     #[error("received malformed response: {0}")]
     Malformed(serde_json::Error),
+
+    #[error("malformed portal client URL")]
+    ClientURL { url: String },
 
     #[error("unable to use byte utils {0}")]
     ByteUtils(#[from] ByteUtilsError),
@@ -204,29 +218,38 @@ impl PortalResponse {
 }
 
 impl PortalClient {
-    /// Returns a client to connect to a Portal network node.
-    pub fn from_config(config: &TransportConfig) -> Result<Self, JsonRpcError> {
-        Ok(match config {
-            TransportConfig::HTTP(http_url) => PortalClient::HTTP(HttpClientManager {
-                client: HttpClientBuilder::default().build(http_url.as_ref())?,
-            }),
-            TransportConfig::IPC(path) => PortalClient::IPC(IpcClientManager {
-                stream: UnixStream::connect(path).map_err(|e| JsonRpcError::OpenFileFailed {
-                    source: e,
-                    path: path.to_owned(),
-                })?,
-                request_id: 0,
-            }),
+    pub async fn from(portal_client_url: String) -> Result<Self, JsonRpcError> {
+        let api = PortalApi {
+            client_url: portal_client_url.clone(),
+        };
+
+        let client_info = &api.get_client_version().await?;
+
+        let node_info = &api.get_node_info().await?;
+
+        let enr_string = node_info.enr.clone();
+        let enr: Enr = enr_string.parse().map_err(|err| JsonRpcError::InvalidEnr {
+            error: err,
+            enr_string,
+        })?;
+
+        Ok(PortalClient {
+            api,
+            client_info: client_info.to_string(),
+            enr,
         })
     }
+}
 
+impl PortalApi {
     pub async fn make_request(
-        self,
+        &self,
         method: &str,
         params: Option<Vec<Box<RawValue>>>,
     ) -> Result<PortalResponse, JsonRpcError> {
-        match self {
-            PortalClient::HTTP(http) => {
+        let transport = PortalApi::parse_client_url(self.client_url.clone())?;
+        match transport {
+            Transport::HTTP(http) => {
                 // jsonrpsee requires the conversion of `Option<Vec<Box<RawValue>>>` to `ArrayParams`
                 let array_params: ArrayParams = match params {
                     Some(json_params) => {
@@ -241,7 +264,7 @@ impl PortalClient {
                 let val: Value = http.client.request(method, array_params).await?;
                 Ok(PortalResponse::from_value(val))
             }
-            PortalClient::IPC(mut ipc) => {
+            Transport::IPC(mut ipc) => {
                 let request = match &params {
                     Some(raw_params) => Request {
                         method,
@@ -274,7 +297,7 @@ impl PortalClient {
         }
     }
 
-    pub async fn get_client_version(self) -> Result<String, JsonRpcError> {
+    pub async fn get_client_version(&self) -> Result<String, JsonRpcError> {
         let method = "web3_clientVersion";
         let params = None;
         self.make_request(method, params)
@@ -282,7 +305,7 @@ impl PortalClient {
             .non_content_response_to_string()
     }
 
-    pub async fn get_node_info(self) -> Result<NodeInfo, JsonRpcError> {
+    pub async fn get_node_info(&self) -> Result<NodeInfo, JsonRpcError> {
         let method = "discv5_nodeInfo";
         let params = None;
         let response = self
@@ -363,6 +386,28 @@ impl PortalClient {
             Ok((Some(Content { raw: content_raw }), trace))
         } else {
             Ok((None, trace))
+        }
+    }
+
+    pub fn parse_client_url(client_url: String) -> Result<Transport, JsonRpcError> {
+        let http_prefix = "http://";
+        let ipc_prefix = "ipc:///";
+        if client_url.strip_prefix(http_prefix).is_some() {
+            Ok(Transport::HTTP(HttpClientManager {
+                client: HttpClientBuilder::default().build(client_url)?,
+            }))
+        } else if let Some(ipc_path) = client_url.strip_prefix(ipc_prefix) {
+            Ok(Transport::IPC(IpcClientManager {
+                stream: UnixStream::connect(ipc_path).map_err(|e| {
+                    JsonRpcError::OpenFileFailed {
+                        source: e,
+                        path: ipc_path.into(),
+                    }
+                })?,
+                request_id: 0,
+            }))
+        } else {
+            Err(JsonRpcError::ClientURL { url: client_url })
         }
     }
 }

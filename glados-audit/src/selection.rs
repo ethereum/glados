@@ -272,8 +272,10 @@ mod tests {
 
     use chrono::Utc;
     use entity::{
+        client_info,
         content::{self, SubProtocol},
         content_audit::{self, AuditResult},
+        node,
     };
     use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
     use migration::{DbErr, Migrator, MigratorTrait};
@@ -282,6 +284,7 @@ mod tests {
         QueryFilter, Set,
     };
     use tokio::sync::mpsc::channel;
+    use trin_types::node_id::NodeId;
 
     use super::*;
 
@@ -329,6 +332,16 @@ mod tests {
                 protocol_id: Set(SubProtocol::History),
             };
             let content_key_model = content_key_active_model.insert(&conn).await?;
+
+            let client_info_active_model = client_info::ActiveModel {
+                id: NotSet,
+                version_info: Set("trin v0.1.0".to_owned()),
+            };
+
+            let node_id = NodeId::random();
+            let node = node::get_or_create(node_id, &conn).await.unwrap();
+
+            let client_info_model = client_info_active_model.insert(&conn).await?;
             // audit table.
             if (16..=30).contains(&num) || num == 1 {
                 let result = match num % 2 == 0 {
@@ -342,6 +355,8 @@ mod tests {
                     strategy_used: Set(Some(SelectionStrategy::Random)),
                     result: Set(result),
                     trace: Set("".to_owned()),
+                    client_info: Set(Some(client_info_model.id)),
+                    node: Set(Some(node.id)),
                 };
                 content_audit_active_model.insert(&conn).await?;
             }
