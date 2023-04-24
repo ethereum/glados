@@ -14,7 +14,7 @@ pub enum AuditResult {
     Success = 1,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum, ValueEnum)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, EnumIter, DeriveActiveEnum, ValueEnum)]
 #[clap(rename_all = "snake_case")]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 /// Each strategy is responsible for selecting which content key(s) to begin audits for.
