@@ -12,10 +12,6 @@
 <div id="top-of-audit-detail">
     <div class="row">
         <h1>Audit #{{ audit.id }}</h1>
-        <span>
-            <a href="/audit/id/{{ audit.id - 1 }}" class="previous">&laquo; Previous</a>
-            <a href="/audit/id/{{ audit.id + 1 }}" class="next">Next &raquo;</a>
-        </span>
         <div class="col">
             <ul>
                 <li>Content Key: {{ content.key_as_hex() }}</li>
