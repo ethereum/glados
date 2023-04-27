@@ -54,6 +54,7 @@ pub struct Model {
     pub created_at: DateTime<FixedOffset>,
     pub strategy_used: Option<SelectionStrategy>,
     pub result: AuditResult,
+    pub trace: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -80,6 +81,7 @@ pub async fn create(
     content_key_model_id: i32,
     query_successful: bool,
     strategy_used: SelectionStrategy,
+    trace_string: String,
     conn: &DatabaseConnection,
 ) -> Result<Model> {
     // If no record exists, create one and return it
@@ -95,6 +97,7 @@ pub async fn create(
         created_at: Set(chrono::offset::Utc::now().into()),
         result: Set(audit_result),
         strategy_used: Set(Some(strategy_used)),
+        trace: Set(trace_string),
     };
     Ok(content_audit.insert(conn).await?)
 }

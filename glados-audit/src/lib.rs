@@ -279,8 +279,14 @@ async fn perform_single_audit(
             return;
         }
     };
-    if let Err(e) =
-        content_audit::create(content_key_model.id, audit_result, task.strategy, &conn).await
+    if let Err(e) = content_audit::create(
+        content_key_model.id,
+        audit_result,
+        task.strategy,
+        "".to_owned(),
+        &conn,
+    )
+    .await
     {
         error!(
             content.key=?task.content_key,

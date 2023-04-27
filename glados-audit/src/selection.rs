@@ -341,6 +341,7 @@ mod tests {
                     created_at: Set(Utc::now().into()),
                     strategy_used: Set(Some(SelectionStrategy::Random)),
                     result: Set(result),
+                    trace: Set("".to_owned()),
                 };
                 content_audit_active_model.insert(&conn).await?;
             }
@@ -381,12 +382,12 @@ mod tests {
             // Check that strategy only yields expected keys.
             assert!(expected_key_ids.contains(&key_model.id));
             checked_ids.insert(key_model.id);
-            if checked_ids.len() == CHANNEL_SIZE as usize {
+            if checked_ids.len() == CHANNEL_SIZE {
                 break;
             }
         }
         // Make sure no key was audited twice by pushing to a hashmap and checking it's length.
-        assert_eq!(checked_ids.len(), CHANNEL_SIZE as usize);
+        assert_eq!(checked_ids.len(), CHANNEL_SIZE);
     }
 
     /// Tests that the `SelectionStrategy::SelectOldestUnaudited` selects the correct values
@@ -416,12 +417,12 @@ mod tests {
             // Check that strategy only yields expected keys.
             assert!(expected_key_ids.contains(&key_model.id));
             checked_ids.insert(key_model.id);
-            if checked_ids.len() == CHANNEL_SIZE as usize {
+            if checked_ids.len() == CHANNEL_SIZE {
                 break;
             }
         }
         // Make sure no key was audited twice by pushing to a hashmap and checking it's length.
-        assert_eq!(checked_ids.len(), CHANNEL_SIZE as usize);
+        assert_eq!(checked_ids.len(), CHANNEL_SIZE);
     }
 
     /// Tests that the `SelectionStrategy::Random` selects the correct values
@@ -449,11 +450,11 @@ mod tests {
             assert!(expected_key_ids.contains(&key_model.id));
             checked_ids.insert(key_model.id);
             println!("ids checked {}", checked_ids.len());
-            if checked_ids.len() == CHANNEL_SIZE as usize {
+            if checked_ids.len() == CHANNEL_SIZE {
                 break;
             }
         }
         // Make sure no key was audited twice by pushing to a hashmap and checking it's length.
-        assert_eq!(checked_ids.len(), CHANNEL_SIZE as usize);
+        assert_eq!(checked_ids.len(), CHANNEL_SIZE);
     }
 }
