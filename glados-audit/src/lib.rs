@@ -1,28 +1,32 @@
 use std::{
     collections::HashMap,
+    env,
     sync::{
         atomic::{AtomicU8, Ordering},
         Arc,
     },
 };
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail};
 use clap::Parser;
 use cli::Args;
+use entity::{
+    content,
+    content_audit::{self, SelectionStrategy},
+    execution_metadata,
+};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
+use glados_core::jsonrpc::{PortalClient, TransportConfig};
+use reqwest::header::{HeaderMap, HeaderValue};
 use sea_orm::DatabaseConnection;
 use tokio::{
     sync::mpsc::{self, Receiver},
     time::{sleep, Duration},
 };
 use tracing::{debug, error, info};
-
-use entity::{
-    content,
-    content_audit::{self, SelectionStrategy},
-    execution_metadata,
-};
-use glados_core::jsonrpc::{PortalClient, TransportConfig};
+use url::Url;
+use validation::Provider;
+use web3::{transports::Http, Web3};
 
 use crate::{
     cli::TransportType, selection::start_audit_selection_task, validation::content_is_valid,
@@ -45,10 +49,13 @@ pub struct AuditConfig {
     pub weights: HashMap<SelectionStrategy, u8>,
     /// Number requests to a Portal node active at the same time.
     pub concurrency: u8,
+    /// An Ethereum execution node to validate content received from
+    /// the Portal node against.
+    pub trusted_provider: Provider,
 }
 
 impl AuditConfig {
-    pub fn from_args() -> Result<AuditConfig> {
+    pub fn from_args() -> anyhow::Result<AuditConfig> {
         let args = Args::parse();
         let transport: TransportConfig = match args.transport {
             TransportType::IPC => match args.ipc_path {
@@ -85,12 +92,51 @@ impl AuditConfig {
             };
             weights.insert(strat.clone(), weight);
         }
+        let trusted_provider: Provider = match args.trusted_provider {
+            cli::TrustedProvider::HTTP => {
+                match args.provider_http_url{
+                    Some(url) => {
+                        let transport = Http::new(url.as_str())?;
+                        let w3 = Web3::new(transport);
+                        Provider::Http(w3)
+                    },
+                    None => bail!("The '--provider-http-url' flag is required if 'http' is selected for the '--trusted-provider'"),
+                }
+            },
+            cli::TrustedProvider::Pandaops => {
+                match args.provider_pandaops {
+                    Some(provider_url) => {
+                        let mut headers = HeaderMap::new();
+                        let client_id = env::var("PANDAOPS_CLIENT_ID")
+                            .map_err(|_| anyhow!("PANDAOPS_CLIENT_ID env var not set."))?;
+                        let client_id = HeaderValue::from_str(&client_id);
+                        let client_secret = env::var("PANDAOPS_CLIENT_SECRET")
+                            .map_err(|_| anyhow!("PANDAOPS_CLIENT_SECRET env var not set."))?;
+                        let client_secret = HeaderValue::from_str(&client_secret);
+                        headers.insert("CF-Access-Client-Id", client_id?);
+                        headers.insert("CF-Access-Client-Secret", client_secret?);
+
+                        let client = reqwest::Client::builder()
+                            .default_headers(headers)
+                            .build()?;
+                        let url = Url::parse(&provider_url)?;
+                        let transport = Http::with_client(client, url);
+                        let w3 = Web3::new(transport);
+                        Provider::Pandaops(w3)
+                    },
+                    None => bail!("The '--provider-pandaops' flag is required if 'pandaops' is selected for the '--trusted-provider'"),
+                }
+            }
+        }
+        ;
+
         Ok(AuditConfig {
             database_url: args.database_url,
             transport,
             strategies,
             weights,
             concurrency: args.concurrency,
+            trusted_provider,
         })
     }
 }
@@ -111,10 +157,10 @@ pub struct TaskChannel {
 
 pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
     let mut task_channels: Vec<TaskChannel> = vec![];
-    for strategy in config.strategies {
+    for strategy in &config.strategies {
         // Each strategy sends tasks to a separate channel.
         let (tx, rx) = mpsc::channel::<AuditTask>(100);
-        let Some(weight) = config.weights.get(&strategy) else {
+        let Some(weight) = config.weights.get(strategy) else {
             error!(strategy=?strategy, "no weight for strategy");
             return
         };
@@ -135,12 +181,7 @@ pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
     let (collation_tx, collation_rx) = mpsc::channel::<AuditTask>(100);
     tokio::spawn(start_collation(collation_tx, task_channels));
     // Perform collated audit tasks.
-    tokio::spawn(perform_content_audits(
-        config.transport,
-        config.concurrency,
-        collation_rx,
-        conn,
-    ));
+    tokio::spawn(perform_content_audits(config, collation_rx, conn));
     debug!("setting up CTRL+C listener");
     tokio::signal::ctrl_c()
         .await
@@ -173,19 +214,18 @@ async fn start_collation(
 }
 
 async fn perform_content_audits(
-    transport: TransportConfig,
-    concurrency: u8,
+    config: AuditConfig,
     mut rx: mpsc::Receiver<AuditTask>,
     conn: DatabaseConnection,
 ) {
     let active_threads = Arc::new(AtomicU8::new(0));
     loop {
         let active_count = active_threads.load(Ordering::Relaxed);
-        if active_count >= concurrency {
+        if active_count >= config.concurrency {
             // Each audit is performed in new thread if enough concurrency is available.
             debug!(
                 active.threads = active_count,
-                max.threads = concurrency,
+                max.threads = config.concurrency,
                 "Waiting for responses on all audit threads... Sleeping..."
             );
             sleep(Duration::from_millis(5000)).await;
@@ -194,7 +234,7 @@ async fn perform_content_audits(
 
         debug!(
             active.threads = active_count,
-            max.threads = concurrency,
+            max.threads = config.concurrency,
             "Checking Rx channel for audits"
         );
 
@@ -204,7 +244,7 @@ async fn perform_content_audits(
                 tokio::spawn(perform_single_audit(
                     active_threads.clone(),
                     task,
-                    transport.clone(),
+                    config.clone(),
                     conn.clone(),
                 ))
             }
@@ -222,10 +262,10 @@ async fn perform_content_audits(
 async fn perform_single_audit(
     active_threads: Arc<AtomicU8>,
     task: AuditTask,
-    transport: TransportConfig,
+    config: AuditConfig,
     conn: DatabaseConnection,
 ) {
-    let client = match PortalClient::from_config(&transport) {
+    let client = match PortalClient::from_config(&config.transport) {
         Ok(c) => c,
         Err(e) => {
             error!(
@@ -252,9 +292,27 @@ async fn perform_single_audit(
         }
     };
 
-    // If content was absent audit result is 'fail'.
+    // If content was absent or invalid the audit result is 'fail'.
     let audit_result = match content_response {
-        Some(content_bytes) => content_is_valid(&task.content_key, &content_bytes.raw),
+        Some(content_bytes) => {
+            match content_is_valid(
+                &config.trusted_provider,
+                &task.content_key,
+                &content_bytes.raw,
+            )
+            .await
+            {
+                Ok(res) => res,
+                Err(e) => {
+                    error!(
+                        content.key=?task.content_key.to_hex(),
+                        err=?e,
+                        "Problem requesting validation from Trusted provider node.");
+                    active_threads.fetch_sub(1, Ordering::Relaxed);
+                    return;
+                }
+            }
+        }
         None => false,
     };
 
