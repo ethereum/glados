@@ -12,7 +12,7 @@ use entity::{
     content_audit::{self, AuditResult},
     execution_metadata, key_value, node, record,
 };
-use ethportal_api::{HistoryContentKey, OverlayContentKey};
+use ethportal_api::types::content_key::{HistoryContentKey, OverlayContentKey};
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect,
@@ -125,6 +125,9 @@ pub async fn node_detail(
             error!(node.node_id=node_id_hex, node.db_id=node_model.id, err=?e, "Error looking up ENRs");
             StatusCode::NOT_FOUND
         })?;
+    let closest_node_list = node::closest_xor(node_model.get_node_id(), &state.database_connection)
+        .await
+        .unwrap();
 
     let latest_enr = enr_list.get(0).cloned();
 
@@ -147,6 +150,7 @@ pub async fn node_detail(
         latest_enr,
         latest_enr_key_value_list,
         enr_list,
+        closest_node_list,
     };
     Ok(HtmlTemplate(template))
 }

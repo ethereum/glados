@@ -14,15 +14,16 @@ askama = "0.11.1"
 axum = "0.6.11"
 chrono = "0.4.23"
 clap = { version = "4.0.26", features = ["derive"] }
+enr = "0.8.1"
 entity = { path = "../entity" }
 env_logger = "0.9.3"
 ethereum-types = "0.14.0"
-ethportal-api = { git = "https://github.com/ethereum/trin" }
+ethportal-api = "0.1.6"
 glados-core = { path = "../glados-core" }
 migration = { path = "../migration" }
 sea-orm = "0.11.3"
 tokio = "1.22.0"
 tower-http = { version = "0.3.5", features = ["fs"] }
 tracing = "0.1.37"
-trin-utils = {git = "https://github.com/ethereum/trin" }
-
+trin-types = "0.1.1-alpha.1"
+trin-utils = "0.1.1-alpha.1"

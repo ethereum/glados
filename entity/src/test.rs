@@ -1,13 +1,14 @@
 #![allow(unused_imports)]
-#[cfg(test)]
 use chrono::prelude::*;
-use ethereum_types::H256;
-use ethportal_api::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
+use ethereum_types::{H256, U256};
+use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
 use sea_orm::entity::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Database, DbConn, DbErr, EntityTrait, NotSet, PaginatorTrait,
     QueryFilter, Set,
 };
+#[cfg(test)]
+use trin_types::node_id::NodeId;
 
 use migration::{Migrator, MigratorTrait};
 use trin_utils::bytes::hex_encode;
@@ -45,10 +46,12 @@ async fn test_node_crud() -> Result<(), DbErr> {
     let node_a = node::ActiveModel {
         id: NotSet,
         node_id: Set(node_id_a.clone()),
+        node_id_high: Set(0),
     };
     let node_b = node::ActiveModel {
         id: NotSet,
         node_id: Set(node_id_b.clone()),
+        node_id_high: Set(0),
     };
 
     assert_eq!(node::Entity::find().count(&conn).await?, 0);
@@ -85,15 +88,12 @@ async fn crud_record() -> Result<(), DbErr> {
     let _conn = setup_database().await?;
 
     use enr::{k256, EnrBuilder};
+    use rand::thread_rng;
     use std::net::Ipv4Addr;
 
-    let raw_signing_key: Vec<u8> = vec![
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-        25, 26, 27, 28, 29, 30, 31,
-    ];
-
     // generate a random secp256k1 key
-    let key = k256::ecdsa::SigningKey::from_bytes(&raw_signing_key).unwrap();
+    let mut rng = thread_rng();
+    let key = k256::ecdsa::SigningKey::random(&mut rng);
 
     let ip = Ipv4Addr::new(192, 168, 0, 1);
     let enr = EnrBuilder::new("v4")
@@ -327,4 +327,93 @@ async fn test_content_table_unique_constraints() {
         .to_string()
         .contains("UNIQUE constraint failed"));
     assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 4);
+}
+
+// This test fails on sqlite which is expected.  The test is still useful as the query can be
+// modified to work on sqlite for debugging purposes.
+#[tokio::test]
+async fn test_query_closest() {
+    use env_logger;
+    env_logger::init();
+    let conn = setup_database().await.unwrap();
+
+    let node_id_a = NodeId::random();
+    let node_id_b = NodeId::random();
+    let node_id_c = NodeId::random();
+
+    let node_a = node::get_or_create(node_id_a, &conn).await.unwrap();
+    let node_b = node::get_or_create(node_id_b, &conn).await.unwrap();
+    let node_c = node::get_or_create(node_id_c, &conn).await.unwrap();
+
+    let distance_a_b = node_a.node_id_high ^ node_b.node_id_high;
+    let distance_a_c = node_a.node_id_high ^ node_c.node_id_high;
+    let distance_b_c = node_b.node_id_high ^ node_c.node_id_high;
+
+    let node_id_a_full = U256::from_big_endian(&node_id_a.raw());
+    let node_id_b_full = U256::from_big_endian(&node_id_b.raw());
+    let node_id_c_full = U256::from_big_endian(&node_id_c.raw());
+
+    assert_eq!(node_a.node_id_high as u64, (node_id_a_full >> 193).as_u64());
+    assert_eq!(node_b.node_id_high as u64, (node_id_b_full >> 193).as_u64());
+    assert_eq!(node_c.node_id_high as u64, (node_id_c_full >> 193).as_u64());
+
+    let distance_a_b_full = node_id_a_full ^ node_id_b_full;
+    let distance_a_c_full = node_id_a_full ^ node_id_c_full;
+    let distance_b_c_full = node_id_b_full ^ node_id_c_full;
+
+    //let distance_a_b_alt = (node_id_a_full | node_id_b_full) - (node_id_a_full & node_id_b_full);
+
+    assert_eq!((distance_a_b_full >> 193).as_u64(), distance_a_b as u64);
+    assert_eq!((distance_a_c_full >> 193).as_u64(), distance_a_c as u64);
+    assert_eq!((distance_b_c_full >> 193).as_u64(), distance_b_c as u64);
+
+    assert_eq!(
+        distance_a_b_full > distance_a_c_full,
+        distance_a_b > distance_a_c
+    );
+    assert_eq!(
+        distance_a_c_full > distance_b_c_full,
+        distance_a_c > distance_b_c
+    );
+    assert_eq!(
+        distance_a_b_full > distance_b_c_full,
+        distance_a_b > distance_b_c
+    );
+
+    let nodes_near_a = node::closest_xor(node_id_a, &conn).await.unwrap();
+    assert_eq!(nodes_near_a.len(), 3);
+
+    let expected_distances_a = match distance_a_b > distance_a_c {
+        true => [0, distance_a_c, distance_a_b],
+        false => [0, distance_a_b, distance_a_c],
+    };
+    let actual_distances_a = [
+        nodes_near_a[0].distance,
+        nodes_near_a[1].distance,
+        nodes_near_a[2].distance,
+    ];
+    assert_eq!(expected_distances_a, actual_distances_a);
+
+    let expected_from_a = match distance_a_b > distance_a_c {
+        true => [node_a.id, node_c.id, node_b.id],
+        false => [node_a.id, node_b.id, node_c.id],
+    };
+    let order_from_a = [nodes_near_a[0].id, nodes_near_a[1].id, nodes_near_a[2].id];
+    assert_eq!(order_from_a, expected_from_a);
+
+    let nodes_near_b = node::closest_xor(node_id_b, &conn).await.unwrap();
+    let expected_from_b = match distance_a_b > distance_b_c {
+        true => [node_b.id, node_c.id, node_a.id],
+        false => [node_b.id, node_a.id, node_c.id],
+    };
+    let order_from_b = [nodes_near_b[0].id, nodes_near_b[1].id, nodes_near_b[2].id];
+    assert_eq!(order_from_b, expected_from_b);
+
+    let nodes_near_c = node::closest_xor(node_id_c, &conn).await.unwrap();
+    let expected_from_c = match distance_a_c > distance_b_c {
+        true => [node_c.id, node_b.id, node_a.id],
+        false => [node_c.id, node_a.id, node_b.id],
+    };
+    let order_from_c = [nodes_near_c[0].id, nodes_near_c[1].id, nodes_near_c[2].id];
+    assert_eq!(order_from_c, expected_from_c);
 }

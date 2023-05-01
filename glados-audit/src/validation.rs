@@ -1,7 +1,6 @@
-use ethportal_api::{
-    BlockHeaderKey, ContentValue, HistoryContentKey, HistoryContentValue, OverlayContentKey,
-};
+use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
 use tracing::warn;
+use trin_types::content_value::{ContentValue, HistoryContentValue};
 use trin_utils::bytes::hex_encode;
 
 /// Checks that content bytes correspond to a correctly formatted
@@ -28,7 +27,7 @@ pub fn content_is_valid(content_key: &HistoryContentKey, content_bytes: &[u8]) -
                 true => true,
                 false => {
                     warn!(
-                        content.key = content_key.to_hex(),
+                        content.key = hex_encode(content_key.to_bytes()),
                         content.value = hex_encode(content_bytes),
                         "computed header hash did not match expected"
                     );

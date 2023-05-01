@@ -12,11 +12,15 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 anyhow = "1.0.68"
 chrono = "0.4.22"
 clap = { version = "4.0.24", features = ["derive"] }
-enr = "0.7.0"
+enr = "0.8.1"
 ethereum-types = "0.14.0"
-ethportal-api = { git = "https://github.com/ethereum/trin" }
+ethportal-api = "0.1.6"
 glados-core = { path = "../glados-core" }
 migration = { path = "../migration" }
 sea-orm = { version = "0.11.3", features = ["sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-native-tls"] }
+sea-query = "0.28.4"
 tokio = { version = "1.21.2", features = ["macros"] }
-trin-utils = {git = "https://github.com/ethereum/trin" }
+trin-utils = "0.1.1-alpha.1"
+trin-types = "0.1.1-alpha.1"
+env_logger = "0.10.0"
+rand = "0.8.5"
