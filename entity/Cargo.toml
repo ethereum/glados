@@ -17,6 +17,6 @@ ethereum-types = "0.14.0"
 ethportal-api = { git = "https://github.com/ethereum/trin" }
 glados-core = { path = "../glados-core" }
 migration = { path = "../migration" }
-sea-orm = { version = "0.10.1", features = ["sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-native-tls"] }
+sea-orm = { version = "0.11.3", features = ["sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-native-tls"] }
 tokio = { version = "1.21.2", features = ["macros"] }
 trin-utils = {git = "https://github.com/ethereum/trin" }
