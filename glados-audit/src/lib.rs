@@ -4,11 +4,13 @@ use std::{
         atomic::{AtomicU8, Ordering},
         Arc,
     },
+    str::FromStr,
 };
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use cli::Args;
+use ethportal_api::types::enr::Enr;
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use sea_orm::DatabaseConnection;
 use tokio::{
@@ -18,6 +20,7 @@ use tokio::{
 use tracing::{debug, error, info};
 
 use entity::{
+    client_info,
     content,
     content_audit::{self, SelectionStrategy},
     execution_metadata,
@@ -238,8 +241,34 @@ async fn perform_single_audit(
         }
     };
 
+    let client_version = match &client.get_client_version().await {
+        Ok(client_version) => client_version,
+        Err(e) => {
+            error!(
+                err=?e,
+                "Unable to fetch client version"
+            );
+            active_threads.fetch_sub(1, Ordering::Relaxed);
+            return;
+        }
+    };
+    let client_node_info = match &client.get_node_info().await {
+        Ok(client_node_info) => client_node_info,
+        Err(e) => {
+            error!(
+                err=?e,
+                "Unable to fetch client node info"
+            );
+            active_threads.fetch_sub(1, Ordering::Relaxed);
+            return;
+        }
+    };
+
+    let client_enr = Enr::from_str(&client_node_info.enr).expect("Unable to decode ENR");
+    let client_version_model = client_info::get_or_create(client_version.to_string(), &client_enr, &conn).await.unwrap();
+
     debug!(content.key = task.content_key.to_hex(), "auditing content",);
-    let content_response = match client.get_content(&task.content_key).await {
+    let content_response = match &client.get_content(&task.content_key).await {
         Ok(c) => c,
         Err(e) => {
             error!(
@@ -284,10 +313,9 @@ async fn perform_single_audit(
         audit_result,
         task.strategy,
         "".to_owned(),
+        client_version_model.id,
         &conn,
-    )
-    .await
-    {
+    ).await {
         error!(
             content.key=?task.content_key,
             err=?e,

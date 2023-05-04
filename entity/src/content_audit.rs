@@ -55,10 +55,19 @@ pub struct Model {
     pub strategy_used: Option<SelectionStrategy>,
     pub result: AuditResult,
     pub trace: String,
+    pub client_info_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::client_info::Entity",
+        from = "Column::ClientInfoId",
+        to = "super::client_info::Column::Id",
+        on_update = "Cascade",
+        on_delete = "Cascade"
+    )]
+    ClientInfo,
     #[sea_orm(
         belongs_to = "super::content::Entity",
         from = "Column::ContentKey",
@@ -75,6 +84,12 @@ impl Related<super::content::Entity> for Entity {
     }
 }
 
+impl Related<super::client_info::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ClientInfo.def()
+    }
+}
+
 impl ActiveModelBehavior for ActiveModel {}
 
 pub async fn create(
@@ -82,6 +97,7 @@ pub async fn create(
     query_successful: bool,
     strategy_used: SelectionStrategy,
     trace_string: String,
+    client_info_id: i32,
     conn: &DatabaseConnection,
 ) -> Result<Model> {
     // If no record exists, create one and return it
@@ -98,6 +114,7 @@ pub async fn create(
         result: Set(audit_result),
         strategy_used: Set(Some(strategy_used)),
         trace: Set(trace_string),
+        client_info_id: Set(client_info_id),
     };
     Ok(content_audit.insert(conn).await?)
 }
