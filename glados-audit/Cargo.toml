@@ -15,7 +15,7 @@ clap = { version = "4.0.24", features = ["derive"] }
 entity = { path = "../entity" }
 env_logger = "0.9.3"
 ethereum-types = "0.14.0"
-ethportal-api = { git = "https://github.com/ethereum/trin" }
+ethportal-api = "0.1.6"
 glados-core = { path = "../glados-core" }
 migration = { path = "../migration" }
 rand = "0.8.5"
@@ -23,7 +23,8 @@ sea-orm = "0.11.3"
 serde_json = "1.0.95"
 tokio = "1.21.2"
 tracing = "0.1.37"
-trin-utils = {git = "https://github.com/ethereum/trin" }
+trin-types = "0.1.1-alpha.1"
+trin-utils = "0.1.1-alpha.1"
 url = "2.3.1"
 web3 = "0.18.0"
 

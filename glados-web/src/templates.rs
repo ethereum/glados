@@ -28,6 +28,7 @@ pub struct NodeDetailTemplate {
     pub latest_enr: Option<record::Model>,
     pub latest_enr_key_value_list: Option<Vec<key_value::Model>>,
     pub enr_list: Vec<record::Model>,
+    pub closest_node_list: Vec<node::ModelWithDistance>,
 }
 
 #[derive(Template)]

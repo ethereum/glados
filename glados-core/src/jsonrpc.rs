@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use discv5::enr::CombinedKey;
 use ethereum_types::{H256, U256};
-use ethportal_api::OverlayContentKey;
+use ethportal_api::types::content_key::OverlayContentKey;
 use jsonrpc::Request;
 use jsonrpsee::{
     core::{client::ClientT, params::ArrayParams},
@@ -19,6 +19,7 @@ use serde_json::{
     value::{to_raw_value, RawValue},
     Value,
 };
+use trin_utils::bytes::hex_encode;
 
 use thiserror::Error;
 use tracing::error;
@@ -327,7 +328,7 @@ impl PortalClient {
         content_key: &T,
     ) -> Result<Option<Content>, JsonRpcError> {
         let method = "portal_historyRecursiveFindContent";
-        let key = &content_key.to_hex();
+        let key = hex_encode(content_key.to_bytes());
         let param = to_raw_value(&key).map_err(|e| JsonRpcError::InvalidJson {
             source: e,
             input: key.to_string(),
@@ -349,7 +350,7 @@ impl PortalClient {
         self,
         content_key: &T,
     ) -> Result<(Option<Content>, String), JsonRpcError> {
-        let params = Some(vec![to_raw_value(&content_key.to_hex())?]);
+        let params = Some(vec![to_raw_value(&hex_encode(content_key.to_bytes()))?]);
         let resp = self
             .make_request("portal_historyTraceRecursiveFindContent", params)
             .await?

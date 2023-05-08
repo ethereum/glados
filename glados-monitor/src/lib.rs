@@ -2,14 +2,14 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::{Error, Result};
-use ethportal_api::{
+use ethportal_api::types::content_key::{
     BlockBodyKey, BlockHeaderKey, BlockReceiptsKey, EpochAccumulatorKey, HistoryContentKey,
     OverlayContentKey,
 };
 use sea_orm::DatabaseConnection;
 use tokio::{fs::read_dir, sync::mpsc, time::sleep};
 use tracing::{debug, error, info, warn};
-use trin_utils::bytes::hex_decode;
+use trin_utils::bytes::{hex_decode, hex_encode};
 use web3::types::{BlockId, H256};
 
 use entity::{content, execution_metadata};
@@ -171,12 +171,12 @@ async fn store_content_key<T: OverlayContentKey>(
 fn log_record_outcome<T: OverlayContentKey>(key: &T, name: &str, outcome: DbOutcome) {
     match outcome {
         DbOutcome::Success => info!(
-            content.key = key.to_hex(),
+            content.key = hex_encode(key.to_bytes()),
             content.kind = name,
             "Imported new record",
         ),
         DbOutcome::Fail(e) => error!(
-            content.key=key.to_hex(),
+            content.key=hex_encode(key.to_bytes()),
             content.kind=name,
             err=?e,
             "Failed to create database record",

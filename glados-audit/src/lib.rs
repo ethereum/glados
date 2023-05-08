@@ -9,13 +9,14 @@ use std::{
 use anyhow::{bail, Result};
 use clap::Parser;
 use cli::Args;
-use ethportal_api::{HistoryContentKey, OverlayContentKey};
+use ethportal_api::types::content_key::{HistoryContentKey, OverlayContentKey};
 use sea_orm::DatabaseConnection;
 use tokio::{
     sync::mpsc::{self, Receiver},
     time::{sleep, Duration},
 };
 use tracing::{debug, error, info};
+use trin_utils::bytes::hex_encode;
 
 use entity::{
     content,
@@ -238,12 +239,15 @@ async fn perform_single_audit(
         }
     };
 
-    debug!(content.key = task.content_key.to_hex(), "auditing content",);
+    debug!(
+        content.key = hex_encode(task.content_key.to_bytes()),
+        "auditing content",
+    );
     let content_response = match client.get_content(&task.content_key).await {
         Ok(c) => c,
         Err(e) => {
             error!(
-                content.key=?task.content_key.to_hex(),
+                content.key=hex_encode(task.content_key.to_bytes()),
                 err=?e,
                 "Problem requesting content from Portal node."
             );
@@ -301,20 +305,20 @@ async fn perform_single_audit(
     match execution_metadata::get(content_key_model.id, &conn).await {
         Ok(Some(b)) => {
             info!(
-                content.key=task.content_key.to_hex(),
+                content.key=hex_encode(task.content_key.to_bytes()),
                 audit.pass=?audit_result,
                 block = b.block_number,
             );
         }
         Ok(None) => {
             error!(
-                content.key=task.content_key.to_hex(),
+                content.key=hex_encode(task.content_key.to_bytes()),
                 audit.pass=?audit_result,
                 "Block metadata absent for key."
             );
         }
         Err(e) => error!(
-                content.key=task.content_key.to_hex(),
+                content.key=hex_encode(task.content_key.to_bytes()),
                 err=?e,
                 "Problem getting block metadata."),
     };

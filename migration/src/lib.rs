@@ -6,6 +6,7 @@ mod m20230310_134806_add_audit_strategy_column;
 mod m20230404_163459_drop_record_tables;
 mod m20230404_163706_create_new_record_tables;
 mod m20230421_120832_add_audit_trace;
+mod m20230501_153121_add_node_id_high_bits_column_to_node_id;
 
 pub struct Migrator;
 
@@ -19,6 +20,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20230404_163459_drop_record_tables::Migration),
             Box::new(m20230404_163706_create_new_record_tables::Migration),
             Box::new(m20230421_120832_add_audit_trace::Migration),
+            Box::new(m20230501_153121_add_node_id_high_bits_column_to_node_id::Migration),
         ]
     }
 }

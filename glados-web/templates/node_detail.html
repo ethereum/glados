@@ -61,4 +61,30 @@
           </table>
     </div>
 </div>
+<div class="row">
+    <div class="col">
+          <h2>Closest Nodes</h2>
+          <table class="table">
+              <thead>
+                  <tr>
+                      <th scope="col">Node ID</th>
+                      <th scope="col">Distance</th>
+                  </tr>
+              </thead>
+              <tbody>
+              {% for neighbor_node in closest_node_list %}
+                  <tr>
+                      <td>
+                          <a href="/network/node/{{ neighbor_node.node_id_as_hex() }}/">{{ neighbor_node.node_id_as_hex() }}</a>
+                      </td>
+                  </tr>
+              {% else %}
+                  <tr>
+                      <td>No closest nodes</td>
+                  </tr>
+              {% endfor %}
+              </tbody>
+          </table>
+    </div>
+</div>
 {% endblock %}
