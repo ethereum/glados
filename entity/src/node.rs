@@ -47,11 +47,19 @@ impl ModelWithDistance {
 pub enum Relation {
     #[sea_orm(has_many = "super::record::Entity")]
     Record,
+    #[sea_orm(has_one = "super::client_info::Entity")]
+    ClientInfo,
 }
 
 impl Related<super::record::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Record.def()
+    }
+}
+
+impl Related<super::client_info::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ClientInfo.def()
     }
 }
 
@@ -115,6 +123,8 @@ pub async fn get_or_create(node_id: NodeId, conn: &DatabaseConnection) -> Result
     // If no record exists, create one and return it
     let raw_node_id = U256::from_big_endian(node_id.raw().as_slice());
     let node_id_high: i64 = (raw_node_id >> 193).as_u64().try_into().unwrap();
+
+    // let client_info = client_info::get_or_create(,&conn)
 
     let node_id_model = ActiveModel {
         id: NotSet,

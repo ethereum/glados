@@ -4,9 +4,10 @@ use std::{
         atomic::{AtomicU8, Ordering},
         Arc,
     },
+    thread::available_parallelism,
 };
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
 use cli::Args;
 use ethportal_api::types::content_key::{HistoryContentKey, OverlayContentKey};
@@ -15,19 +16,17 @@ use tokio::{
     sync::mpsc::{self, Receiver},
     time::{sleep, Duration},
 };
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use trin_utils::bytes::hex_encode;
 
 use entity::{
-    content,
+    client_info, content,
     content_audit::{self, SelectionStrategy},
-    execution_metadata,
+    execution_metadata, node,
 };
-use glados_core::jsonrpc::{PortalClient, TransportConfig};
+use glados_core::jsonrpc::PortalClient;
 
-use crate::{
-    cli::TransportType, selection::start_audit_selection_task, validation::content_is_valid,
-};
+use crate::{selection::start_audit_selection_task, validation::content_is_valid};
 
 pub mod cli;
 pub(crate) mod selection;
@@ -38,33 +37,33 @@ pub(crate) mod validation;
 pub struct AuditConfig {
     /// For Glados-related data.
     pub database_url: String,
-    /// For communication with a Portal Network node.
-    pub transport: TransportConfig,
     /// Specific strategies to run.
     pub strategies: Vec<SelectionStrategy>,
     /// Weight for each strategy.
     pub weights: HashMap<SelectionStrategy, u8>,
     /// Number requests to a Portal node active at the same time.
     pub concurrency: u8,
+    /// Portal Clients
+    pub portal_clients: Vec<PortalClient>,
 }
 
 impl AuditConfig {
-    pub fn from_args() -> Result<AuditConfig> {
+    pub async fn from_args() -> Result<AuditConfig> {
         let args = Args::parse();
-        let transport: TransportConfig = match args.transport {
-            TransportType::IPC => match args.ipc_path {
-                Some(p) => TransportConfig::IPC(p),
-                None => {
-                    bail!("The '--ipc-path' flag is required if '--transport ipc' variant is selected.")
-                }
-            },
-            TransportType::HTTP => match args.http_url {
-                Some(h) => TransportConfig::HTTP(h),
-                None => {
-                    bail!("The '--http-url' flag is required if '--transport http' variant is selected.");
-                }
-            },
-        };
+        let parallelism = available_parallelism()?.get() as u8;
+        if args.concurrency > parallelism {
+            warn!(
+                selected.concurrency = args.concurrency,
+                system.concurrency = parallelism,
+                "Selected concurrency greater than system concurrency."
+            )
+        } else {
+            info!(
+                selected.concurrency = args.concurrency,
+                system.concurrency = parallelism,
+                "Selected concurrency set."
+            )
+        }
         let strategies = match args.strategy {
             Some(s) => s,
             None => {
@@ -86,12 +85,20 @@ impl AuditConfig {
             };
             weights.insert(strat.clone(), weight);
         }
+
+        let mut portal_clients: Vec<PortalClient> = vec![];
+        for client_url in args.portal_client {
+            let client = PortalClient::from(client_url).await?;
+            info!("Found a portal client with type: {:?}", client.client_info);
+            portal_clients.push(client);
+        }
+
         Ok(AuditConfig {
             database_url: args.database_url,
-            transport,
             strategies,
             weights,
             concurrency: args.concurrency,
+            portal_clients,
         })
     }
 }
@@ -112,10 +119,10 @@ pub struct TaskChannel {
 
 pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
     let mut task_channels: Vec<TaskChannel> = vec![];
-    for strategy in config.strategies {
+    for strategy in &config.strategies {
         // Each strategy sends tasks to a separate channel.
         let (tx, rx) = mpsc::channel::<AuditTask>(100);
-        let Some(weight) = config.weights.get(&strategy) else {
+        let Some(weight) = config.weights.get(strategy) else {
             error!(strategy=?strategy, "no weight for strategy");
             return
         };
@@ -136,12 +143,7 @@ pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
     let (collation_tx, collation_rx) = mpsc::channel::<AuditTask>(100);
     tokio::spawn(start_collation(collation_tx, task_channels));
     // Perform collated audit tasks.
-    tokio::spawn(perform_content_audits(
-        config.transport,
-        config.concurrency,
-        collation_rx,
-        conn,
-    ));
+    tokio::spawn(perform_content_audits(config, collation_rx, conn));
     debug!("setting up CTRL+C listener");
     tokio::signal::ctrl_c()
         .await
@@ -174,12 +176,15 @@ async fn start_collation(
 }
 
 async fn perform_content_audits(
-    transport: TransportConfig,
-    concurrency: u8,
+    config: AuditConfig,
     mut rx: mpsc::Receiver<AuditTask>,
     conn: DatabaseConnection,
 ) {
+    let concurrency = config.concurrency;
     let active_threads = Arc::new(AtomicU8::new(0));
+
+    let mut cycle_of_clients = config.portal_clients.iter().cycle();
+
     loop {
         let active_count = active_threads.load(Ordering::Relaxed);
         if active_count >= concurrency {
@@ -202,10 +207,17 @@ async fn perform_content_audits(
         match rx.recv().await {
             Some(task) => {
                 active_threads.fetch_add(1, Ordering::Relaxed);
+                let client = match cycle_of_clients.next() {
+                    Some(client) => client,
+                    None => {
+                        error!("Empty list of clients for audit.");
+                        return;
+                    }
+                };
                 tokio::spawn(perform_single_audit(
                     active_threads.clone(),
                     task,
-                    transport.clone(),
+                    client.clone(),
                     conn.clone(),
                 ))
             }
@@ -223,27 +235,17 @@ async fn perform_content_audits(
 async fn perform_single_audit(
     active_threads: Arc<AtomicU8>,
     task: AuditTask,
-    transport: TransportConfig,
+    client: PortalClient,
     conn: DatabaseConnection,
 ) {
-    let client = match PortalClient::from_config(&transport) {
-        Ok(c) => c,
-        Err(e) => {
-            error!(
-                content.key=?task.content_key,
-                err=?e,
-                "Could not connect to Portal node."
-            );
-            active_threads.fetch_sub(1, Ordering::Relaxed);
-            return;
-        }
-    };
+    let client_info = client.client_info.clone();
 
     debug!(
         content.key = hex_encode(task.content_key.to_bytes()),
+        client.url = client.api.client_url.clone(),
         "auditing content",
     );
-    let content_response = match client.get_content(&task.content_key).await {
+    let content_response = match client.api.get_content(&task.content_key).await {
         Ok(c) => c,
         Err(e) => {
             error!(
@@ -283,8 +285,32 @@ async fn perform_single_audit(
             return;
         }
     };
+
+    let client_info_id = match client_info::get_or_create(client_info, &conn).await {
+        Ok(client_info) => client_info.id,
+        Err(error) => {
+            error!(content.key=?task.content_key,
+                err=?error,
+                "Could not create/lookup client info in db."
+            );
+            return;
+        }
+    };
+
+    let node_id = match node::get_or_create(client.enr.node_id().into(), &conn).await {
+        Ok(enr) => enr.id,
+        Err(err) => {
+            error!(
+                err=?err,
+                "Failed to created node."
+            );
+            return;
+        }
+    };
     if let Err(e) = content_audit::create(
         content_key_model.id,
+        client_info_id,
+        node_id,
         audit_result,
         task.strategy,
         "".to_owned(),

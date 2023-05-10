@@ -17,7 +17,7 @@ async fn main() -> Result<()> {
     //
     debug!("Parsing CLI arguments");
 
-    let config = AuditConfig::from_args()?;
+    let config = AuditConfig::from_args().await?;
 
     //
     // Database Connection

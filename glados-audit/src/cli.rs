@@ -1,7 +1,5 @@
 use clap::{ArgAction, Parser, ValueEnum};
 use entity::content_audit::SelectionStrategy;
-use std::path::PathBuf;
-use url::Url;
 
 const DEFAULT_DB_URL: &str = "sqlite::memory:";
 
@@ -10,12 +8,6 @@ const DEFAULT_DB_URL: &str = "sqlite::memory:";
 pub struct Args {
     #[arg(short, long, default_value = DEFAULT_DB_URL)]
     pub database_url: String,
-    #[arg(short, long, requires = "transport")]
-    pub ipc_path: Option<PathBuf>,
-    #[arg(short = 'u', long, requires = "transport")]
-    pub http_url: Option<Url>,
-    #[arg(short, long)]
-    pub transport: TransportType,
     #[arg(short, long, default_value = "4", help = "number of auditing threads")]
     pub concurrency: u8,
     #[arg(short, long, action(ArgAction::Append), value_enum, default_value = None, help = "Specific strategy to use. Default is to use all available strategies. May be passed multiple times for multiple strategies (--strategy latest --strategy random). Duplicates are permitted (--strategy random --strategy random).")]
@@ -48,21 +40,21 @@ pub struct Args {
         help = "relative weight of the 'random' strategy"
     )]
     pub random_strategy_weight: u8,
+    #[arg(short, long, action(ArgAction::Append))]
+    pub portal_client: Vec<String>,
 }
 
 impl Default for Args {
     fn default() -> Self {
         Self {
             database_url: DEFAULT_DB_URL.to_string(),
-            ipc_path: Default::default(),
-            http_url: Default::default(),
-            transport: TransportType::HTTP,
             concurrency: 4,
             latest_strategy_weight: 1,
             failed_strategy_weight: 1,
             oldest_strategy_weight: 1,
             random_strategy_weight: 1,
             strategy: None,
+            portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
         }
     }
 }
@@ -74,33 +66,30 @@ mod test {
     /// Tests that the defaults are correct when the minimum required flags are passed.
     #[test]
     fn test_minimum_args() {
-        const IPC_PATH: &str = "/path/to/ipc";
-        let result = Args::parse_from(["test", "--transport", "ipc", "--ipc-path", IPC_PATH]);
+        const PORTAL_CLIENT_STRING: &str = "ipc:////path/to/ipc";
+        let result = Args::parse_from(["test", "--portal-client", PORTAL_CLIENT_STRING]);
         let expected = Args {
             database_url: DEFAULT_DB_URL.to_string(),
-            ipc_path: Some(PathBuf::from(IPC_PATH)),
-            transport: TransportType::IPC,
+            portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
             ..Default::default()
         };
         assert_eq!(result, expected);
     }
     #[test]
     fn test_custom_concurrency() {
-        const IPC_PATH: &str = "/path/to/ipc";
+        const PORTAL_CLIENT_STRING: &str = "ipc:////path/to/ipc";
         let result = Args::parse_from([
             "test",
-            "--transport",
-            "ipc",
-            "--ipc-path",
-            IPC_PATH,
-            "--latest-strategy-weight",
+            "--concurrency",
             "3",
+            "--portal-client",
+            PORTAL_CLIENT_STRING,
         ]);
         let expected = Args {
-            transport: TransportType::IPC,
+            database_url: DEFAULT_DB_URL.to_string(),
+            concurrency: 3,
             strategy: None,
-            ipc_path: Some(PathBuf::from(IPC_PATH)),
-            latest_strategy_weight: 3,
+            portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
             ..Default::default()
         };
         assert_eq!(result, expected);
@@ -109,23 +98,19 @@ mod test {
     /// Tests that a specific audit strategy can be used without other strategies.
     #[test]
     fn test_custom_strategy() {
-        const IPC_PATH: &str = "/path/to/ipc";
+        const PORTAL_CLIENT_STRING: &str = "ipc:////path/to/ipc";
         let result = Args::parse_from([
             "test",
-            "--transport",
-            "ipc",
-            "--ipc-path",
-            IPC_PATH,
             "--strategy",
             "latest",
+            "--portal-client",
+            PORTAL_CLIENT_STRING,
         ]);
         let expected = Args {
-            transport: TransportType::IPC,
             database_url: DEFAULT_DB_URL.to_string(),
-            http_url: None,
-            ipc_path: Some(PathBuf::from(IPC_PATH)),
             concurrency: 4,
             strategy: Some(vec![SelectionStrategy::Latest]),
+            portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
             ..Default::default()
         };
         assert_eq!(result, expected);
@@ -135,13 +120,11 @@ mod test {
     /// This case shows 1 latest and 2 random, which doubles the rate of random audits.
     #[test]
     fn test_multiple_custom_strategies() {
-        const IPC_PATH: &str = "/path/to/ipc";
+        const PORTAL_CLIENT_STRING: &str = "ipc:////path/to/ipc";
         let result = Args::parse_from([
             "test",
-            "--transport",
-            "ipc",
-            "--ipc-path",
-            IPC_PATH,
+            "--portal-client",
+            PORTAL_CLIENT_STRING,
             "--strategy",
             "random",
             "--strategy",
@@ -150,16 +133,14 @@ mod test {
             "random", // Duplicate is permitted
         ]);
         let expected = Args {
-            transport: TransportType::IPC,
             database_url: DEFAULT_DB_URL.to_string(),
-            http_url: None,
-            ipc_path: Some(PathBuf::from(IPC_PATH)),
             concurrency: 4,
             strategy: Some(vec![
                 SelectionStrategy::Random,
                 SelectionStrategy::Latest,
                 SelectionStrategy::Random,
             ]),
+            portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
             ..Default::default()
         };
         assert_eq!(result, expected);
