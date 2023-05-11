@@ -10,7 +10,7 @@ use std::{
 use anyhow::Result;
 use clap::Parser;
 use cli::Args;
-use ethportal_api::types::content_key::{HistoryContentKey, OverlayContentKey};
+use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use sea_orm::DatabaseConnection;
 use tokio::{
     sync::mpsc::{self, Receiver},

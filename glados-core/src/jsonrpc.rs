@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use ethereum_types::{H256, U256};
-use ethportal_api::types::content_key::OverlayContentKey;
 use jsonrpc::Request;
 use jsonrpsee::{
     core::{client::ClientT, params::ArrayParams},
@@ -18,16 +17,15 @@ use serde_json::{
     value::{to_raw_value, RawValue},
     Value,
 };
-use trin_utils::bytes::hex_encode;
-
 use thiserror::Error;
 use tracing::error;
+use trin_utils::bytes::hex_encode;
 use trin_utils::bytes::{hex_decode, ByteUtilsError};
 #[cfg(windows)]
 use uds_windows::UnixStream;
 use url::Url;
 
-use ethportal_api::types::discv5::Enr;
+use ethportal_api::{Enr, OverlayContentKey};
 
 /// Configuration details for connection to a Portal network node.
 #[derive(Clone, Debug)]

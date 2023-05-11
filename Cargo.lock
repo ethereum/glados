@@ -1440,8 +1440,8 @@ dependencies = [
  "sea-orm",
  "sea-query",
  "tokio",
- "trin-types",
- "trin-utils",
+ "trin-types 0.1.1-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "trin-utils 0.1.1-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1578,7 +1578,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "219675dc3593f2b99d5cc22d8bbaf956059a66b7eb69444d8502e2b9f5199814"
 dependencies = [
  "hashbrown 0.3.1",
- "keccak-hash 0.8.0",
+ "keccak-hash",
  "log",
  "parking_lot 0.8.0",
  "rlp 0.3.0",
@@ -1697,29 +1697,17 @@ checksum = "0198b9d0078e0f30dedc7acbb21c974e838fc8fae3ee170128658a98cb2c1c04"
 
 [[package]]
 name = "ethportal-api"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d9b657a02a5bc595f54df26888c52e8e22d13c0b4466427b0afd4e1951e7080"
+version = "0.2.0"
+source = "git+https://github.com/ethereum/trin#6c7f8017fceb8788cb57b143b85cfc3282b8b333"
 dependencies = [
- "bytes",
- "enr 0.7.0",
- "eth2_ssz",
- "eth2_ssz_derive",
+ "discv5 0.2.2",
  "eth2_ssz_types",
- "eth_trie",
  "ethereum-types 0.12.1",
- "ethnum",
- "hex",
- "hex-literal",
  "jsonrpsee",
- "keccak-hash 0.10.0",
- "rand 0.8.5",
- "rlp 0.5.2",
- "rlp-derive",
  "serde",
- "serde-hex",
  "serde_json",
- "sha2 0.10.6",
+ "trin-types 0.1.1-alpha.1 (git+https://github.com/ethereum/trin)",
+ "trin-utils 0.1.1-alpha.1 (git+https://github.com/ethereum/trin)",
 ]
 
 [[package]]
@@ -2061,8 +2049,8 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
- "trin-types",
- "trin-utils",
+ "trin-types 0.1.1-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "trin-utils 0.1.1-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "url",
  "web3",
 ]
@@ -2083,7 +2071,7 @@ dependencies = [
  "sea-orm",
  "tokio",
  "tracing",
- "trin-types",
+ "trin-types 0.1.1-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "url",
 ]
 
@@ -2106,7 +2094,7 @@ dependencies = [
  "sha2 0.10.6",
  "thiserror",
  "tracing",
- "trin-utils",
+ "trin-utils 0.1.1-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "url",
 ]
 
@@ -2126,7 +2114,7 @@ dependencies = [
  "sea-orm",
  "tokio",
  "tracing",
- "trin-utils",
+ "trin-utils 0.1.1-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "url",
  "web3",
 ]
@@ -2151,8 +2139,8 @@ dependencies = [
  "tokio",
  "tower-http",
  "tracing",
- "trin-types",
- "trin-utils",
+ "trin-types 0.1.1-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "trin-utils 0.1.1-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2386,12 +2374,6 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-
-[[package]]
-name = "hex-literal"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
 
 [[package]]
 name = "hkdf"
@@ -2931,16 +2913,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce2bd4c29270e724d3eaadf7bdc8700af4221fc0ed771b855eadcd1b98d52851"
 dependencies = [
  "primitive-types 0.10.1",
- "tiny-keccak 2.0.2",
-]
-
-[[package]]
-name = "keccak-hash"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b286e6b663fb926e1eeb68528e69cb70ed46c6d65871a21b2215ae8154c6d3c"
-dependencies = [
- "primitive-types 0.12.1",
  "tiny-keccak 2.0.2",
 ]
 
@@ -5402,7 +5374,7 @@ dependencies = [
  "eth_trie",
  "ethereum-types 0.12.1",
  "ethnum",
- "keccak-hash 0.8.0",
+ "keccak-hash",
  "lazy_static",
  "quickcheck",
  "rand 0.8.5",
@@ -5421,7 +5393,48 @@ dependencies = [
  "tokio",
  "tree_hash",
  "tree_hash_derive",
- "trin-utils",
+ "trin-utils 0.1.1-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ureq",
+ "url",
+ "validator",
+]
+
+[[package]]
+name = "trin-types"
+version = "0.1.1-alpha.1"
+source = "git+https://github.com/ethereum/trin#6c7f8017fceb8788cb57b143b85cfc3282b8b333"
+dependencies = [
+ "anyhow",
+ "base64 0.13.1",
+ "bytes",
+ "clap 2.34.0",
+ "discv5 0.2.2",
+ "eth2_ssz",
+ "eth2_ssz_derive",
+ "eth2_ssz_types",
+ "eth_trie",
+ "ethereum-types 0.12.1",
+ "ethnum",
+ "keccak-hash",
+ "lazy_static",
+ "quickcheck",
+ "rand 0.8.5",
+ "rlp 0.5.2",
+ "rlp-derive",
+ "serde",
+ "serde-hex",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.10.6",
+ "sha3 0.9.1",
+ "snap",
+ "stremio-serde-hex",
+ "structopt",
+ "thiserror",
+ "tokio",
+ "tree_hash",
+ "tree_hash_derive",
+ "trin-utils 0.1.1-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "ureq",
  "url",
  "validator",
@@ -5432,6 +5445,20 @@ name = "trin-utils"
 version = "0.1.1-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69c4d5e151a7bc9c69bb706c5b46cd39c8c12a8e7be877d38b5c3830ff87e8e1"
+dependencies = [
+ "ansi_term",
+ "atty",
+ "hex",
+ "rand 0.8.5",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "trin-utils"
+version = "0.1.1-alpha.1"
+source = "git+https://github.com/ethereum/trin#6c7f8017fceb8788cb57b143b85cfc3282b8b333"
 dependencies = [
  "ansi_term",
  "atty",

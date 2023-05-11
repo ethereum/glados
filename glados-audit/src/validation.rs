@@ -1,4 +1,4 @@
-use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
+use ethportal_api::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
 use tracing::warn;
 use trin_types::content_value::{ContentValue, HistoryContentValue};
 use trin_utils::bytes::hex_encode;

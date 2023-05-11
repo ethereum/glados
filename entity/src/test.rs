@@ -4,7 +4,7 @@ use std::str::FromStr;
 #[cfg(test)]
 use chrono::prelude::*;
 use ethereum_types::{H256, U256};
-use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
+use ethportal_api::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
 use sea_orm::entity::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Database, DbConn, DbErr, EntityTrait, NotSet, PaginatorTrait,

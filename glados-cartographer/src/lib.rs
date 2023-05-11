@@ -3,9 +3,7 @@ use clap::Parser;
 use cli::Args;
 use ethereum_types::H256;
 use ethportal_api::HistoryNetworkApiClient;
-use ethportal_api::{
-    jsonrpsee::http_client::HttpClientBuilder, types::discv5::NodeId as EthPortalNodeId,
-};
+use ethportal_api::{jsonrpsee::http_client::HttpClientBuilder, NodeId as EthPortalNodeId};
 use sea_orm::DatabaseConnection;
 use tokio::time::{self, Duration};
 use tracing::{debug, info};
