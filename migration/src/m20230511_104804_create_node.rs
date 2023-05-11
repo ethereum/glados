@@ -7,14 +7,23 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .alter_table(
-                Table::alter()
+            .create_table(
+                Table::create()
                     .table(Node::Table)
-                    .add_column_if_not_exists(
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(Node::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Node::NodeId).binary_len(32).not_null())
+                    .col(
                         ColumnDef::new(Node::NodeIdHigh)
                             .big_unsigned()
                             .not_null()
-                            .default(0), // u64
+                            .default(0),
                     )
                     .to_owned(),
             )
@@ -22,21 +31,16 @@ impl MigrationTrait for Migration {
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Replace the sample below with your own migration scripts
         manager
-            .alter_table(
-                Table::alter()
-                    .table(Node::Table)
-                    .drop_column(Node::NodeIdHigh)
-                    .to_owned(),
-            )
+            .drop_table(Table::drop().table(Node::Table).to_owned())
             .await
     }
 }
 
-/// Learn more at https://docs.rs/sea-query#iden
 #[derive(Iden)]
 enum Node {
     Table,
+    Id,
+    NodeId,
     NodeIdHigh,
 }
