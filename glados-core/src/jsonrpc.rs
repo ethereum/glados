@@ -139,7 +139,6 @@ pub struct JsonRPCResult {
 pub struct NodeInfo {
     pub enr: String,
     pub nodeId: String,
-    pub ip: String,
 }
 
 #[allow(non_snake_case)]
