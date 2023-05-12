@@ -10,42 +10,49 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(Content::Table)
-                    .if_not_exists()
                     .col(
                         ColumnDef::new(Content::Id)
-                            .integer() // i32
+                            .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(Content::ProtocolId)
-                            .integer() // i32
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(Content::ContentKey)
-                            .binary_len(33) // 33 bytes
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(Content::ContentId)
-                            .binary_len(32) // 32 bytes
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(Content::ProtocolId).unsigned().not_null())
+                    .col(ColumnDef::new(Content::ContentKey).binary().not_null())
+                    .col(ColumnDef::new(Content::ContentId).binary_len(32).not_null())
                     .col(
                         ColumnDef::new(Content::FirstAvailableAt)
-                            .timestamp_with_time_zone() // chrono::DateTime<FixedOffset>
+                            .timestamp_with_time_zone()
                             .not_null(),
                     )
                     .index(
                         Index::create()
                             .unique()
                             .name("idx-unique-id-protocol-and-key") // Triple column constraint
-                            .col(Content::ProtocolId) // 1
-                            .col(Content::ContentKey) // 2
-                            .col(Content::ContentId), // 3
+                            .col(Content::ProtocolId)
+                            .col(Content::ContentKey)
+                            .col(Content::ContentId),
                     )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .name("idx-unique-protocol-and-key")
+                            .col(Content::ProtocolId)
+                            .col(Content::ContentKey),
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .name("idx-unique-protocol-and-id")
+                            .col(Content::ProtocolId)
+                            .col(Content::ContentId),
+                    )
+                    // .index(
+                    //     Index::create()
+                    //         .name("idx-available-and-protocol")
+                    //         .col(Content::FirstAvailableAt)
+                    //         .col(Content::ProtocolId),
+                    // )
                     .to_owned(),
             )
             .await

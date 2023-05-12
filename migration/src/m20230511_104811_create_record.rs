@@ -10,7 +10,6 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(Record::Table)
-                    .if_not_exists()
                     .col(
                         ColumnDef::new(Record::Id)
                             .integer()
@@ -19,8 +18,27 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(Record::NodeId).integer().not_null())
+                    .index(
+                        Index::create()
+                            .unique()
+                            .name("idx_record-node_id-seqno")
+                            .col(Record::NodeId)
+                            .col(Record::SequenceNumber),
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .name("idx_record-node_id")
+                            .col(Record::NodeId),
+                    )
                     .col(ColumnDef::new(Record::Raw).text().not_null())
                     .col(ColumnDef::new(Record::SequenceNumber).integer().not_null())
+                    .index(
+                        Index::create()
+                            .unique()
+                            .name("idx_record-seq_no")
+                            .col(Record::SequenceNumber),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk-enr_id-node_id")

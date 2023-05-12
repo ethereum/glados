@@ -10,7 +10,6 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(Node::Table)
-                    .if_not_exists()
                     .col(
                         ColumnDef::new(Node::Id)
                             .integer()
@@ -19,6 +18,12 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(Node::NodeId).binary_len(32).not_null())
+                    .index(
+                        Index::create()
+                            .unique()
+                            .name("idx_node-node_id")
+                            .col(Node::NodeId),
+                    )
                     .col(
                         ColumnDef::new(Node::NodeIdHigh)
                             .big_unsigned()

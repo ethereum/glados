@@ -10,7 +10,6 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(ClientInfo::Table)
-                    .if_not_exists()
                     .col(
                         ColumnDef::new(ClientInfo::Id)
                             .integer()

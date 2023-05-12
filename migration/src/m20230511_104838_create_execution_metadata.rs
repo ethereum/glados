@@ -10,7 +10,6 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(ExecutionMetadata::Table)
-                    .if_not_exists()
                     .col(
                         ColumnDef::new(ExecutionMetadata::Id)
                             .integer()
@@ -27,6 +26,12 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(ExecutionMetadata::BlockNumber)
                             .integer()
                             .not_null(),
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .name("idx_execution-block_number")
+                            .col(ExecutionMetadata::BlockNumber),
                     )
                     .foreign_key(
                         ForeignKey::create()

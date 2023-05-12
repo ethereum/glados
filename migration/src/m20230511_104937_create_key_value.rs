@@ -10,7 +10,6 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(KeyValue::Table)
-                    .if_not_exists()
                     .col(
                         ColumnDef::new(KeyValue::Id)
                             .integer()
@@ -20,6 +19,18 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(KeyValue::RecordId).integer().not_null())
                     .col(ColumnDef::new(KeyValue::Key).binary().not_null())
+                    .index(
+                        Index::create()
+                            .unique()
+                            .name("idx-unique-record-and-key")
+                            .col(Record::Id)
+                            .col(KeyValue::Key),
+                    )
+                    // .index(
+                    //     Index::create()
+                    //         .name("idx-unique-keyvalue_key")
+                    //         .col(KeyValue::Key),
+                    // )
                     .col(ColumnDef::new(KeyValue::Value).binary().not_null())
                     .foreign_key(
                         ForeignKey::create()

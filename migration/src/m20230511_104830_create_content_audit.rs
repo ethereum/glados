@@ -10,7 +10,6 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(ContentAudit::Table)
-                    .if_not_exists()
                     .col(
                         ColumnDef::new(ContentAudit::Id)
                             .integer()
@@ -37,6 +36,12 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(ColumnDef::new(ContentAudit::Result).integer().not_null())
+                    // .index(
+                    //     Index::create()
+                    //         .name("idx-created-and-result")
+                    //         .col(ContentAudit::CreatedAt)
+                    //         .col(ContentAudit::Result),
+                    // )
                     .col(
                         ColumnDef::new(ContentAudit::ClientInfo)
                             .integer()
