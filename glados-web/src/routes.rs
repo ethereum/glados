@@ -1,12 +1,10 @@
-use std::sync::Arc;
-use std::{fmt::Display, io};
-
 use axum::{
     extract::{Extension, Path},
     http::StatusCode,
     response::IntoResponse,
 };
 use chrono::{DateTime, Duration, Utc};
+use entity::client_info;
 use entity::{
     content,
     content_audit::{self, AuditResult},
@@ -14,19 +12,21 @@ use entity::{
 };
 use ethportal_api::types::content_key::{HistoryContentKey, OverlayContentKey};
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect,
+    ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, ModelTrait, PaginatorTrait,
+    QueryFilter, QueryOrder, QuerySelect,
 };
+use std::sync::Arc;
+use std::{fmt::Display, io};
 use tracing::error;
 use tracing::info;
 use trin_utils::bytes::{hex_decode, hex_encode};
 
-use crate::state::State;
 use crate::templates::{
     ContentAuditDetailTemplate, ContentDashboardTemplate, ContentIdDetailTemplate,
     ContentIdListTemplate, ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate,
     HtmlTemplate, IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate,
 };
+use crate::{state::State, templates::AuditTuple};
 
 //
 // Routes
@@ -216,56 +216,15 @@ pub async fn content_dashboard(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let recent_content_model: Vec<(content::Model, Vec<content_audit::Model>)> =
-        content::Entity::find()
-            .order_by_desc(content::Column::FirstAvailableAt)
-            .find_with_related(content_audit::Entity)
-            .filter(content_audit::Column::Result.is_not_null())
-            .limit(KEY_COUNT)
-            .all(&state.database_connection)
-            .await
-            .map_err(|e| {
-                error!(key.count=KEY_COUNT, err=?e, "Could not look up latest keys with audits");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+    let audits_of_recent_content: Vec<AuditTuple> =
+        get_audits_for_recent_content(KEY_COUNT, &state.database_connection).await?;
 
-    let recent_audits_model: Vec<(content_audit::Model, Vec<content::Model>)> =
-        content_audit::Entity::find()
-            .order_by_desc(content_audit::Column::CreatedAt)
-            .find_with_related(content::Entity)
-            .limit(KEY_COUNT)
-            .all(&state.database_connection)
-            .await
-            .map_err(|e| {
-                error!(key.count=KEY_COUNT, err=?e, "Could not look up recent audits");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-
-    let recent_audit_success_model: Vec<(content_audit::Model, Vec<content::Model>)> =
-        content_audit::Entity::find()
-            .order_by_desc(content_audit::Column::CreatedAt)
-            .find_with_related(content::Entity)
-            .filter(content_audit::Column::Result.eq(AuditResult::Success))
-            .limit(KEY_COUNT)
-            .all(&state.database_connection)
-            .await
-            .map_err(|e| {
-                error!(key.count=KEY_COUNT, err=?e, "Could not look up recent successful audits");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-
-    let recent_audit_failure_model: Vec<(content_audit::Model, Vec<content::Model>)> =
-        content_audit::Entity::find()
-            .order_by_desc(content_audit::Column::CreatedAt)
-            .find_with_related(content::Entity)
-            .filter(content_audit::Column::Result.eq(AuditResult::Failure))
-            .limit(KEY_COUNT)
-            .all(&state.database_connection)
-            .await
-            .map_err(|e| {
-                error!(key.count=KEY_COUNT, err=?e, "Could not look up recent failed audits");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+    let recent_audits: Vec<AuditTuple> =
+        get_recent_audits(KEY_COUNT, &state.database_connection).await?;
+    let recent_audit_successes: Vec<AuditTuple> =
+        get_recent_audit_successes(KEY_COUNT, &state.database_connection).await?;
+    let recent_audit_failures: Vec<AuditTuple> =
+        get_recent_audit_failures(KEY_COUNT, &state.database_connection).await?;
 
     let template = ContentDashboardTemplate {
         stats: [
@@ -274,65 +233,137 @@ pub async fn content_dashboard(
             get_audit_stats(Period::Week, &state.database_connection).await?,
         ],
         contentid_list,
-        recent_content: content_model_to_display(recent_content_model)?,
-        recent_audits: audit_model_to_display(recent_audits_model)?,
-        recent_audit_successes: audit_model_to_display(recent_audit_success_model)?,
-        recent_audit_failures: audit_model_to_display(recent_audit_failure_model)?,
+        audits_of_recent_content,
+        recent_audits,
+        recent_audit_successes,
+        recent_audit_failures,
     };
     Ok(HtmlTemplate(template))
 }
 
-/// Summary of a model result (content with vector of audits).
-fn content_model_to_display(
-    content_model: Vec<(content::Model, Vec<content_audit::Model>)>,
-) -> Result<Vec<(content::Model, content_audit::Model)>, StatusCode> {
-    content_model
-        .into_iter()
-        .map(|content| {
-            let content_data = content.0;
-            let mut audits = content.1;
-            audits.sort_by(|a, b| a.id.cmp(&b.id));
-            let latest_audit: Result<entity::content_audit::Model, StatusCode> = audits
-                .into_iter()
-                // Choose the latest audit.
-                .rev()
-                .next()
-                // We know there will beat least one audit because we filtered nulls out after joining.
-                .ok_or_else(|| {
-                    error!("Expected content to have at least one associated audit.");
-                    StatusCode::INTERNAL_SERVER_ERROR
-                });
-            match latest_audit {
-                Ok(a) => Ok((content_data, a)),
-                Err(e) => Err(e),
-            }
-        })
-        .collect()
+pub async fn get_recent_audits(
+    num_audits: u64,
+    conn: &DatabaseConnection,
+) -> Result<Vec<AuditTuple>, StatusCode> {
+    let recent_audits: Vec<content_audit::Model> = content_audit::Entity::find()
+        .order_by_desc(content_audit::Column::CreatedAt)
+        .limit(num_audits)
+        .all(conn)
+        .await
+        .map_err(|e| {
+            error!(key.count=num_audits, err=?e, "Could not look up recent audits");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    get_audit_tuples_from_audit_models(recent_audits, conn).await
 }
 
-/// Summary of a model result (audit with vector of content).
-fn audit_model_to_display(
-    content_model: Vec<(content_audit::Model, Vec<content::Model>)>,
-) -> Result<Vec<(content::Model, content_audit::Model)>, StatusCode> {
-    content_model
-        .into_iter()
-        .map(|content| {
-            let audit = content.0;
-            let content_data = content.1;
-            let content_data: Result<entity::content::Model, StatusCode> = content_data
-                .into_iter()
-                .next()
-                // We know there will be one content because audits only have one one content foreign key.
-                .ok_or_else(|| {
-                    error!("Expected audit to have at least one associated content.");
-                    StatusCode::INTERNAL_SERVER_ERROR
-                });
-            match content_data {
-                Ok(c) => Ok((c, audit)),
-                Err(e) => Err(e),
+pub async fn get_audits_for_recent_content(
+    num_content: u64,
+    conn: &DatabaseConnection,
+) -> Result<Vec<AuditTuple>, StatusCode> {
+    // Get recent content that has been audited along with the audit.
+    // Done in a single query and then split using unzip.
+    let (recent_content, audits): (Vec<content::Model>, Vec<content_audit::Model>) =
+        content::Entity::find()
+            .order_by_desc(content::Column::FirstAvailableAt)
+            .find_with_related(content_audit::Entity)
+            .filter(content_audit::Column::Result.is_not_null())
+            .limit(num_content)
+            .all(conn)
+            .await
+            .map_err(|e| {
+                error!(key.count=num_content, err=?e, "Could not look up latest keys with audits");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?
+            .into_iter()
+            .filter_map(|(content, audits)| audits.into_iter().next().map(|audit| (content, audit)))
+            .unzip();
+
+    let client_info = audits
+            .load_one(client_info::Entity, conn)
+            .await
+            .map_err(|e| {
+                error!(key.count=audits.len(), err=?e, "Could not look up client info for recent audits");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+
+    let audit_tuples: Vec<AuditTuple> = itertools::izip!(audits, recent_content, client_info)
+        .filter_map(|(audit, con, info)| {
+            if let (c, Some(i)) = (con, info) {
+                Some((audit, c, i))
+            } else {
+                None
             }
         })
-        .collect()
+        .collect();
+
+    Ok(audit_tuples)
+}
+
+pub async fn get_recent_audit_successes(
+    num_audits: u64,
+    conn: &DatabaseConnection,
+) -> Result<Vec<AuditTuple>, StatusCode> {
+    let recent_audits: Vec<content_audit::Model> = content_audit::Entity::find()
+        .order_by_desc(content_audit::Column::CreatedAt)
+        .filter(content_audit::Column::Result.eq(AuditResult::Success))
+        .limit(num_audits)
+        .all(conn)
+        .await
+        .map_err(|e| {
+            error!(key.count=num_audits, err=?e, "Could not look up recent audit successes");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    get_audit_tuples_from_audit_models(recent_audits, conn).await
+}
+
+pub async fn get_recent_audit_failures(
+    num_audits: u64,
+    conn: &DatabaseConnection,
+) -> Result<Vec<AuditTuple>, StatusCode> {
+    let recent_audits: Vec<content_audit::Model> = content_audit::Entity::find()
+        .order_by_desc(content_audit::Column::CreatedAt)
+        .filter(content_audit::Column::Result.eq(AuditResult::Failure))
+        .limit(num_audits)
+        .all(conn)
+        .await
+        .map_err(|e| {
+            error!(key.count=num_audits, err=?e, "Could not look up recent audit failures");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    get_audit_tuples_from_audit_models(recent_audits, conn).await
+}
+
+pub async fn get_audit_tuples_from_audit_models(
+    audits: Vec<content_audit::Model>,
+    conn: &DatabaseConnection,
+) -> Result<Vec<AuditTuple>, StatusCode> {
+    // Get the corresponding content for each audit.
+    let content: Vec<Option<content::Model>> =
+        audits.load_one(content::Entity, conn).await.map_err(|e| {
+            error!(key.count=audits.len(), err=?e, "Could not look up content for recent audits");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    // Get the corresponding client_info for each audit.
+    let client_info: Vec<Option<client_info::Model>> = audits
+        .load_one(client_info::Entity, conn)
+        .await
+        .map_err(|e| {
+            error!(key.count=audits.len(), err=?e, "Could not look up client info for recent audits");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    // Zip up the audits with their corresponding content and client info.
+    // Filter out the (ideally zero) audits that do not have content or client info.
+    let audit_tuples: Vec<AuditTuple> = itertools::izip!(audits, content, client_info)
+        .filter_map(|(audit, content, info)| content.map(|c| (audit, c, info.unwrap())))
+        .collect();
+
+    Ok(audit_tuples)
 }
 
 pub async fn contentid_list(

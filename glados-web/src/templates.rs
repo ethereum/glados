@@ -4,7 +4,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 
-use entity::{content, content_audit, key_value, node, record};
+use entity::{client_info, content, content_audit, key_value, node, record};
 
 use crate::routes::Stats;
 
@@ -39,15 +39,17 @@ pub struct EnrDetailTemplate {
     pub key_value_list: Vec<key_value::Model>,
 }
 
+pub type AuditTuple = (content_audit::Model, content::Model, client_info::Model);
+
 #[derive(Template)]
 #[template(path = "content_dashboard.html")]
 pub struct ContentDashboardTemplate {
     pub stats: [Stats; 3],
     pub contentid_list: Vec<content::Model>,
-    pub recent_content: Vec<(content::Model, content_audit::Model)>,
-    pub recent_audits: Vec<(content::Model, content_audit::Model)>,
-    pub recent_audit_successes: Vec<(content::Model, content_audit::Model)>,
-    pub recent_audit_failures: Vec<(content::Model, content_audit::Model)>,
+    pub audits_of_recent_content: Vec<AuditTuple>,
+    pub recent_audits: Vec<AuditTuple>,
+    pub recent_audit_successes: Vec<AuditTuple>,
+    pub recent_audit_failures: Vec<AuditTuple>,
 }
 
 #[derive(Template)]

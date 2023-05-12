@@ -223,7 +223,8 @@ impl PortalClient {
             client_url: portal_client_url.clone(),
         };
 
-        let client_info = &api.get_client_version().await?;
+        let client_info = api.get_client_version().await?;
+        let stripped_client_info = strip_quotes(client_info);
 
         let node_info = &api.get_node_info().await?;
 
@@ -235,7 +236,7 @@ impl PortalClient {
 
         Ok(PortalClient {
             api,
-            client_info: client_info.to_string(),
+            client_info: stripped_client_info.to_string(),
             enr,
         })
     }
@@ -451,5 +452,30 @@ fn distance_log2(distance: U256) -> Result<u16, JsonRpcError> {
         Ok(0)
     } else {
         Ok((256 - distance.leading_zeros()).try_into()?)
+    }
+}
+
+fn strip_quotes(client_info: String) -> String {
+    if client_info.starts_with('"') && client_info.ends_with('"') {
+        let mut chars = client_info.chars();
+        chars.next();
+        chars.next_back();
+        chars.as_str().to_owned()
+    } else {
+        client_info
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::strip_quotes;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case("\"test\"", "test")]
+    #[case("test", "test")]
+    fn test_strip_quotes(#[case] original: String, #[case] expected: String) {
+        assert_eq!(strip_quotes(original), expected);
     }
 }

@@ -2100,6 +2100,7 @@ dependencies = [
  "jsonrpsee",
  "jsonrpsee-core",
  "jsonrpsee-types",
+ "rstest",
  "rustc-hex",
  "serde",
  "serde_json",
@@ -2146,6 +2147,7 @@ dependencies = [
  "ethereum-types 0.14.1",
  "ethportal-api",
  "glados-core",
+ "itertools",
  "migration",
  "sea-orm",
  "tokio",
@@ -4064,6 +4066,19 @@ checksum = "e33d7b2abe0c340d8797fe2907d3f20d3b5ea5908683618bfe80df7f621f672a"
 dependencies = [
  "proc-macro2",
  "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "rstest"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2288c66aeafe3b2ed227c981f364f9968fa952ef0b30e84ada4486e7ee24d00a"
+dependencies = [
+ "cfg-if 1.0.0",
+ "proc-macro2",
+ "quote",
+ "rustc_version 0.4.0",
  "syn 1.0.109",
 ]
 

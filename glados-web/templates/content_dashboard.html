@@ -57,10 +57,12 @@
                         <th scope="col">Content ID</th>
                         <th scope="col">Content first available</th>
                         <th scope="col">Audited at</th>
+                        <th scope="col">Client</th>
+
                     </tr>
                 </thead>
                 <tbody>
-                    {% for (content, audit) in recent_content %}
+                    {% for (audit, content, client_info) in audits_of_recent_content %}
                     <tr>
                         <td>{% if audit.trace != "" %}<a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a>{% else %}
                             {{ audit.id }}{% endif %}</td>
@@ -72,6 +74,7 @@
                         <td><a href="/content/id/{{content.id_as_hex()}}/">{{ content.id_as_hex_short() }}</a></td>
                         <td>{{ content.available_at_local_time() }}</td>
                         <td>{{ audit.created_at_local_time() }}</td>
+                        <td>{{ client_info.version_info }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -121,10 +124,11 @@
                         <th scope="col">Content ID</th>
                         <th scope="col">Content first available</th>
                         <th scope="col">Audited at</th>
+                        <th scope="col">Client</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for (content, audit) in recent_audits %}
+                    {% for (audit, content, client_info) in recent_audits %}
                     <tr>
                         <td>{% if audit.trace != "" %}<a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a>{% else %}
                             {{ audit.id }}{% endif %}</td>
@@ -136,6 +140,7 @@
                         <td><a href="/content/id/{{content.id_as_hex()}}/">{{ content.id_as_hex_short() }}</a></td>
                         <td>{{ content.available_at_local_time() }}</td>
                         <td>{{ audit.created_at_local_time() }}</td>
+                        <td>{{ client_info.version_info }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -158,10 +163,11 @@
                         <th scope="col">Content ID</th>
                         <th scope="col">Content first available</th>
                         <th scope="col">Audited at</th>
+                        <th scope="col">Client</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for (content, audit) in recent_audit_successes %}
+                    {% for (audit, content, client_info) in recent_audit_successes %}
                     <tr>
                         <td>{% if audit.trace != "" %}<a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a>{% else %}
                             {{ audit.id }}{% endif %}</td>
@@ -173,6 +179,7 @@
                         <td><a href="/content/id/{{content.id_as_hex()}}/">{{ content.id_as_hex_short() }}</a></td>
                         <td>{{ content.available_at_local_time() }}</td>
                         <td>{{ audit.created_at_local_time() }}</td>
+                        <td>{{ client_info.version_info }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -195,10 +202,11 @@
                         <th scope="col">Content ID</th>
                         <th scope="col">Content first available</th>
                         <th scope="col">Audited at</th>
+                        <th scope="col">Client</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for (content, audit) in recent_audit_failures %}
+                    {% for (audit, content, client_info) in recent_audit_failures %}
                     <tr>
                         <td>{% if audit.trace != "" %}<a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a>{% else %}
                             {{ audit.id }}{% endif %}</td>
@@ -210,6 +218,7 @@
                         <td><a href="/content/id/{{content.id_as_hex()}}/">{{ content.id_as_hex_short() }}</a></td>
                         <td>{{ content.available_at_local_time() }}</td>
                         <td>{{ audit.created_at_local_time() }}</td>
+                        <td>{{ client_info.version_info }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

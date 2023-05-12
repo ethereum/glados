@@ -124,8 +124,6 @@ pub async fn get_or_create(node_id: NodeId, conn: &DatabaseConnection) -> Result
     let raw_node_id = U256::from_big_endian(node_id.raw().as_slice());
     let node_id_high: i64 = (raw_node_id >> 193).as_u64().try_into().unwrap();
 
-    // let client_info = client_info::get_or_create(,&conn)
-
     let node_id_model = ActiveModel {
         id: NotSet,
         node_id: Set(node_id.raw().into()),
