@@ -1,4 +1,4 @@
-use clap::{ArgAction, Parser, ValueEnum};
+use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use entity::content_audit::SelectionStrategy;
 
 const DEFAULT_DB_URL: &str = "sqlite::memory:";
@@ -42,6 +42,18 @@ pub struct Args {
     pub random_strategy_weight: u8,
     #[arg(short, long, action(ArgAction::Append))]
     pub portal_client: Vec<String>,
+    #[command(subcommand)]
+    pub subcommand: Option<Command>,
+}
+
+#[derive(Subcommand, Debug, Eq, PartialEq, Clone)]
+pub enum Command {
+    /// Run a single audit for a specific, previously audited content key.
+    Audit {
+        content_key: String,
+        portal_client: String,
+        database_url: String,
+    },
 }
 
 impl Default for Args {
@@ -55,6 +67,7 @@ impl Default for Args {
             random_strategy_weight: 1,
             strategy: None,
             portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
+            subcommand: None,
         }
     }
 }

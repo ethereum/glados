@@ -32,6 +32,9 @@ pub async fn start_audit_selection_task(
         SelectionStrategy::SelectOldestUnaudited => {
             select_oldest_unaudited_content_for_audit(tx, conn).await
         }
+        SelectionStrategy::SpecificContentKey => {
+            error!("SpecificContentKey is not a valid audit strategy")
+        }
     }
 }
 
@@ -464,7 +467,6 @@ mod tests {
             // Check that strategy only yields expected keys.
             assert!(expected_key_ids.contains(&key_model.id));
             checked_ids.insert(key_model.id);
-            println!("ids checked {}", checked_ids.len());
             if checked_ids.len() == CHANNEL_SIZE {
                 break;
             }

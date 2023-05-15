@@ -8,7 +8,6 @@ use std::{
 };
 
 use anyhow::Result;
-use clap::Parser;
 use cli::Args;
 use ethportal_api::types::content_key::{HistoryContentKey, OverlayContentKey};
 use sea_orm::DatabaseConnection;
@@ -48,8 +47,7 @@ pub struct AuditConfig {
 }
 
 impl AuditConfig {
-    pub async fn from_args() -> Result<AuditConfig> {
-        let args = Args::parse();
+    pub async fn from_args(args: Args) -> Result<AuditConfig> {
         let parallelism = available_parallelism()?.get() as u8;
         if args.concurrency > parallelism {
             warn!(
@@ -82,6 +80,7 @@ impl AuditConfig {
                 SelectionStrategy::Random => args.random_strategy_weight,
                 SelectionStrategy::Failed => args.failed_strategy_weight,
                 SelectionStrategy::SelectOldestUnaudited => args.oldest_strategy_weight,
+                SelectionStrategy::SpecificContentKey => 0,
             };
             weights.insert(strat.clone(), weight);
         }
@@ -92,7 +91,6 @@ impl AuditConfig {
             info!("Found a portal client with type: {:?}", client.client_info);
             portal_clients.push(client);
         }
-
         Ok(AuditConfig {
             database_url: args.database_url,
             strategies,
@@ -115,6 +113,27 @@ pub struct TaskChannel {
     strategy: SelectionStrategy,
     weight: u8,
     rx: Receiver<AuditTask>,
+}
+
+pub async fn run_glados_command(conn: DatabaseConnection, command: cli::Command) -> Result<()> {
+    let (content_key, portal_client) = match command {
+        cli::Command::Audit {
+            content_key,
+            portal_client,
+            ..
+        } => (content_key, portal_client),
+    };
+    let content_key = trin_utils::bytes::hex_decode(&content_key).unwrap();
+    let content_key = HistoryContentKey::try_from(content_key).unwrap();
+
+    let task = AuditTask {
+        strategy: SelectionStrategy::SpecificContentKey,
+        content_key,
+    };
+    let client = PortalClient::from(portal_client).await?;
+    let active_threads = Arc::new(AtomicU8::new(0));
+    perform_single_audit(active_threads, task, client.clone(), conn).await;
+    Ok(())
 }
 
 pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {

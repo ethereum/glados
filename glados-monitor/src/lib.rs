@@ -141,7 +141,7 @@ async fn store_block_keys(block_number: i32, block_hash: &[u8; 32], conn: &Datab
     store_content_key(&receipts, "block_receipts", block_number, conn).await;
 }
 
-/// Accepts a ContentKey from the Historyand attempts to store it.
+/// Accepts a ContentKey from the History and attempts to store it.
 ///
 /// Errors are logged.
 async fn store_content_key<T: OverlayContentKey>(

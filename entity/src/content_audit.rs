@@ -34,6 +34,8 @@ pub enum SelectionStrategy {
     /// 1. Not yet audited.
     /// 2. Sorted by date entered into glados database (oldest first).
     SelectOldestUnaudited = 3,
+    /// Perform a single audit for a previously audited content key.
+    SpecificContentKey = 4,
 }
 
 impl AuditResult {
@@ -156,6 +158,7 @@ impl SelectionStrategy {
             SelectionStrategy::Random => "Random".to_string(),
             SelectionStrategy::Failed => "Failed".to_string(),
             SelectionStrategy::SelectOldestUnaudited => "Select Oldest Unaudited".to_string(),
+            SelectionStrategy::SpecificContentKey => "Specific Content Key".to_string(),
         }
     }
 }
