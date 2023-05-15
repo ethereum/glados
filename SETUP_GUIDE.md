@@ -15,9 +15,8 @@ This example uses the following:
 
 All commands are issued on `machine-a` unless otherwise stated.
 
-Important notes:
+Important note:
 - If `glados-monitor`, `glados-audit` and `glados-web` are in `sqlite::memory:`-mode they won't be able to share a database. In-memory databases are ephemeral and only persist as long as the process is running.
-- `glados-audit` does not support `http` communication (must start `trin` with `--web3-transport ipc`)
 
 Start Ethereum execution client (not covered here).
 
@@ -49,7 +48,7 @@ Start `glados-audit`, which takes monitoring data from the glados database,
 checks if `trin` has it, then records the outcome in the glados database.
 ```command
 ~/glados$ RUST_LOG=debug cargo run -p glados-audit -- \
-    --ipc-path /path/to/trin-jsonrpc.ipc \
+    --portal-client ipc:////path/to/trin-jsonrpc.ipc \
     --database-url sqlite:////path/to/database.sqlite
 ```
 Start `glados-web`, which takes audit data from the glados database and serves
