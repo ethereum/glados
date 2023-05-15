@@ -48,7 +48,7 @@ Start `glados-audit`, which takes monitoring data from the glados database,
 checks if `trin` has it, then records the outcome in the glados database.
 ```command
 ~/glados$ RUST_LOG=debug cargo run -p glados-audit -- \
-    --portal-client /path/to/trin-jsonrpc.ipc \
+    --portal-client ipc:////path/to/trin-jsonrpc.ipc \
     --database-url sqlite:////path/to/database.sqlite
 ```
 Start `glados-web`, which takes audit data from the glados database and serves
