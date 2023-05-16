@@ -1,1 +1,7 @@
 /target
+
+# where jetbrains IDE's store stuff
+.idea
+
+# most popular python virtual enviroment folder name
+venv
