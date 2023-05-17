@@ -71,8 +71,7 @@ pub async fn network_dashboard(
         .map_err(|e| {
             error!(key.count=KEY_COUNT, err=?e, "Could not look up recent ENR records");
             StatusCode::INTERNAL_SERVER_ERROR
-        })
-        .unwrap()
+        })?
         .iter()
         .filter_map(|(r, n)| {
             n.as_ref()
@@ -101,22 +100,22 @@ pub async fn node_detail(
     Path(node_id_hex): Path<String>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<HtmlTemplate<NodeDetailTemplate>, StatusCode> {
-    const KEY_COUNT: u64 = 50;
     let node_id = hex_decode(&node_id_hex).map_err(|e| {
         error!(node_id=node_id_hex, err=?e, "Could not decode proved node_id");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    let node_model = node::Entity::find()
+    let node_model = match node::Entity::find()
         .filter(node::Column::NodeId.eq(node_id))
         .one(&state.database_connection)
         .await
         .map_err(|e| {
             error!(node_id=node_id_hex, err=?e, "No record found for node_id");
             StatusCode::NOT_FOUND
-        })
-        .unwrap()
-        .unwrap();
-    let enr_list = record::Entity::find()
+        })? {
+        None => panic!("No record found for node_id"),
+        Some(res) => res,
+    };
+    let enr_list = match record::Entity::find()
         .filter(record::Column::NodeId.eq(node_model.id))
         .order_by_desc(record::Column::SequenceNumber)
         .all(&state.database_connection)
@@ -124,10 +123,15 @@ pub async fn node_detail(
         .map_err(|e| {
             error!(node.node_id=node_id_hex, node.db_id=node_model.id, err=?e, "Error looking up ENRs");
             StatusCode::NOT_FOUND
-        })?;
-    let closest_node_list = node::closest_xor(node_model.get_node_id(), &state.database_connection)
-        .await
-        .unwrap();
+        }) {
+        Ok(res) => res,
+        Err(err) => panic!("{}", err),
+    };
+    let closest_node_list =
+        match node::closest_xor(node_model.get_node_id(), &state.database_connection).await {
+            Ok(res) => res,
+            Err(err) => panic!("{}", err),
+        };
 
     let latest_enr = enr_list.get(0).cloned();
 
@@ -159,22 +163,22 @@ pub async fn enr_detail(
     Path((node_id_hex, enr_seq)): Path<(String, u64)>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<HtmlTemplate<EnrDetailTemplate>, StatusCode> {
-    const KEY_COUNT: u64 = 50;
     let node_id = hex_decode(&node_id_hex).map_err(|e| {
         error!(node_id=node_id_hex, err=?e, "Could not decode proved node_id");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    let node_model = node::Entity::find()
+    let node_model = match node::Entity::find()
         .filter(node::Column::NodeId.eq(node_id))
         .one(&state.database_connection)
         .await
         .map_err(|e| {
             error!(node_id=node_id_hex, err=?e, "No record found for node_id");
             StatusCode::NOT_FOUND
-        })
-        .unwrap()
-        .unwrap();
-    let enr = record::Entity::find()
+        })? {
+        None => panic!("No record found for node_id"),
+        Some(node_model) => node_model,
+    };
+    let enr = match record::Entity::find()
         .filter(record::Column::NodeId.eq(node_model.id.to_owned()))
         .filter(record::Column::SequenceNumber.eq(enr_seq))
         .one(&state.database_connection)
@@ -182,17 +186,21 @@ pub async fn enr_detail(
         .map_err(|e| {
             error!(enr.node_id=node_id_hex, enr.seq=enr_seq, err=?e, "No record found for node_id and sequence_number");
             StatusCode::NOT_FOUND
-        })
-        .unwrap()
-        .unwrap();
-    let key_value_list = key_value::Entity::find()
+        })? {
+        None => panic!("No enr is found for node_id and sequence_number"),
+        Some(enr) => enr,
+    };
+    let key_value_list = match key_value::Entity::find()
         .filter(key_value::Column::RecordId.eq(enr.id))
         .all(&state.database_connection)
         .await
         .map_err(|e| {
             error!(enr.id=enr.id, enr.node_id=node_id_hex, err=?e, "Error looking up key_value pairs");
             StatusCode::NOT_FOUND
-        })?;
+        }) {
+        Ok(res) => res,
+        Err(err) => panic!("{}", err),
+    };
 
     let template = EnrDetailTemplate {
         node: node_model,
@@ -206,7 +214,7 @@ pub async fn content_dashboard(
     Extension(state): Extension<Arc<State>>,
 ) -> Result<HtmlTemplate<ContentDashboardTemplate>, StatusCode> {
     const KEY_COUNT: u64 = 20;
-    let contentid_list = content::Entity::find()
+    let contentid_list = match content::Entity::find()
         .order_by_desc(content::Column::FirstAvailableAt)
         .limit(KEY_COUNT)
         .all(&state.database_connection)
@@ -214,10 +222,13 @@ pub async fn content_dashboard(
         .map_err(|e| {
             error!(key.count=KEY_COUNT, err=?e, "Could not look up latest keys");
             StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        }) {
+        Ok(res) => res,
+        Err(err) => panic!("{}", err),
+    };
 
     let recent_content_model: Vec<(content::Model, Vec<content_audit::Model>)> =
-        content::Entity::find()
+        match content::Entity::find()
             .order_by_desc(content::Column::FirstAvailableAt)
             .find_with_related(content_audit::Entity)
             .filter(content_audit::Column::Result.is_not_null())
@@ -227,7 +238,10 @@ pub async fn content_dashboard(
             .map_err(|e| {
                 error!(key.count=KEY_COUNT, err=?e, "Could not look up latest keys with audits");
                 StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+            }) {
+            Ok(res) => res,
+            Err(err) => panic!("{}", err),
+        };
 
     let recent_audits_model: Vec<(content_audit::Model, Vec<content::Model>)> =
         content_audit::Entity::find()
@@ -471,20 +485,27 @@ pub async fn contentaudit_detail(
     Path(audit_id): Path<String>,
     Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
-    let audit_id = audit_id.parse::<i32>().unwrap();
+    let audit_id = match audit_id.parse::<i32>() {
+        Ok(res) => res,
+        Err(err) => panic!("{}", err),
+    };
     info!("Audit ID: {}", audit_id);
-    let audit = content_audit::Entity::find_by_id(audit_id)
+    let audit = match content_audit::Entity::find_by_id(audit_id)
         .one(&state.database_connection)
         .await
-        .unwrap()
-        .expect("No audit found");
+    {
+        Ok(res) => res.expect("No audit found"),
+        Err(err) => panic!("{}", err),
+    };
 
-    let content = audit
+    let content = match audit
         .find_related(content::Entity)
         .one(&state.database_connection)
         .await
-        .unwrap()
-        .expect("Failed to get audit content key");
+    {
+        Ok(res) => res.expect("Failed to get audit content key"),
+        Err(err) => panic!("{}", err),
+    };
 
     let template = ContentAuditDetailTemplate { audit, content };
     HtmlTemplate(template)

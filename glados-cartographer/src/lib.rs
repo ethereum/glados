@@ -88,9 +88,12 @@ async fn perform_dht_audits(config: CartographerConfig, conn: DatabaseConnection
 /// applies even if the audit process encounters an error.
 async fn perform_dht_probe(config: &CartographerConfig, conn: &DatabaseConnection) {
     let client = match &config.transport {
-        TransportConfig::HTTP(http_url) => HttpClientBuilder::default()
-            .build(http_url.as_ref())
-            .unwrap(),
+        TransportConfig::HTTP(http_url) => {
+            match HttpClientBuilder::default().build(http_url.as_ref()) {
+                Ok(client) => client,
+                Err(err) => panic!("{}", err),
+            }
+        }
         TransportConfig::IPC(_path) => panic!("not implemented"),
     };
 
@@ -102,10 +105,13 @@ async fn perform_dht_probe(config: &CartographerConfig, conn: &DatabaseConnectio
         "Performing RFN on DHT",
     );
 
-    let found_enrs = client
+    let found_enrs = match client
         .recursive_find_nodes(EthPortalNodeId(target.raw()))
         .await
-        .unwrap();
+    {
+        Ok(res) => res,
+        Err(err) => panic!("{}", err),
+    };
 
     info!(
         target.node_id=?target_display,
@@ -114,12 +120,14 @@ async fn perform_dht_probe(config: &CartographerConfig, conn: &DatabaseConnectio
     );
 
     for enr in found_enrs {
-        record::get_or_create(&enr, conn).await.unwrap();
+        if let Err(err) = record::get_or_create(&enr, conn).await {
+            panic!("{}", err);
+        }
         info!(
-        enr.base64=?enr,
-        enr.seq=?enr.seq(),
-        enr.node_id=?H256::from(enr.node_id().raw()),
-        "ENR saved",
+            enr.base64=?enr,
+            enr.seq=?enr.seq(),
+            enr.node_id=?H256::from(enr.node_id().raw()),
+            "ENR saved",
         );
     }
 }

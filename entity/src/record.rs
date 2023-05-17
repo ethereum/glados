@@ -42,9 +42,7 @@ impl Related<super::node::Entity> for Entity {
 impl ActiveModelBehavior for ActiveModel {}
 
 pub async fn get_or_create(enr: &Enr, conn: &DatabaseConnection) -> Result<Model> {
-    let node_id = super::node::get_or_create(enr.node_id().into(), conn)
-        .await
-        .unwrap();
+    let node_id = super::node::get_or_create(enr.node_id().into(), conn).await?;
 
     // First try to lookup an existing entry.
     if let Some(enr_model) = Entity::find()
@@ -62,14 +60,12 @@ pub async fn get_or_create(enr: &Enr, conn: &DatabaseConnection) -> Result<Model
         id: NotSet,
         node_id: Set(node_id.id),
         raw: Set(enr.to_base64()),
-        sequence_number: Set(enr.seq().try_into().unwrap()),
+        sequence_number: Set(enr.seq().try_into()?),
     };
-    let enr_model = enr_model_unsaved.insert(conn).await.unwrap();
+    let enr_model = enr_model_unsaved.insert(conn).await?;
 
     for (enr_key, enr_value) in enr.iter() {
-        super::key_value::get_or_create(enr_model.id, enr_key, &enr_value.to_vec(), conn)
-            .await
-            .unwrap();
+        super::key_value::get_or_create(enr_model.id, enr_key, &enr_value.to_vec(), conn).await?;
     }
 
     Ok(enr_model)

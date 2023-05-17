@@ -26,7 +26,7 @@ async fn setup_database() -> Result<DbConn, DbErr> {
 
     let conn: DbConn = Database::connect(&base_url).await?;
 
-    Migrator::up(&conn, None).await.unwrap();
+    Migrator::up(&conn, None).await?;
 
     println!("Setup database schema");
 

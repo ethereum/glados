@@ -254,7 +254,7 @@ impl PortalApi {
                     Some(json_params) => {
                         let mut param_aggregator = rpc_params!();
                         for json_param in json_params {
-                            param_aggregator.insert(json_param).unwrap()
+                            param_aggregator.insert(json_param)?
                         }
                         param_aggregator
                     }

@@ -85,7 +85,7 @@ pub async fn closest_xor(
     conn: &DatabaseConnection,
 ) -> Result<Vec<ModelWithDistance>> {
     let raw_node_id = U256::from_big_endian(node_id.raw().as_slice());
-    let node_id_high: i64 = (raw_node_id >> 193).as_u64().try_into().unwrap();
+    let node_id_high: i64 = (raw_node_id >> 193).as_u64().try_into()?;
 
     let distance_expression = match conn.get_database_backend() {
         DatabaseBackend::Sqlite => Expr::cust_with_values(
@@ -122,7 +122,7 @@ pub async fn get_or_create(node_id: NodeId, conn: &DatabaseConnection) -> Result
 
     // If no record exists, create one and return it
     let raw_node_id = U256::from_big_endian(node_id.raw().as_slice());
-    let node_id_high: i64 = (raw_node_id >> 193).as_u64().try_into().unwrap();
+    let node_id_high: i64 = (raw_node_id >> 193).as_u64().try_into()?;
 
     // let client_info = client_info::get_or_create(,&conn)
 

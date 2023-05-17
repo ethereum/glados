@@ -33,14 +33,13 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
     let nodes_with_zero_high_bits = entity::node::Entity::find()
         .filter(entity::node::Column::NodeIdHigh.eq(0))
         .all(&config.database_connection)
-        .await
-        .unwrap();
+        .await?;
 
     info!(rows=?nodes_with_zero_high_bits.len(), "One time migration: setting high bits for node model");
 
     for node_model in nodes_with_zero_high_bits {
         let raw_node_id = U256::from_big_endian(node_model.get_node_id().raw().as_slice());
-        let node_id_high: i64 = (raw_node_id >> 193).as_u64().try_into().unwrap();
+        let node_id_high: i64 = (raw_node_id >> 193).as_u64().try_into()?;
 
         let mut node: entity::node::ActiveModel = node_model.into();
         let previous_value = node.node_id_high;
