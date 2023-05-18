@@ -2,14 +2,12 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use cli::Args;
 use ethereum_types::H256;
+use ethportal_api::jsonrpsee::http_client::HttpClientBuilder;
+use ethportal_api::types::node_id::NodeId;
 use ethportal_api::HistoryNetworkApiClient;
-use ethportal_api::{
-    jsonrpsee::http_client::HttpClientBuilder, types::discv5::NodeId as EthPortalNodeId,
-};
 use sea_orm::DatabaseConnection;
 use tokio::time::{self, Duration};
 use tracing::{debug, info};
-use trin_types::node_id::NodeId;
 
 use entity::record;
 use glados_core::jsonrpc::TransportConfig;
@@ -103,7 +101,7 @@ async fn perform_dht_probe(config: &CartographerConfig, conn: &DatabaseConnectio
     );
 
     let found_enrs = client
-        .recursive_find_nodes(EthPortalNodeId(target.raw()))
+        .recursive_find_nodes(NodeId(target.raw()))
         .await
         .unwrap();
 

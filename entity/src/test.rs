@@ -5,13 +5,13 @@ use std::str::FromStr;
 use chrono::prelude::*;
 use ethereum_types::{H256, U256};
 use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
+#[cfg(test)]
+use ethportal_api::types::node_id::NodeId;
 use sea_orm::entity::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Database, DbConn, DbErr, EntityTrait, NotSet, PaginatorTrait,
     QueryFilter, Set,
 };
-#[cfg(test)]
-use trin_types::node_id::NodeId;
 
 use ethportal_api::utils::bytes::hex_encode;
 use migration::{Migrator, MigratorTrait};

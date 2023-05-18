@@ -1,7 +1,7 @@
 use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
+use ethportal_api::types::content_value::{ContentValue, HistoryContentValue};
 use ethportal_api::utils::bytes::hex_encode;
 use tracing::warn;
-use trin_types::content_value::{ContentValue, HistoryContentValue};
 
 /// Checks that content bytes correspond to a correctly formatted
 /// content value.
