@@ -97,15 +97,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ansi_term"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
-dependencies = [
- "winapi",
-]
-
-[[package]]
 name = "anstream"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -734,21 +725,6 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "2.34.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0610544180c38b88101fecf2dd634b174a62eef6946f84dfc6a7127512b381c"
-dependencies = [
- "ansi_term",
- "atty",
- "bitflags",
- "strsim 0.8.0",
- "textwrap 0.11.0",
- "unicode-width",
- "vec_map",
-]
-
-[[package]]
-name = "clap"
 version = "3.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71655c45cb9845d3270c9d6df84ebe72b4dad3c2ba3f7023ad47c144e4e473a5"
@@ -758,7 +734,7 @@ dependencies = [
  "clap_lex 0.2.4",
  "indexmap",
  "once_cell",
- "textwrap 0.16.0",
+ "textwrap",
 ]
 
 [[package]]
@@ -782,7 +758,7 @@ dependencies = [
  "anstyle",
  "bitflags",
  "clap_lex 0.4.1",
- "strsim 0.10.0",
+ "strsim",
 ]
 
 [[package]]
@@ -1084,7 +1060,7 @@ dependencies = [
  "ident_case",
  "proc-macro2",
  "quote",
- "strsim 0.10.0",
+ "strsim",
  "syn 1.0.109",
 ]
 
@@ -1440,8 +1416,6 @@ dependencies = [
  "sea-orm",
  "sea-query",
  "tokio",
- "trin-types",
- "trin-utils",
 ]
 
 [[package]]
@@ -1578,7 +1552,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "219675dc3593f2b99d5cc22d8bbaf956059a66b7eb69444d8502e2b9f5199814"
 dependencies = [
  "hashbrown 0.3.1",
- "keccak-hash 0.8.0",
+ "keccak-hash",
  "log",
  "parking_lot 0.8.0",
  "rlp 0.3.0",
@@ -1697,12 +1671,15 @@ checksum = "0198b9d0078e0f30dedc7acbb21c974e838fc8fae3ee170128658a98cb2c1c04"
 
 [[package]]
 name = "ethportal-api"
-version = "0.1.6"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d9b657a02a5bc595f54df26888c52e8e22d13c0b4466427b0afd4e1951e7080"
+checksum = "65446aa83e7a598e7305ca79db45e82401686fa546766f00874f8ecf50e8d68f"
 dependencies = [
+ "anyhow",
+ "base64 0.13.1",
  "bytes",
- "enr 0.7.0",
+ "clap 4.2.1",
+ "discv5 0.2.2",
  "eth2_ssz",
  "eth2_ssz_derive",
  "eth2_ssz_types",
@@ -1710,16 +1687,27 @@ dependencies = [
  "ethereum-types 0.12.1",
  "ethnum",
  "hex",
- "hex-literal",
  "jsonrpsee",
- "keccak-hash 0.10.0",
+ "keccak-hash",
+ "lazy_static",
+ "quickcheck",
  "rand 0.8.5",
  "rlp 0.5.2",
  "rlp-derive",
  "serde",
- "serde-hex",
  "serde_json",
+ "serde_yaml",
  "sha2 0.10.6",
+ "sha3 0.9.1",
+ "snap",
+ "stremio-serde-hex",
+ "thiserror",
+ "tokio",
+ "tree_hash",
+ "tree_hash_derive",
+ "ureq",
+ "url",
+ "validator",
 ]
 
 [[package]]
@@ -2061,8 +2049,6 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
- "trin-types",
- "trin-utils",
  "url",
  "web3",
 ]
@@ -2083,7 +2069,6 @@ dependencies = [
  "sea-orm",
  "tokio",
  "tracing",
- "trin-types",
  "url",
 ]
 
@@ -2106,7 +2091,6 @@ dependencies = [
  "sha2 0.10.6",
  "thiserror",
  "tracing",
- "trin-utils",
  "url",
 ]
 
@@ -2126,7 +2110,6 @@ dependencies = [
  "sea-orm",
  "tokio",
  "tracing",
- "trin-utils",
  "url",
  "web3",
 ]
@@ -2151,8 +2134,6 @@ dependencies = [
  "tokio",
  "tower-http",
  "tracing",
- "trin-types",
- "trin-utils",
 ]
 
 [[package]]
@@ -2386,12 +2367,6 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-
-[[package]]
-name = "hex-literal"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
 
 [[package]]
 name = "hkdf"
@@ -2931,16 +2906,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce2bd4c29270e724d3eaadf7bdc8700af4221fc0ed771b855eadcd1b98d52851"
 dependencies = [
  "primitive-types 0.10.1",
- "tiny-keccak 2.0.2",
-]
-
-[[package]]
-name = "keccak-hash"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b286e6b663fb926e1eeb68528e69cb70ed46c6d65871a21b2215ae8154c6d3c"
-dependencies = [
- "primitive-types 0.12.1",
  "tiny-keccak 2.0.2",
 ]
 
@@ -4494,17 +4459,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde-hex"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca37e3e4d1b39afd7ff11ee4e947efae85adfddf4841787bfa47c470e96dc26d"
-dependencies = [
- "array-init",
- "serde",
- "smallvec 0.6.14",
-]
-
-[[package]]
 name = "serde_derive"
 version = "1.0.158"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4904,39 +4858,9 @@ dependencies = [
 
 [[package]]
 name = "strsim"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
-
-[[package]]
-name = "strsim"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
-
-[[package]]
-name = "structopt"
-version = "0.3.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c6b5c64445ba8094a6ab0c3cd2ad323e07171012d9c98b0b15651daf1787a10"
-dependencies = [
- "clap 2.34.0",
- "lazy_static",
- "structopt-derive",
-]
-
-[[package]]
-name = "structopt-derive"
-version = "0.4.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcb5ae327f9cc13b68763b5749770cb9e048a99bd9dfdfa58d0cf05d5f64afe0"
-dependencies = [
- "heck 0.3.3",
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
 
 [[package]]
 name = "subtle"
@@ -5010,15 +4934,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be55cf8942feac5c765c2c993422806843c9a9a45d4d5c407ad6dd2ea95eb9b6"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "textwrap"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
-dependencies = [
- "unicode-width",
 ]
 
 [[package]]
@@ -5386,63 +5301,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "trin-types"
-version = "0.1.1-alpha.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a926388451bb3243f8d76f4fbf358c664b587007b1a5585b465d13b0633abe20"
-dependencies = [
- "anyhow",
- "base64 0.13.1",
- "bytes",
- "clap 2.34.0",
- "discv5 0.2.2",
- "eth2_ssz",
- "eth2_ssz_derive",
- "eth2_ssz_types",
- "eth_trie",
- "ethereum-types 0.12.1",
- "ethnum",
- "keccak-hash 0.8.0",
- "lazy_static",
- "quickcheck",
- "rand 0.8.5",
- "rlp 0.5.2",
- "rlp-derive",
- "serde",
- "serde-hex",
- "serde_json",
- "serde_yaml",
- "sha2 0.10.6",
- "sha3 0.9.1",
- "snap",
- "stremio-serde-hex",
- "structopt",
- "thiserror",
- "tokio",
- "tree_hash",
- "tree_hash_derive",
- "trin-utils",
- "ureq",
- "url",
- "validator",
-]
-
-[[package]]
-name = "trin-utils"
-version = "0.1.1-alpha.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69c4d5e151a7bc9c69bb706c5b46cd39c8c12a8e7be877d38b5c3830ff87e8e1"
-dependencies = [
- "ansi_term",
- "atty",
- "hex",
- "rand 0.8.5",
- "thiserror",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "try-lock"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5658,12 +5516,6 @@ name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
-
-[[package]]
-name = "vec_map"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
 name = "version_check"
