@@ -10,13 +10,13 @@ use std::{
 use anyhow::Result;
 use cli::Args;
 use ethportal_api::types::content_key::{HistoryContentKey, OverlayContentKey};
+use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use sea_orm::DatabaseConnection;
 use tokio::{
     sync::mpsc::{self, Receiver},
     time::{sleep, Duration},
 };
 use tracing::{debug, error, info, warn};
-use trin_utils::bytes::hex_encode;
 
 use entity::{
     client_info, content,
@@ -123,7 +123,7 @@ pub async fn run_glados_command(conn: DatabaseConnection, command: cli::Command)
             ..
         } => (content_key, portal_client),
     };
-    let content_key = trin_utils::bytes::hex_decode(&content_key).unwrap();
+    let content_key = hex_decode(&content_key).unwrap();
     let content_key = HistoryContentKey::try_from(content_key).unwrap();
 
     let task = AuditTask {

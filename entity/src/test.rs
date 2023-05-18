@@ -13,8 +13,8 @@ use sea_orm::{
 #[cfg(test)]
 use trin_types::node_id::NodeId;
 
+use ethportal_api::utils::bytes::hex_encode;
 use migration::{Migrator, MigratorTrait};
-use trin_utils::bytes::hex_encode;
 
 use crate::content::SubProtocol;
 use crate::content_audit::SelectionStrategy;

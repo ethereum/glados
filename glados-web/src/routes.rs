@@ -13,13 +13,13 @@ use entity::{
     execution_metadata, key_value, node, record,
 };
 use ethportal_api::types::content_key::{HistoryContentKey, OverlayContentKey};
+use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect,
 };
 use tracing::error;
 use tracing::info;
-use trin_utils::bytes::{hex_decode, hex_encode};
 
 use crate::state::State;
 use crate::templates::{
