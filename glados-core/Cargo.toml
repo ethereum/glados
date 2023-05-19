@@ -26,3 +26,6 @@ jsonrpsee = { version = "0.16.2", features = ["client"] }
 jsonrpsee-types = "0.16.2"
 rustc-hex = "2.1.0"
 jsonrpsee-core = "0.16.2"
+
+[dev-dependencies]
+rstest = "0.11.0"
