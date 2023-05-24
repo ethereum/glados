@@ -18,16 +18,15 @@ use serde_json::{
     value::{to_raw_value, RawValue},
     Value,
 };
-use trin_utils::bytes::hex_encode;
 
+use ethportal_api::utils::bytes::{hex_decode, hex_encode, ByteUtilsError};
 use thiserror::Error;
 use tracing::error;
-use trin_utils::bytes::{hex_decode, ByteUtilsError};
 #[cfg(windows)]
 use uds_windows::UnixStream;
 use url::Url;
 
-use ethportal_api::types::discv5::Enr;
+use ethportal_api::types::enr::Enr;
 
 /// Configuration details for connection to a Portal network node.
 #[derive(Clone, Debug)]

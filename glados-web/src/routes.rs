@@ -11,6 +11,7 @@ use entity::{
     execution_metadata, key_value, node, record,
 };
 use ethportal_api::types::content_key::{HistoryContentKey, OverlayContentKey};
+use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, ModelTrait, PaginatorTrait,
     QueryFilter, QueryOrder, QuerySelect,
@@ -19,7 +20,6 @@ use std::sync::Arc;
 use std::{fmt::Display, io};
 use tracing::error;
 use tracing::info;
-use trin_utils::bytes::{hex_decode, hex_encode};
 
 use crate::templates::{
     ContentAuditDetailTemplate, ContentDashboardTemplate, ContentIdDetailTemplate,

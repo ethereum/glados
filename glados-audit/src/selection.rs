@@ -281,13 +281,13 @@ mod tests {
         node,
     };
     use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
+    use ethportal_api::types::node_id::NodeId;
     use migration::{DbErr, Migrator, MigratorTrait};
     use sea_orm::{
         ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, Database, DbConn, EntityTrait,
         QueryFilter, Set,
     };
     use tokio::sync::mpsc::channel;
-    use trin_types::node_id::NodeId;
 
     use super::*;
 

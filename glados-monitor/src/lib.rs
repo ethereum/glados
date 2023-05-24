@@ -6,10 +6,10 @@ use ethportal_api::types::content_key::{
     BlockBodyKey, BlockHeaderKey, BlockReceiptsKey, EpochAccumulatorKey, HistoryContentKey,
     OverlayContentKey,
 };
+use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use sea_orm::DatabaseConnection;
 use tokio::{fs::read_dir, sync::mpsc, time::sleep};
 use tracing::{debug, error, info, warn};
-use trin_utils::bytes::{hex_decode, hex_encode};
 use web3::types::{BlockId, H256};
 
 use entity::{content, execution_metadata};
