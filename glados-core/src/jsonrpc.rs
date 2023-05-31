@@ -1,13 +1,12 @@
-use std::io::Write;
 #[cfg(unix)]
-use std::os::unix::net::UnixStream;
+use reth_ipc::client::{IpcClientBuilder, IpcError};
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use ethereum_types::{H256, U256};
 use ethportal_api::types::content_key::OverlayContentKey;
-use jsonrpc::Request;
 use jsonrpsee::{
+    async_client::Client,
     core::{client::ClientT, params::ArrayParams},
     http_client::{HttpClient, HttpClientBuilder},
     rpc_params,
@@ -22,8 +21,6 @@ use serde_json::{
 use ethportal_api::utils::bytes::{hex_decode, hex_encode, ByteUtilsError};
 use thiserror::Error;
 use tracing::error;
-#[cfg(windows)]
-use uds_windows::UnixStream;
 use url::Url;
 
 use ethportal_api::types::enr::Enr;
@@ -60,8 +57,7 @@ pub struct HttpClientManager {
 
 /// IPC-based transport for connecting to a Portal network node.
 pub struct IpcClientManager {
-    stream: UnixStream,
-    request_id: u64,
+    client: Client,
 }
 
 #[derive(Error, Debug)]
@@ -73,7 +69,11 @@ pub enum JsonRpcError {
     Empty,
 
     #[error("HTTP client error")]
-    HttpClient(#[from] jsonrpsee_core::Error),
+    HttpClient(#[from] jsonrpsee::core::error::Error),
+
+    #[cfg(unix)]
+    #[error("IPC client error")]
+    IpcClient(#[from] IpcError),
 
     /// Portal network defines "0x" as the response for absent content.
     #[error("expected special 0x 'content absent' message for content request, received HTTP response with None result")]
@@ -246,52 +246,26 @@ impl PortalApi {
         method: &str,
         params: Option<Vec<Box<RawValue>>>,
     ) -> Result<PortalResponse, JsonRpcError> {
-        let transport = PortalApi::parse_client_url(self.client_url.clone())?;
+        let transport = PortalApi::parse_client_url(self.client_url.clone()).await?;
+        // jsonrpsee requires the conversion of `Option<Vec<Box<RawValue>>>` to `ArrayParams`
+        let array_params: ArrayParams = match params {
+            Some(json_params) => {
+                let mut param_aggregator = rpc_params!();
+                for json_param in json_params {
+                    param_aggregator.insert(json_param).unwrap()
+                }
+                param_aggregator
+            }
+            None => rpc_params!(),
+        };
         match transport {
             Transport::HTTP(http) => {
-                // jsonrpsee requires the conversion of `Option<Vec<Box<RawValue>>>` to `ArrayParams`
-                let array_params: ArrayParams = match params {
-                    Some(json_params) => {
-                        let mut param_aggregator = rpc_params!();
-                        for json_param in json_params {
-                            param_aggregator.insert(json_param).unwrap()
-                        }
-                        param_aggregator
-                    }
-                    None => rpc_params!(),
-                };
                 let val: Value = http.client.request(method, array_params).await?;
                 Ok(PortalResponse::from_value(val))
             }
-            Transport::IPC(mut ipc) => {
-                let request = match &params {
-                    Some(raw_params) => Request {
-                        method,
-                        params: raw_params,
-                        id: serde_json::json!(ipc.request_id),
-                        jsonrpc: Some("2.0"),
-                    },
-                    None => Request {
-                        method,
-                        params: &[],
-                        id: serde_json::json!(ipc.request_id),
-                        jsonrpc: Some("2.0"),
-                    },
-                };
-                // Manually increment the request id after using it in the request.
-                ipc.request_id += 1;
-
-                let data = serde_json::to_vec(&request)?;
-                ipc.stream.write_all(&data)?;
-                ipc.stream.flush()?;
-
-                let response: JsonRPCResult =
-                    serde_json::Deserializer::from_reader(ipc.stream.try_clone()?)
-                        .into_iter()
-                        .next()
-                        // Empty response should only happen when they immediately send EOF
-                        .ok_or(JsonRpcError::Empty)??;
-                Ok(PortalResponse::from_value(response.result))
+            Transport::IPC(ipc) => {
+                let val: Value = ipc.client.request(method, array_params).await?;
+                Ok(PortalResponse::from_value(val))
             }
         }
     }
@@ -388,7 +362,7 @@ impl PortalApi {
         }
     }
 
-    pub fn parse_client_url(client_url: String) -> Result<Transport, JsonRpcError> {
+    pub async fn parse_client_url(client_url: String) -> Result<Transport, JsonRpcError> {
         let http_prefix = "http://";
         let ipc_prefix = "ipc:///";
         if client_url.strip_prefix(http_prefix).is_some() {
@@ -396,15 +370,12 @@ impl PortalApi {
                 client: HttpClientBuilder::default().build(client_url)?,
             }))
         } else if let Some(ipc_path) = client_url.strip_prefix(ipc_prefix) {
-            Ok(Transport::IPC(IpcClientManager {
-                stream: UnixStream::connect(ipc_path).map_err(|e| {
-                    JsonRpcError::OpenFileFailed {
-                        source: e,
-                        path: ipc_path.into(),
-                    }
-                })?,
-                request_id: 0,
-            }))
+            #[cfg(unix)]
+            return Ok(Transport::IPC(IpcClientManager {
+                client: IpcClientBuilder::default().build(ipc_path).await?,
+            }));
+            #[cfg(windows)]
+            panic!("Reth doesn't support Unix Domain Sockets IPC for windows, use http")
         } else {
             Err(JsonRpcError::ClientURL { url: client_url })
         }
