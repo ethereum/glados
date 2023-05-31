@@ -264,16 +264,31 @@ async fn perform_single_audit(
         client.url = client.api.client_url.clone(),
         "auditing content",
     );
-    let content_response = match client.api.get_content(&task.content_key).await {
-        Ok(c) => c,
-        Err(e) => {
-            error!(
-                content.key=hex_encode(task.content_key.to_bytes()),
-                err=?e,
-                "Problem requesting content from Portal node."
-            );
-            active_threads.fetch_sub(1, Ordering::Relaxed);
-            return;
+    let (content_response, trace) = if client.clone().is_trin() {
+        match client.api.get_content_with_trace(&task.content_key).await {
+            Ok(c) => c,
+            Err(e) => {
+                error!(
+                    content.key=hex_encode(task.content_key.to_bytes()),
+                    err=?e,
+                    "Problem requesting content with trace from Portal node."
+                );
+                active_threads.fetch_sub(1, Ordering::Relaxed);
+                return;
+            }
+        }
+    } else {
+        match client.api.get_content(&task.content_key).await {
+            Ok(c) => (c, "".to_owned()),
+            Err(e) => {
+                error!(
+                    content.key=hex_encode(task.content_key.to_bytes()),
+                    err=?e,
+                    "Problem requesting content from Portal node."
+                );
+                active_threads.fetch_sub(1, Ordering::Relaxed);
+                return;
+            }
         }
     };
 
@@ -332,7 +347,7 @@ async fn perform_single_audit(
         node_id,
         audit_result,
         task.strategy,
-        "".to_owned(),
+        trace,
         &conn,
     )
     .await
