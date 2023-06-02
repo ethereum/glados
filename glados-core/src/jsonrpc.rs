@@ -238,6 +238,10 @@ impl PortalClient {
             enr,
         })
     }
+
+    pub fn is_trin(self) -> bool {
+        self.client_info.contains("trin")
+    }
 }
 
 impl PortalApi {
