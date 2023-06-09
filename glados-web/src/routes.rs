@@ -571,34 +571,32 @@ async fn get_audit_stats(period: Period, conn: &DatabaseConnection) -> Result<St
     let cutoff = period.cutoff_time();
     let new_content = content::Entity::find()
         .filter(content::Column::FirstAvailableAt.gt(cutoff))
-        .all(conn)
+        .count(conn)
         .await
         .map_err(|e| {
             error!(err=?e, "Could not look up audit stats");
             StatusCode::INTERNAL_SERVER_ERROR
-        })?
-        .len() as u32;
+        })? as u32;
 
     let total_audits = content_audit::Entity::find()
         .filter(content_audit::Column::CreatedAt.gt(cutoff))
-        .all(conn)
+        .count(conn)
         .await
         .map_err(|e| {
             error!(err=?e, "Could not look up audit stats");
             StatusCode::INTERNAL_SERVER_ERROR
-        })?
-        .len() as u32;
+        })? as u32;
 
     let total_passes = content_audit::Entity::find()
         .filter(content_audit::Column::CreatedAt.gt(cutoff))
         .filter(content_audit::Column::Result.eq(AuditResult::Success))
-        .all(conn)
+        .count(conn)
         .await
         .map_err(|e| {
             error!(err=?e, "Could not look up audit stats");
             StatusCode::INTERNAL_SERVER_ERROR
-        })?
-        .len() as u32;
+        })? as u32;
+
     let total_failures = total_audits - total_passes;
     let audits_per_minute = (60 * total_audits)
         .checked_div(period.total_seconds())
