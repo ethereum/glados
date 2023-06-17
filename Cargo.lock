@@ -230,6 +230,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde",
+ "serde_json",
  "syn 1.0.109",
  "toml",
 ]
@@ -1401,6 +1402,7 @@ checksum = "cf56acd72bb22d2824e66ae8e9e5ada4d0de17a69c7fd35569dde2ada8ec9116"
 dependencies = [
  "base64 0.13.1",
  "bytes",
+ "ed25519-dalek 2.0.0",
  "hex",
  "k256 0.13.1",
  "log",
@@ -2184,6 +2186,7 @@ dependencies = [
  "itertools",
  "migration",
  "sea-orm",
+ "serde",
  "tokio",
  "tower-http",
  "tracing",

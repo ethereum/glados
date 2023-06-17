@@ -4,7 +4,7 @@ use axum::{
     response::IntoResponse,
 };
 use chrono::{DateTime, Duration, Utc};
-use entity::client_info;
+use entity::{census, census_node, client_info};
 use entity::{
     content,
     content_audit::{self, AuditResult},
@@ -12,10 +12,14 @@ use entity::{
 };
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
+use migration::{Alias, JoinType};
+use sea_orm::sea_query::{Expr, Query, SeaRc};
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, ModelTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect,
+    ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, DynIden, EntityTrait,
+    FromQueryResult, LoaderTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
 };
+use serde::Serialize;
+use std::fmt::Formatter;
 use std::sync::Arc;
 use std::{fmt::Display, io};
 use tracing::error;
@@ -35,8 +39,87 @@ pub async fn handle_error(_err: io::Error) -> impl IntoResponse {
     (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong...")
 }
 
-pub async fn root(Extension(_state): Extension<Arc<State>>) -> impl IntoResponse {
-    let template = IndexTemplate {};
+#[derive(FromQueryResult, Serialize)]
+pub struct PieChartResult {
+    pub client_name: String,
+    pub client_count: i32,
+}
+
+impl Display for PieChartResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Client Name {} Client Count {}",
+            self.client_name, self.client_count
+        )
+    }
+}
+
+pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
+    let left_table: DynIden = SeaRc::new(Alias::new("left_table"));
+    let right_table: DynIden = SeaRc::new(Alias::new("right_table"));
+    let builder = state.database_connection.get_database_backend();
+    let mut client_count = Query::select();
+    client_count
+        .expr_as(
+            Expr::cust("CAST(COUNT(*) AS INT)"),
+            Alias::new("client_count"),
+        )
+        .expr_as(
+            Expr::cust("CAST(COALESCE(substr(value, 2, 1), 'unknown') AS TEXT)"),
+            Alias::new("client_name"),
+        )
+        .from_subquery(
+            Query::select()
+                .expr_as(
+                    Expr::col(census_node::Column::RecordId),
+                    Alias::new("record_id"),
+                )
+                .from(census_node::Entity)
+                .from_subquery(
+                    Query::select()
+                        .from(census::Entity)
+                        .expr_as(Expr::max(Expr::col(census::Column::Id)), Alias::new("id"))
+                        .take(),
+                    Alias::new("max_census_id"),
+                )
+                .and_where(
+                    Expr::col((Alias::new("census_node"), Alias::new("census_id")))
+                        .eq(Expr::col((Alias::new("max_census_id"), Alias::new("id")))),
+                )
+                .take(),
+            left_table.clone(),
+        )
+        .join_subquery(
+            JoinType::LeftJoin,
+            Query::select()
+                .from(key_value::Entity)
+                .column(key_value::Column::RecordId)
+                .column(key_value::Column::Value)
+                .and_where(
+                    Expr::cust(if builder == DbBackend::Sqlite {
+                        "CAST(key AS TEXT)"
+                    } else {
+                        "convert_from(key, 'UTF8')"
+                    })
+                    // Uses a CAST to TEXT on the table in order to do a comparison to the binary value, both SQLite and Postgres both need to be casted in order to be compared
+                    .eq("c"),
+                )
+                .take(),
+            right_table.clone(),
+            Expr::col((left_table.clone(), Alias::new("record_id")))
+                .equals((right_table.clone(), Alias::new("record_id"))),
+        )
+        .add_group_by([Expr::cust("substr(value, 2, 1)")]);
+
+    let pie_chart_data = PieChartResult::find_by_statement(builder.build(&client_count))
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+
+    let template = IndexTemplate {
+        pie_chart_client_count: pie_chart_data,
+    };
     HtmlTemplate(template)
 }
 
@@ -214,36 +297,22 @@ pub async fn content_dashboard(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    // Run queries for content dashboard data concurrently
-    let (
-        audits_of_recent_content,
-        recent_audits,
-        recent_audit_successes,
-        recent_audit_failures,
-        hour_stats,
-        day_stats,
-        week_stats,
-    ) = tokio::join!(
-        get_audits_for_recent_content(KEY_COUNT, &state.database_connection),
-        get_recent_audits(KEY_COUNT, &state.database_connection),
-        get_recent_audit_successes(KEY_COUNT, &state.database_connection),
-        get_recent_audit_failures(KEY_COUNT, &state.database_connection),
-        get_audit_stats(Period::Hour, &state.database_connection),
-        get_audit_stats(Period::Day, &state.database_connection),
-        get_audit_stats(Period::Week, &state.database_connection),
-    );
+    let audits_of_recent_content: Vec<AuditTuple> =
+        get_audits_for_recent_content(KEY_COUNT, &state.database_connection).await?;
 
-    // Get results from queries
-    let audits_of_recent_content: Vec<AuditTuple> = audits_of_recent_content?;
-    let recent_audits: Vec<AuditTuple> = recent_audits?;
-    let recent_audit_successes: Vec<AuditTuple> = recent_audit_successes?;
-    let recent_audit_failures: Vec<AuditTuple> = recent_audit_failures?;
-    let hour_stats = hour_stats?;
-    let day_stats = day_stats?;
-    let week_stats = week_stats?;
+    let recent_audits: Vec<AuditTuple> =
+        get_recent_audits(KEY_COUNT, &state.database_connection).await?;
+    let recent_audit_successes: Vec<AuditTuple> =
+        get_recent_audit_successes(KEY_COUNT, &state.database_connection).await?;
+    let recent_audit_failures: Vec<AuditTuple> =
+        get_recent_audit_failures(KEY_COUNT, &state.database_connection).await?;
 
     let template = ContentDashboardTemplate {
-        stats: [hour_stats, day_stats, week_stats],
+        stats: [
+            get_audit_stats(Period::Hour, &state.database_connection).await?,
+            get_audit_stats(Period::Day, &state.database_connection).await?,
+            get_audit_stats(Period::Week, &state.database_connection).await?,
+        ],
         contentid_list,
         audits_of_recent_content,
         recent_audits,
@@ -293,12 +362,12 @@ pub async fn get_audits_for_recent_content(
             .unzip();
 
     let client_info = audits
-            .load_one(client_info::Entity, conn)
-            .await
-            .map_err(|e| {
-                error!(key.count=audits.len(), err=?e, "Could not look up client info for recent audits");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+        .load_one(client_info::Entity, conn)
+        .await
+        .map_err(|e| {
+            error!(key.count=audits.len(), err=?e, "Could not look up client info for recent audits");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let audit_tuples: Vec<AuditTuple> = itertools::izip!(audits, recent_content, client_info)
         .filter_map(|(audit, con, info)| {
@@ -549,6 +618,7 @@ impl Display for Period {
         write!(f, "Last {time_period}")
     }
 }
+
 impl Period {
     fn cutoff_time(&self) -> DateTime<Utc> {
         let duration = match self {
