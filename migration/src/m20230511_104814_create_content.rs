@@ -47,12 +47,6 @@ impl MigrationTrait for Migration {
                             .col(Content::ProtocolId)
                             .col(Content::ContentId),
                     )
-                    // .index(
-                    //     Index::create()
-                    //         .name("idx-available-and-protocol")
-                    //         .col(Content::FirstAvailableAt)
-                    //         .col(Content::ProtocolId),
-                    // )
                     .to_owned(),
             )
             .await

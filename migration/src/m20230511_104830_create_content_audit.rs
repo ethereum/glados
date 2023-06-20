@@ -32,16 +32,10 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(ContentAudit::CreatedAt)
-                            .timestamp_with_time_zone() // chrono::DateTime<FixedOffset>
+                            .timestamp() // chrono::DateTime<Utc>
                             .not_null(),
                     )
                     .col(ColumnDef::new(ContentAudit::Result).integer().not_null())
-                    // .index(
-                    //     Index::create()
-                    //         .name("idx-created-and-result")
-                    //         .col(ContentAudit::CreatedAt)
-                    //         .col(ContentAudit::Result),
-                    // )
                     .col(
                         ColumnDef::new(ContentAudit::ClientInfo)
                             .integer()

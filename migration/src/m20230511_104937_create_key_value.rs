@@ -26,11 +26,6 @@ impl MigrationTrait for Migration {
                             .col(Record::Id)
                             .col(KeyValue::Key),
                     )
-                    // .index(
-                    //     Index::create()
-                    //         .name("idx-unique-keyvalue_key")
-                    //         .col(KeyValue::Key),
-                    // )
                     .col(ColumnDef::new(KeyValue::Value).binary().not_null())
                     .foreign_key(
                         ForeignKey::create()
