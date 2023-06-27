@@ -9,8 +9,12 @@ use std::{
 
 use anyhow::Result;
 use cli::Args;
-use ethportal_api::types::content_key::{HistoryContentKey, OverlayContentKey};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
+use ethportal_api::{
+    types::content_key::{HistoryContentKey, OverlayContentKey},
+    HistoryNetworkApiClient,
+    PossibleHistoryContentValue::{ContentAbsent, ContentPresent},
+};
 use sea_orm::DatabaseConnection;
 use tokio::{
     sync::mpsc::{self, Receiver},
@@ -32,7 +36,7 @@ pub(crate) mod selection;
 pub(crate) mod validation;
 
 /// Configuration created from CLI arguments.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct AuditConfig {
     /// For Glados-related data.
     pub database_url: String,
@@ -43,7 +47,7 @@ pub struct AuditConfig {
     /// Number requests to a Portal node active at the same time.
     pub concurrency: u8,
     /// Portal Clients
-    pub portal_clients: Vec<PortalClient>,
+    pub portal_clients: Vec<Arc<PortalClient>>,
 }
 
 impl AuditConfig {
@@ -85,11 +89,11 @@ impl AuditConfig {
             weights.insert(strat.clone(), weight);
         }
 
-        let mut portal_clients: Vec<PortalClient> = vec![];
+        let mut portal_clients: Vec<Arc<PortalClient>> = vec![];
         for client_url in args.portal_client {
             let client = PortalClient::from(client_url).await?;
             info!("Found a portal client with type: {:?}", client.client_info);
-            portal_clients.push(client);
+            portal_clients.push(Arc::new(client));
         }
         Ok(AuditConfig {
             database_url: args.database_url,
@@ -132,7 +136,7 @@ pub async fn run_glados_command(conn: DatabaseConnection, command: cli::Command)
     };
     let client = PortalClient::from(portal_client).await?;
     let active_threads = Arc::new(AtomicU8::new(0));
-    perform_single_audit(active_threads, task, client.clone(), conn).await;
+    perform_single_audit(active_threads, task, Arc::new(client), conn).await;
     Ok(())
 }
 
@@ -202,7 +206,7 @@ async fn perform_content_audits(
     let concurrency = config.concurrency;
     let active_threads = Arc::new(AtomicU8::new(0));
 
-    let mut cycle_of_clients = config.portal_clients.iter().cycle();
+    let mut cycle_of_clients = config.portal_clients.into_iter().cycle();
 
     loop {
         let active_count = active_threads.load(Ordering::Relaxed);
@@ -236,7 +240,7 @@ async fn perform_content_audits(
                 tokio::spawn(perform_single_audit(
                     active_threads.clone(),
                     task,
-                    client.clone(),
+                    Arc::clone(&client),
                     conn.clone(),
                 ))
             }
@@ -254,7 +258,7 @@ async fn perform_content_audits(
 async fn perform_single_audit(
     active_threads: Arc<AtomicU8>,
     task: AuditTask,
-    client: PortalClient,
+    client: Arc<PortalClient>,
     conn: DatabaseConnection,
 ) {
     let client_info = client.client_info.clone();
@@ -264,9 +268,14 @@ async fn perform_single_audit(
         client.url = client.api.client_url.clone(),
         "auditing content",
     );
-    let (content_response, trace) = if client.clone().is_trin() {
-        match client.api.get_content_with_trace(&task.content_key).await {
-            Ok(c) => c,
+    let (content_response, trace) = if client.is_trin() {
+        match HistoryNetworkApiClient::trace_recursive_find_content(
+            &client.api.client,
+            task.content_key.clone(),
+        )
+        .await
+        {
+            Ok(c) => (c.content, "".to_owned()),
             Err(e) => {
                 error!(
                     content.key=hex_encode(task.content_key.to_bytes()),
@@ -278,7 +287,12 @@ async fn perform_single_audit(
             }
         }
     } else {
-        match client.api.get_content(&task.content_key).await {
+        match HistoryNetworkApiClient::recursive_find_content(
+            &client.api.client,
+            task.content_key.clone(),
+        )
+        .await
+        {
             Ok(c) => (c, "".to_owned()),
             Err(e) => {
                 error!(
@@ -294,8 +308,8 @@ async fn perform_single_audit(
 
     // If content was absent audit result is 'fail'.
     let audit_result = match content_response {
-        Some(content_bytes) => content_is_valid(&task.content_key, &content_bytes.raw),
-        None => false,
+        ContentPresent(content) => true,
+        ContentAbsent => false,
     };
 
     let content_key_model = match content::get(&task.content_key, &conn).await {

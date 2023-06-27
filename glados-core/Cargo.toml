@@ -21,7 +21,7 @@ env_logger = "0.9.3"
 tracing = "0.1.37"
 ethportal-api = "0.2.0"
 url = "2.3.1"
-jsonrpsee = { version = "0.18.2", features = ["async-client", "client"] }
+jsonrpsee = { version = "0.16.2", features = ["async-client", "client"] }
 jsonrpsee-types = "0.16.2"
 rustc-hex = "2.1.0"
 jsonrpsee-core = "0.16.2"
