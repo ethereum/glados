@@ -3,6 +3,7 @@ use reth_ipc::client::{IpcClientBuilder, IpcError};
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use discv5::enr::NodeId;
 use ethereum_types::{H256, U256};
 use ethportal_api::types::content_key::OverlayContentKey;
 use jsonrpsee::{
@@ -137,7 +138,7 @@ pub struct JsonRPCResult {
 #[derive(Serialize, Deserialize)]
 pub struct NodeInfo {
     pub enr: String,
-    pub nodeId: String,
+    pub nodeId: NodeId,
 }
 
 #[allow(non_snake_case)]

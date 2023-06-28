@@ -10,7 +10,7 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 
 [dependencies]
 anyhow = "1.0.68"
-discv5 = "0.1.0"
+discv5 = { version = "0.3.0", features = ["serde"]}
 ethereum-types = "0.14.0"
 jsonrpc = "0.13.0"
 serde = "1.0.147"
