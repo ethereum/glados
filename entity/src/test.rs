@@ -303,7 +303,7 @@ async fn test_content_table_unique_constraints() {
         .contains("UNIQUE constraint failed"));
     assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
 
-    // DB=2. Add same content_key, different content_id, same protocol (accepts). DB=3.
+    // DB=2. Add same content_key, different content_id, same protocol (rejects). DB=2.
     let action_c = content::ActiveModel {
         id: NotSet,
         content_id: Set(id_b),
@@ -311,19 +311,25 @@ async fn test_content_table_unique_constraints() {
         protocol_id: Set(protocol_a.clone()),
         first_available_at: Set(Utc::now().into()),
     };
-    action_c.clone().insert(&conn).await.unwrap();
-    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 3);
+    assert!(action_c
+        .clone()
+        .insert(&conn)
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("UNIQUE constraint failed"));
+    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
 
-    // DB=3. Repeat addition (rejects). DB=3.
+    // DB=2. Repeat addition (rejects). DB=2.
     assert!(action_c
         .insert(&conn)
         .await
         .unwrap_err()
         .to_string()
         .contains("UNIQUE constraint failed"));
-    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 3);
+    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
 
-    // DB=3. Add different content_key, same content_id, same protocol (accepts). DB=4.
+    // DB=2. Add different content_key, same content_id, same protocol (rejects). DB=2.
     let action_d = content::ActiveModel {
         id: NotSet,
         content_id: Set(id_a),
@@ -331,17 +337,13 @@ async fn test_content_table_unique_constraints() {
         protocol_id: Set(protocol_a),
         first_available_at: Set(Utc::now().into()),
     };
-    action_d.clone().insert(&conn).await.unwrap();
-    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 4);
-
-    // DB=4. Repeat addition (rejects). DB=4.
     assert!(action_d
         .insert(&conn)
         .await
         .unwrap_err()
         .to_string()
         .contains("UNIQUE constraint failed"));
-    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 4);
+    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
 }
 
 // This test fails on sqlite which is expected.  The test is still useful as the query can be
