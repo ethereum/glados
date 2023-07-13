@@ -27,12 +27,6 @@ impl MigrationTrait for Migration {
                             .integer()
                             .not_null(),
                     )
-                    .index(
-                        Index::create()
-                            .unique()
-                            .name("idx_execution-block_number")
-                            .col(ExecutionMetadata::BlockNumber),
-                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("FK_executionmetadata_content") // Metadata points to content

@@ -32,7 +32,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(ContentAudit::CreatedAt)
-                            .timestamp() // chrono::DateTime<Utc>
+                            .timestamp_with_time_zone() // chrono::DateTime<Utc>
                             .not_null(),
                     )
                     .col(ColumnDef::new(ContentAudit::Result).integer().not_null())
