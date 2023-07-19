@@ -36,4 +36,14 @@ pub enum Commands {
         #[arg(short, long)]
         path: PathBuf,
     },
+
+    /// Imports blocks from a remote provider
+    BulkDownloadBlockData {
+        #[arg(short, long)]
+        beginning: u64,
+        #[arg(short, long)]
+        end: u64,
+        #[arg(short, long)]
+        provider_url: String,
+    },
 }

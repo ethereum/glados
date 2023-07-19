@@ -1,16 +1,22 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Error, Result};
 use ethportal_api::types::content_key::{
     BlockBodyKey, BlockHeaderKey, BlockReceiptsKey, EpochAccumulatorKey, HistoryContentKey,
     OverlayContentKey,
 };
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
+use reqwest::header;
 use sea_orm::DatabaseConnection;
+use std::env;
 use tokio::{fs::read_dir, sync::mpsc, time::sleep};
 use tracing::{debug, error, info, warn};
+use web3::transports::Http;
 use web3::types::{BlockId, H256};
+use web3::Web3;
+
+use url::Url;
 
 use entity::{content, execution_metadata};
 
@@ -86,37 +92,39 @@ async fn retrieve_new_blocks(
         let Some(block_number_to_retrieve) = rx.recv().await else {continue};
         debug!(block.number=?block_number_to_retrieve, "fetching block");
 
-        let Ok(block) = w3
-            .eth()
-            .block(BlockId::from(block_number_to_retrieve))
+        let block_hash = fetch_block_hash(block_number_to_retrieve, w3.clone())
             .await
-        else {
-            warn!(head.number=?block_number_to_retrieve, "Failed to retrieve block");
-            continue
-        };
+            .unwrap();
 
-        let Some(blk) = block else {
-            error!(
-                block.number=?block_number_to_retrieve,
-                "failure retrieving block",
-            );
-            continue
-        };
-
-        let Some(block_hash) = blk.hash else {
-            error!(head.number=?block_number_to_retrieve, "Fetched block has no hash (skipping)");
-            continue
-        };
-
-        info!(
-            block.hash=?block_hash,
-            block.number=?block_number_to_retrieve,
-            "received block",
-        );
         let block_num =
             i32::try_from(block_number_to_retrieve).expect("Block num does not fit in i32.");
         store_block_keys(block_num, block_hash.as_fixed_bytes(), &conn).await;
     }
+}
+
+/// Gets the block hash for the given block number.
+async fn fetch_block_hash(
+    block_number: web3::types::U64,
+    w3: web3::Web3<web3::transports::Http>,
+) -> Result<H256> {
+    let block = w3
+        .eth()
+        .block(BlockId::from(block_number))
+        .await
+        .map_err(|e| anyhow!("Failed to retrieve block: {}", e))?
+        .ok_or_else(|| anyhow!("Failed to retrieve block"))?;
+
+    let block_hash = block
+        .hash
+        .ok_or_else(|| anyhow!("Fetched block has no hash (skipping)"))?;
+
+    info!(
+        block.hash=?block_hash,
+        block.number=?block_number,
+        "received block",
+    );
+
+    Ok(block_hash)
 }
 
 /// Stores the content keys and block metadata for the given block.
@@ -242,4 +250,72 @@ pub async fn import_pre_merge_accumulators(
         }
     }
     Ok(())
+}
+
+pub async fn bulk_download_block_data(
+    conn: DatabaseConnection,
+    beginning: u64,
+    end: u64,
+    provider_url: String,
+) -> Result<()> {
+    if beginning > end {
+        error!("Beginning block number must be less than or equal to end block number");
+        Err(anyhow!(
+            "Beginning block number must be less than or equal to end block number"
+        ))?;
+    }
+    info!(
+        beginning = beginning,
+        end = end,
+        provider_url = provider_url.as_str(),
+        "Starting bulk download of block data",
+    );
+
+    let w3 = panda_ops_web3(provider_url).expect("Failed to connect to PandaOps");
+
+    let mut failed_block_numbers: Vec<u64> = vec![];
+
+    // Loop from beginning to end and download all blocks from provider URL
+    for block_number in beginning..(end + 1) {
+        info!(block_number = block_number, "Downloading block",);
+        let block_hash = match fetch_block_hash(block_number.into(), w3.clone()).await {
+            Ok(block_hash) => block_hash,
+            Err(err) => {
+                failed_block_numbers.push(block_number);
+                warn!(
+                    block_number = block_number,
+                    error = err.to_string().as_str(),
+                    "Failed to download block"
+                );
+                continue;
+            }
+        };
+        let block_number = i32::try_from(block_number).expect("Block num does not fit in i32.");
+        store_block_keys(block_number, block_hash.as_fixed_bytes(), &conn).await;
+    }
+
+    if !failed_block_numbers.is_empty() {
+        warn!("Failed to download blocks: {:?}", failed_block_numbers);
+    }
+    Ok(())
+}
+
+pub fn panda_ops_web3(provider_url: String) -> Result<Web3<Http>> {
+    let mut headers = header::HeaderMap::new();
+    let client_id = env::var("PANDAOPS_CLIENT_ID")
+        .map_err(|_| anyhow!("PANDAOPS_CLIENT_ID env var not set."))?;
+    let client_id = header::HeaderValue::from_str(&client_id);
+    let client_secret = env::var("PANDAOPS_CLIENT_SECRET")
+        .map_err(|_| anyhow!("PANDAOPS_CLIENT_SECRET env var not set."))?;
+    let client_secret = header::HeaderValue::from_str(&client_secret);
+    headers.insert("CF-Access-Client-Id", client_id?);
+    headers.insert("CF-Access-Client-Secret", client_secret?);
+
+    let client = reqwest::Client::builder()
+        .default_headers(headers)
+        .build()?;
+    let url = Url::parse(&provider_url)?;
+    let transport = web3::transports::Http::with_client(client, url);
+    let w3 = web3::Web3::new(transport);
+    Ok(w3)
 }
