@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{default, path::PathBuf};
 
 use clap::{Parser, Subcommand};
 
@@ -45,5 +45,7 @@ pub enum Commands {
         end: u64,
         #[arg(short, long)]
         provider_url: String,
+        #[arg(default_value = "5")]
+        concurrency: u32,
     },
 }

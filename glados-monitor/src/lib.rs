@@ -257,6 +257,7 @@ pub async fn bulk_download_block_data(
     beginning: u64,
     end: u64,
     provider_url: String,
+    concurrency: u32,
 ) -> Result<()> {
     if beginning > end {
         error!("Beginning block number must be less than or equal to end block number");

@@ -62,6 +62,7 @@ async fn main() -> Result<()> {
             beginning,
             end,
             provider_url,
+            concurrency,
         }) => {
             info!("Bulk downloading block data");
             task::spawn(bulk_download_block_data(
@@ -69,6 +70,7 @@ async fn main() -> Result<()> {
                 *beginning,
                 *end,
                 provider_url.to_string(),
+                concurrency,
             ))
         }
         &None => {
