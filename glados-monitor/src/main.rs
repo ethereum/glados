@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
                 *beginning,
                 *end,
                 provider_url.to_string(),
-                concurrency,
+                *concurrency,
             ))
         }
         &None => {

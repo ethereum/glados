@@ -7,9 +7,11 @@ use ethportal_api::types::content_key::{
     OverlayContentKey,
 };
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
+use futures::future::join_all;
 use reqwest::header;
 use sea_orm::DatabaseConnection;
 use std::env;
+use tokio::task::JoinHandle;
 use tokio::{fs::read_dir, sync::mpsc, time::sleep};
 use tracing::{debug, error, info, warn};
 use web3::transports::Http;
@@ -178,7 +180,7 @@ async fn store_content_key<T: OverlayContentKey>(
 /// Helper function for common error pattern to be logged.
 fn log_record_outcome<T: OverlayContentKey>(key: &T, name: &str, outcome: DbOutcome) {
     match outcome {
-        DbOutcome::Success => info!(
+        DbOutcome::Success => debug!(
             content.key = hex_encode(key.to_bytes()),
             content.kind = name,
             "Imported new record",
@@ -274,29 +276,45 @@ pub async fn bulk_download_block_data(
 
     let w3 = panda_ops_web3(provider_url).expect("Failed to connect to PandaOps");
 
-    let mut failed_block_numbers: Vec<u64> = vec![];
+    // Chunk the block numbers into groups of `concurrency` size
+    let range: Vec<u64> = (beginning..(end + 1)).collect();
+    let chunks = range.chunks(concurrency as usize);
 
-    // Loop from beginning to end and download all blocks from provider URL
-    for block_number in beginning..(end + 1) {
-        info!(block_number = block_number, "Downloading block",);
-        let block_hash = match fetch_block_hash(block_number.into(), w3.clone()).await {
-            Ok(block_hash) => block_hash,
-            Err(err) => {
-                failed_block_numbers.push(block_number);
-                warn!(
-                    block_number = block_number,
-                    error = err.to_string().as_str(),
-                    "Failed to download block"
-                );
-                continue;
-            }
-        };
-        let block_number = i32::try_from(block_number).expect("Block num does not fit in i32.");
-        store_block_keys(block_number, block_hash.as_fixed_bytes(), &conn).await;
-    }
+    for chunk in chunks {
+        info!(
+            block_number = chunk[0],
+            "Downloading blocks {}-{}",
+            chunk[0],
+            chunk[chunk.len() - 1],
+        );
 
-    if !failed_block_numbers.is_empty() {
-        warn!("Failed to download blocks: {:?}", failed_block_numbers);
+        // Request & store all blocks in the chunk concurrently
+        let join_handles: Vec<JoinHandle<_>> = chunk
+            .iter()
+            .map(|block_number| {
+                let w3 = w3.clone();
+                let conn = conn.clone();
+                let block_number = *block_number;
+                tokio::spawn(async move {
+                    let block_hash = match fetch_block_hash(block_number.into(), w3).await {
+                        Ok(block_hash) => block_hash,
+                        Err(err) => {
+                            warn!(
+                                block_number = block_number,
+                                error = err.to_string().as_str(),
+                                "Failed to download block"
+                            );
+                            return;
+                        }
+                    };
+                    let block_number =
+                        i32::try_from(block_number).expect("Block num does not fit in i32.");
+                    store_block_keys(block_number, block_hash.as_fixed_bytes(), &conn).await;
+                })
+            })
+            .collect();
+
+        join_all(join_handles).await;
     }
     Ok(())
 }
