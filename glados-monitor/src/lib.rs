@@ -254,6 +254,7 @@ pub async fn import_pre_merge_accumulators(
     Ok(())
 }
 
+/// Bulk download block data from a remote provider.
 pub async fn bulk_download_block_data(
     conn: DatabaseConnection,
     beginning: u64,
@@ -281,12 +282,7 @@ pub async fn bulk_download_block_data(
     let chunks = range.chunks(concurrency as usize);
 
     for chunk in chunks {
-        info!(
-            block_number = chunk[0],
-            "Downloading blocks {}-{}",
-            chunk[0],
-            chunk[chunk.len() - 1],
-        );
+        info!("Downloading blocks {}-{}", chunk[0], chunk[chunk.len() - 1]);
 
         // Request & store all blocks in the chunk concurrently
         let join_handles: Vec<JoinHandle<_>> = chunk
@@ -296,17 +292,21 @@ pub async fn bulk_download_block_data(
                 let conn = conn.clone();
                 let block_number = *block_number;
                 tokio::spawn(async move {
-                    let block_hash = match fetch_block_hash(block_number.into(), w3).await {
-                        Ok(block_hash) => block_hash,
-                        Err(err) => {
-                            warn!(
-                                block_number = block_number,
-                                error = err.to_string().as_str(),
-                                "Failed to download block"
-                            );
-                            return;
-                        }
+                    // In case of failure, retry until successful
+                    let block_hash = loop {
+                        match fetch_block_hash(block_number.into(), w3.clone()).await {
+                            Ok(block_hash) => break block_hash,
+                            Err(err) => {
+                                warn!(
+                                    block_number = block_number,
+                                    error = err.to_string().as_str(),
+                                    "Failed to download block"
+                                );
+                            }
+                        };
+                        sleep(Duration::from_secs(1)).await;
                     };
+
                     let block_number =
                         i32::try_from(block_number).expect("Block num does not fit in i32.");
                     store_block_keys(block_number, block_hash.as_fixed_bytes(), &conn).await;
