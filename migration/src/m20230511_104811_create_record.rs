@@ -33,12 +33,6 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Record::Raw).text().not_null())
                     .col(ColumnDef::new(Record::SequenceNumber).integer().not_null())
-                    .index(
-                        Index::create()
-                            .unique()
-                            .name("idx_record-seq_no")
-                            .col(Record::SequenceNumber),
-                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk-enr_id-node_id")
