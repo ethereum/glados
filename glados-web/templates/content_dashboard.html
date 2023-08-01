@@ -1,40 +1,43 @@
 {% extends "base.html" %}
 
 {% block title %}Content Dashboard{% endblock %}
-
+{% block head %}
+<link rel="stylesheet" href="/static/css/content_dashboard.css">
+{% endblock %}
 {% block content %}
 <div class="row">
     <div class="col">
         <ul>
-            <h1>Content Dashboard</h1>
-            <div>
-                <h2>Audit stats</h2>
+            <br/>
+            <h1 class="header">Content Dashboard</h1>
+            <div class="dashboard-box">
+                <h2 class="header">Audit stats</h2>
                 <table class="table">
                     <thead>
-                        <tr>
-                            <th scope="col">Period </th>
-                            <th scope="col">New content </th>
-                            <th scope="col">Total audits</th>
-                            <th scope="col">Total audit passes</th>
-                            <th scope="col">Total audit failures</th>
-                            <th scope="col"><span class="badge text-bg-success">Pass rate</span> (%) </th>
-                            <th scope="col"><span class="badge text-bg-danger">Failure rate</span> (%) </th>
-                            <th scope="col">Audits per minute</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for stat in stats %}
-                        <tr>
-                            <th scope="row">{{ stat.period.to_string() }} </th>
-                            <td>{{ stat.new_content }}</td>
-                            <td>{{ stat.total_audits }}</td>
-                            <td>{{ stat.total_passes }}</td>
-                            <td>{{ stat.total_failures }}</td>
-                            <td>{{ stat.passes_per_100 }}%</td>
-                            <td>{{ stat.failures_per_100 }}%</td>
-                            <td>{{ stat.audits_per_minute }}</td>
-                        </tr>
-                        {% endfor %}
+                    <tr>
+                        <th scope="col">Period </th>
+                        <th scope="col">New content </th>
+                        <th scope="col">Total audits</th>
+                        <th scope="col">Total audit passes</th>
+                        <th scope="col">Total audit failures</th>
+                        <th scope="col"><span class="badge text-bg-success">Pass rate</span> (%) </th>
+                        <th scope="col"><span class="badge text-bg-danger">Failure rate</span> (%) </th>
+                        <th scope="col">Audits per minute</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stat in stats %}
+                    <tr>
+                        <th scope="row">{{ stat.period.to_string() }} </th>
+                        <td>{{ stat.new_content }}</td>
+                        <td>{{ stat.total_audits }}</td>
+                        <td>{{ stat.total_passes }}</td>
+                        <td>{{ stat.total_failures }}</td>
+                        <td>{{ stat.passes_per_100 }}%</td>
+                        <td>{{ stat.failures_per_100 }}%</td>
+                        <td>{{ stat.audits_per_minute }}</td>
+                    </tr>
+                    {% endfor %}
                     </tbody>
                 </table>
             </div>
@@ -45,9 +48,10 @@
 <div class="row">
     <div class="col">
         <ul>
-            <h2> Recent content with audits</h2>
-            <table class="table">
-                <thead>
+            <div class="dashboard-box2">
+                <h2 class="header"> Recent content with audits</h2>
+                <table class="table">
+                    <thead>
                     <tr>
                         <th scope="col">Audit </th>
                         <th scope="col">Result </th>
@@ -77,17 +81,19 @@
                         <td>{{ client_info.version_info }}</td>
                     </tr>
                     {% endfor %}
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         </ul>
     </div>
 </div>
 <div class="row">
     <div class="col">
         <ul>
-            <h2>Recent Content</h2>
-            <table class="table">
-                <thead>
+            <div class="dashboard-box3">
+                <h2 class="header">Recent Content</h2>
+                <table class="table">
+                    <thead>
                     <tr>
                         <th scope="col">Sub-protocol </th>
                         <th scope="col">Content Key</th>
@@ -104,17 +110,19 @@
                         <td>{{ content.available_at_local_time() }}</td>
                     </tr>
                     {% endfor %}
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         </ul>
     </div>
 </div>
 <div class="row">
     <div class="col">
         <ul>
-            <h2> Recent audits</h2>
-            <table class="table">
-                <thead>
+            <div class="dashboard-box4">
+                <h2 class="header"> Recent audits</h2>
+                <table class="table">
+                    <thead>
                     <tr>
                         <th scope="col">Audit </th>
                         <th scope="col">Result </th>
@@ -143,17 +151,19 @@
                         <td>{{ client_info.version_info }}</td>
                     </tr>
                     {% endfor %}
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         </ul>
     </div>
 </div>
 <div class="row">
     <div class="col">
         <ul>
-            <h2> Recent audit successes</h2>
-            <table class="table">
-                <thead>
+            <div class="dashboard-box5">
+                <h2 class="header"> Recent audit successes</h2>
+                <table class="table">
+                    <thead>
                     <tr>
                         <th scope="col">Audit </th>
                         <th scope="col">Result </th>
@@ -182,17 +192,19 @@
                         <td>{{ client_info.version_info }}</td>
                     </tr>
                     {% endfor %}
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         </ul>
     </div>
 </div>
 <div class="row">
     <div class="col">
         <ul>
-            <h2> Recent audit failures</h2>
-            <table class="table">
-                <thead>
+            <div class="dashboard-box6">
+                <h2 class="header"> Recent audit failures</h2>
+                <table class="table">
+                    <thead>
                     <tr>
                         <th scope="col">Audit </th>
                         <th scope="col">Result </th>
@@ -221,9 +233,11 @@
                         <td>{{ client_info.version_info }}</td>
                     </tr>
                     {% endfor %}
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         </ul>
     </div>
 </div>
+
 {% endblock %}
