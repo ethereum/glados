@@ -9,8 +9,10 @@ use ethportal_api::types::content_key::{
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use futures::future::join_all;
 use reqwest::header;
-use sea_orm::DatabaseConnection;
+use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection};
 use std::env;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
 use tokio::{fs::read_dir, sync::mpsc, time::sleep};
 use tracing::{debug, error, info, warn};
@@ -94,9 +96,13 @@ async fn retrieve_new_blocks(
         let Some(block_number_to_retrieve) = rx.recv().await else {continue};
         debug!(block.number=?block_number_to_retrieve, "fetching block");
 
-        let block_hash = fetch_block_hash(block_number_to_retrieve, w3.clone())
-            .await
-            .unwrap();
+        let block_hash = match fetch_block_hash(block_number_to_retrieve, &w3).await {
+            Ok(block_hash) => block_hash,
+            Err(e) => {
+                error!(block.number=?block_number_to_retrieve, err=?e, "Failed to fetch block");
+                continue;
+            }
+        };
 
         let block_num =
             i32::try_from(block_number_to_retrieve).expect("Block num does not fit in i32.");
@@ -107,14 +113,14 @@ async fn retrieve_new_blocks(
 /// Gets the block hash for the given block number.
 async fn fetch_block_hash(
     block_number: web3::types::U64,
-    w3: web3::Web3<web3::transports::Http>,
+    w3: &web3::Web3<web3::transports::Http>,
 ) -> Result<H256> {
     let block = w3
         .eth()
         .block(BlockId::from(block_number))
         .await
         .map_err(|e| anyhow!("Failed to retrieve block: {}", e))?
-        .ok_or_else(|| anyhow!("Failed to retrieve block"))?;
+        .ok_or_else(|| anyhow!("No block found at {block_number}"))?;
 
     let block_hash = block
         .hash
@@ -257,69 +263,107 @@ pub async fn import_pre_merge_accumulators(
 /// Bulk download block data from a remote provider.
 pub async fn bulk_download_block_data(
     conn: DatabaseConnection,
-    beginning: u64,
+    start: u64,
     end: u64,
     provider_url: String,
     concurrency: u32,
 ) -> Result<()> {
-    if beginning > end {
-        error!("Beginning block number must be less than or equal to end block number");
+    if start > end {
         Err(anyhow!(
-            "Beginning block number must be less than or equal to end block number"
+            "End block number must be greater than or equal to start block number"
         ))?;
     }
     info!(
-        beginning = beginning,
+        start = start,
         end = end,
         provider_url = provider_url.as_str(),
         "Starting bulk download of block data",
     );
 
-    let w3 = panda_ops_web3(provider_url).expect("Failed to connect to PandaOps");
+    let w3 = panda_ops_web3(&provider_url)?;
 
-    // Chunk the block numbers into groups of `concurrency` size
-    let range: Vec<u64> = (beginning..(end + 1)).collect();
-    let chunks = range.chunks(concurrency as usize);
-
-    for chunk in chunks {
-        info!("Downloading blocks {}-{}", chunk[0], chunk[chunk.len() - 1]);
-
-        // Request & store all blocks in the chunk concurrently
-        let join_handles: Vec<JoinHandle<_>> = chunk
-            .iter()
-            .map(|block_number| {
-                let w3 = w3.clone();
-                let conn = conn.clone();
-                let block_number = *block_number;
-                tokio::spawn(async move {
-                    // In case of failure, retry until successful
-                    let block_hash = loop {
-                        match fetch_block_hash(block_number.into(), w3.clone()).await {
-                            Ok(block_hash) => break block_hash,
-                            Err(err) => {
-                                warn!(
-                                    block_number = block_number,
-                                    error = err.to_string().as_str(),
-                                    "Failed to download block"
-                                );
-                            }
-                        };
-                        sleep(Duration::from_secs(1)).await;
+    // On Sqlite, a pool having `concurrency` requests + inserts running at all times is most efficient
+    if conn.get_database_backend() == DatabaseBackend::Sqlite {
+        let semaphore = Arc::new(Semaphore::new(concurrency as usize));
+        for block_number in start..end {
+            let w3 = w3.clone();
+            let conn = conn.clone();
+            let permit = semaphore.clone().acquire_owned().await?;
+            tokio::spawn(async move {
+                // In case of failure, retry until successful
+                let block_hash = loop {
+                    match fetch_block_hash(block_number.into(), &w3).await {
+                        Ok(block_hash) => break block_hash,
+                        Err(err) => {
+                            warn!(
+                                block_number = block_number,
+                                error = err.to_string().as_str(),
+                                "Failed to download block"
+                            );
+                        }
                     };
+                    sleep(Duration::from_secs(1)).await;
+                };
 
-                    let block_number =
-                        i32::try_from(block_number).expect("Block num does not fit in i32.");
-                    store_block_keys(block_number, block_hash.as_fixed_bytes(), &conn).await;
+                let block_number =
+                    i32::try_from(block_number).expect("Block num does not fit in i32.");
+                store_block_keys(block_number, block_hash.as_fixed_bytes(), &conn).await;
+                drop(permit);
+            });
+        }
+
+        // Wait for all tasks to complete
+        let _ = semaphore.clone().acquire_many(concurrency).await?;
+    } else {
+        // On Postgres, a brief pause in between large amounts of inserts is most efficient.
+        // Currently that pause is done while requesting the next batch of block data.
+        // An approach that decouples downloading/inserting and sets the rate of insertions
+        // based on knowledge of postgres internals could get improved performance.
+
+        // Chunk the block numbers into groups of `concurrency` size
+        let range: Vec<u64> = (start..end).collect();
+        let chunks = range.chunks(concurrency as usize);
+
+        for chunk in chunks {
+            info!("Downloading blocks {}-{}", chunk[0], chunk[chunk.len() - 1]);
+
+            // Request & store all blocks in the chunk concurrently
+            let join_handles: Vec<JoinHandle<_>> = chunk
+                .iter()
+                .map(|block_number| {
+                    let w3 = w3.clone();
+                    let conn = conn.clone();
+                    let block_number = *block_number;
+                    tokio::spawn(async move {
+                        // In case of failure, retry until successful
+                        let block_hash = loop {
+                            match fetch_block_hash(block_number.into(), &w3).await {
+                                Ok(block_hash) => break block_hash,
+                                Err(err) => {
+                                    warn!(
+                                        block_number = block_number,
+                                        error = err.to_string().as_str(),
+                                        "Failed to download block"
+                                    );
+                                }
+                            };
+                            sleep(Duration::from_secs(1)).await;
+                        };
+
+                        let block_number =
+                            i32::try_from(block_number).expect("Block num does not fit in i32.");
+                        store_block_keys(block_number, block_hash.as_fixed_bytes(), &conn).await;
+                    })
                 })
-            })
-            .collect();
+                .collect();
 
-        join_all(join_handles).await;
+            join_all(join_handles).await;
+        }
     }
     Ok(())
 }
 
-pub fn panda_ops_web3(provider_url: String) -> Result<Web3<Http>> {
+pub fn panda_ops_web3(provider_url: &str) -> Result<Web3<Http>> {
     let mut headers = header::HeaderMap::new();
     let client_id = env::var("PANDAOPS_CLIENT_ID")
         .map_err(|_| anyhow!("PANDAOPS_CLIENT_ID env var not set."))?;
@@ -333,7 +377,7 @@ pub fn panda_ops_web3(provider_url: String) -> Result<Web3<Http>> {
     let client = reqwest::Client::builder()
         .default_headers(headers)
         .build()?;
-    let url = Url::parse(&provider_url)?;
+    let url = Url::parse(provider_url)?;
     let transport = web3::transports::Http::with_client(client, url);
     let w3 = web3::Web3::new(transport);
     Ok(w3)

@@ -1,7 +1,7 @@
 #[cfg(unix)]
 use reth_ipc::client::{IpcClientBuilder, IpcError};
-use std::path::PathBuf;
 use std::str::FromStr;
+use std::{path::PathBuf, time::Duration};
 
 use ethereum_types::{H256, U256};
 use ethportal_api::types::content_key::OverlayContentKey;
@@ -371,7 +371,9 @@ impl PortalApi {
         let ipc_prefix = "ipc:///";
         if client_url.strip_prefix(http_prefix).is_some() {
             Ok(Transport::HTTP(HttpClientManager {
-                client: HttpClientBuilder::default().build(client_url)?,
+                client: HttpClientBuilder::default()
+                    .request_timeout(Duration::from_secs(120))
+                    .build(client_url)?,
             }))
         } else if let Some(ipc_path) = client_url.strip_prefix(ipc_prefix) {
             #[cfg(unix)]

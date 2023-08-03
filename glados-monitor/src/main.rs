@@ -59,16 +59,16 @@ async fn main() -> Result<()> {
             task::spawn(import_pre_merge_accumulators(conn, path.to_path_buf()))
         }
         Some(Commands::BulkDownloadBlockData {
-            beginning,
-            end,
+            start_block_number,
+            end_block_number,
             provider_url,
             concurrency,
         }) => {
             info!("Bulk downloading block data");
             task::spawn(bulk_download_block_data(
                 conn,
-                *beginning,
-                *end,
+                *start_block_number,
+                *end_block_number,
                 provider_url.to_string(),
                 *concurrency,
             ))
@@ -84,8 +84,18 @@ async fn main() -> Result<()> {
         _ = signal::ctrl_c() => {
             println!("Received a CTRL+C signal, exiting");
         }
-        _ = task_handle => {
-            println!("Command completed, exiting");
+        task_result = task_handle => {
+            match task_result {
+                Ok(Err(err)) => {
+                    println!("Error: {:?}", err);
+                },
+                Ok(Ok(())) => {
+                    println!("Command completed successfully");
+                }
+                Err(e) => println!("Task failed: {:?}", e),
+
+            }
+
         }
     }
     Ok(())
@@ -123,11 +133,14 @@ async fn follow_head_command_pandaops(
     //
     debug!("Connecting to pandaops provider");
 
+    let w3 = panda_ops_web3(&provider_url)?;
+    let client_version = w3.web3().client_version().await?;
     info!(
+        client_version = client_version,
         provider_url = &provider_url,
         "web3 pandaops connection established"
     );
-    let w3 = panda_ops_web3(provider_url)?;
+
     run_glados_monitor(conn, w3).await;
     Ok(())
 }
