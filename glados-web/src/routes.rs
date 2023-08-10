@@ -214,22 +214,36 @@ pub async fn content_dashboard(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let audits_of_recent_content: Vec<AuditTuple> =
-        get_audits_for_recent_content(KEY_COUNT, &state.database_connection).await?;
+    // Run queries for content dashboard data concurrently
+    let (
+        audits_of_recent_content,
+        recent_audits,
+        recent_audit_successes,
+        recent_audit_failures,
+        hour_stats,
+        day_stats,
+        week_stats,
+    ) = tokio::join!(
+        get_audits_for_recent_content(KEY_COUNT, &state.database_connection),
+        get_recent_audits(KEY_COUNT, &state.database_connection),
+        get_recent_audit_successes(KEY_COUNT, &state.database_connection),
+        get_recent_audit_failures(KEY_COUNT, &state.database_connection),
+        get_audit_stats(Period::Hour, &state.database_connection),
+        get_audit_stats(Period::Day, &state.database_connection),
+        get_audit_stats(Period::Week, &state.database_connection),
+    );
 
-    let recent_audits: Vec<AuditTuple> =
-        get_recent_audits(KEY_COUNT, &state.database_connection).await?;
-    let recent_audit_successes: Vec<AuditTuple> =
-        get_recent_audit_successes(KEY_COUNT, &state.database_connection).await?;
-    let recent_audit_failures: Vec<AuditTuple> =
-        get_recent_audit_failures(KEY_COUNT, &state.database_connection).await?;
+    // Get results from queries
+    let audits_of_recent_content: Vec<AuditTuple> = audits_of_recent_content?;
+    let recent_audits: Vec<AuditTuple> = recent_audits?;
+    let recent_audit_successes: Vec<AuditTuple> = recent_audit_successes?;
+    let recent_audit_failures: Vec<AuditTuple> = recent_audit_failures?;
+    let hour_stats = hour_stats?;
+    let day_stats = day_stats?;
+    let week_stats = week_stats?;
 
     let template = ContentDashboardTemplate {
-        stats: [
-            get_audit_stats(Period::Hour, &state.database_connection).await?,
-            get_audit_stats(Period::Day, &state.database_connection).await?,
-            get_audit_stats(Period::Week, &state.database_connection).await?,
-        ],
+        stats: [hour_stats, day_stats, week_stats],
         contentid_list,
         audits_of_recent_content,
         recent_audits,
