@@ -10,7 +10,7 @@ pub fn content_is_valid(content_key: &HistoryContentKey, content_bytes: &[u8]) -
     let content: HistoryContentValue = match HistoryContentValue::decode(content_bytes) {
         Ok(c) => c,
         Err(e) => {
-            warn!(content.value=hex_encode(content_bytes), err=?e, "could not deserialize content bytes");
+            warn!(content.key=content_key.to_hex(), err=?e, "could not deserialize content bytes");
             return false;
         }
     };
