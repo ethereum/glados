@@ -4,8 +4,9 @@ use std::str::FromStr;
 #[cfg(test)]
 use chrono::prelude::*;
 use ethereum_types::{H256, U256};
-use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
 #[cfg(test)]
+use ethportal_api::generate_random_remote_enr;
+use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
 use ethportal_api::types::node_id::NodeId;
 use sea_orm::entity::prelude::*;
 use sea_orm::{
@@ -433,4 +434,24 @@ async fn test_query_closest() {
     };
     let order_from_c = [nodes_near_c[0].id, nodes_near_c[1].id, nodes_near_c[2].id];
     assert_eq!(order_from_c, expected_from_c);
+}
+
+#[tokio::test]
+async fn test_insert_two_enrs_with_same_sequence_number() {
+    // initializes db
+    let conn = Database::connect("sqlite::memory:").await.unwrap();
+
+    // initializes db tables
+    Migrator::up(&conn, None).await.unwrap();
+
+    // generate 2 enrs with same sequence number
+    let (_, enr_1) = generate_random_remote_enr();
+    let (_, enr_2) = generate_random_remote_enr();
+
+    // check to verify sequence numbers are the same
+    assert_eq!(enr_1.seq(), enr_2.seq());
+
+    // insert both enrs into record table
+    record::get_or_create(&enr_1, &conn).await.unwrap();
+    record::get_or_create(&enr_2, &conn).await.unwrap();
 }
