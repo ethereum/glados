@@ -2,17 +2,20 @@
 
 {% block title %}Glados{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="/static/css/homepage.css">
+{% endblock %}
+
 {% block content %}
-  <div class="row">
+<div class="container">
+  <div class="header">
     <h1>Glados</h1>
   </div>
-  <div class="row">
-    <div class="col">
-      <a href="/content/">Content Dashboard</a>
-    </div>
-    <div class="col">
-      <a href="/network/">Network Explorer</a>
-    </div>
+
+  <div class="menu">
+    <a href="/content/">Content Dashboard</a>
+    <a href="/network/">Network Explorer</a>
   </div>
+</div>
 </div>
 {% endblock %}
