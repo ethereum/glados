@@ -1,3 +1,10 @@
+.bootstrap-css {
+    border-radius: 10px;
+    width: 98% !important;
+    height: 100% !important;
+    border: 2px white;
+}
+
 .header {
     margin-bottom: 5px;
     font-family: Arial, sans-serif;
