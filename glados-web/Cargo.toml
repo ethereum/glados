@@ -18,7 +18,7 @@ enr = "0.8.1"
 entity = { path = "../entity" }
 env_logger = "0.9.3"
 ethereum-types = "0.14.0"
-ethportal-api = "0.2.0"
+ethportal-api = "0.2.2"
 glados-core = { path = "../glados-core" }
 migration = { path = "../migration" }
 itertools = "0.10.5"

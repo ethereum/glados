@@ -2,9 +2,9 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use cli::Args;
 use ethereum_types::H256;
-use ethportal_api::jsonrpsee::http_client::HttpClientBuilder;
 use ethportal_api::types::node_id::NodeId;
 use ethportal_api::HistoryNetworkApiClient;
+use ethportal_api::{generate_random_remote_enr, jsonrpsee::http_client::HttpClientBuilder};
 use sea_orm::DatabaseConnection;
 use tokio::time::{self, Duration};
 use tracing::{debug, info};
@@ -92,8 +92,10 @@ async fn perform_dht_probe(config: &CartographerConfig, conn: &DatabaseConnectio
         TransportConfig::IPC(_path) => panic!("not implemented"),
     };
 
-    let target = NodeId::random();
-    let target_display = H256::from(target.0);
+    // let target = NodeId::random();
+    let target_enr = generate_random_remote_enr().1;
+    let target = target_enr.node_id();
+    let target_display = H256::from(target.raw());
 
     info!(
         target.node_id=?target_display,
@@ -101,7 +103,7 @@ async fn perform_dht_probe(config: &CartographerConfig, conn: &DatabaseConnectio
     );
 
     let found_enrs = client
-        .recursive_find_nodes(NodeId(target.raw()))
+        .recursive_find_nodes(target_enr.into())
         .await
         .unwrap();
 

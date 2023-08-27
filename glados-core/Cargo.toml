@@ -19,15 +19,13 @@ sha2 = "0.10.6"
 thiserror = "1.0.37"
 env_logger = "0.9.3"
 tracing = "0.1.37"
-ethportal-api = "0.2.0"
+ethportal-api = "0.2.2"
 url = "2.3.1"
-jsonrpsee = { version = "0.18.2", features = ["async-client", "client"] }
-jsonrpsee-types = "0.16.2"
+jsonrpsee = { version = "0.20.0", features = ["async-client", "client"] }
 rustc-hex = "2.1.0"
-jsonrpsee-core = "0.16.2"
 
 [dev-dependencies]
 rstest = "0.11.0"
 
 [target.'cfg(unix)'.dependencies]
-reth-ipc = { version = "0.1.0", git = "https://github.com/paradigmxyz/reth.git"}
+reth-ipc = { version = "0.1.0-alpha.6", git = "https://github.com/paradigmxyz/reth.git"}

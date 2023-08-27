@@ -2,7 +2,7 @@
 use anyhow::{bail, Result};
 use chrono::{DateTime, FixedOffset};
 use clap::ValueEnum;
-use ethportal_api::types::content_key::OverlayContentKey;
+use ethportal_api::OverlayContentKey;
 use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
 
 use crate::content;

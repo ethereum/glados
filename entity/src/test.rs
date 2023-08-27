@@ -4,9 +4,9 @@ use std::str::FromStr;
 #[cfg(test)]
 use chrono::prelude::*;
 use ethereum_types::{H256, U256};
-use ethportal_api::types::content_key::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
 #[cfg(test)]
-use ethportal_api::types::node_id::NodeId;
+use ethportal_api::types::node_id::{generate_random_node_id, NodeId};
+use ethportal_api::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
 use sea_orm::entity::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Database, DbConn, DbErr, EntityTrait, NotSet, PaginatorTrait,
@@ -366,9 +366,9 @@ async fn test_query_closest() {
     let distance_a_c = node_a.node_id_high ^ node_c.node_id_high;
     let distance_b_c = node_b.node_id_high ^ node_c.node_id_high;
 
-    let node_id_a_full = U256::from_big_endian(&node_id_a.raw());
-    let node_id_b_full = U256::from_big_endian(&node_id_b.raw());
-    let node_id_c_full = U256::from_big_endian(&node_id_c.raw());
+    let node_id_a_full = U256::from_big_endian(&node_id_a.0);
+    let node_id_b_full = U256::from_big_endian(&node_id_b.0);
+    let node_id_c_full = U256::from_big_endian(&node_id_c.0);
 
     assert_eq!(node_a.node_id_high as u64, (node_id_a_full >> 193).as_u64());
     assert_eq!(node_b.node_id_high as u64, (node_id_b_full >> 193).as_u64());
