@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::{path::PathBuf, time::Duration};
 
 use ethereum_types::{H256, U256};
-use ethportal_api::types::content_key::OverlayContentKey;
+use ethportal_api::OverlayContentKey;
 use jsonrpsee::{
     async_client::Client,
     core::{client::ClientT, params::ArrayParams},

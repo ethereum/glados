@@ -9,8 +9,8 @@ use std::{
 
 use anyhow::Result;
 use cli::Args;
-use ethportal_api::types::content_key::{HistoryContentKey, OverlayContentKey};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
+use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use sea_orm::DatabaseConnection;
 use tokio::{
     sync::mpsc::{self, Receiver},

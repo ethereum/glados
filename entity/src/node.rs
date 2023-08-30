@@ -84,7 +84,7 @@ pub async fn closest_xor(
     node_id: NodeId,
     conn: &DatabaseConnection,
 ) -> Result<Vec<ModelWithDistance>> {
-    let raw_node_id = U256::from_big_endian(node_id.raw().as_slice());
+    let raw_node_id = U256::from_big_endian(&node_id.0);
     let node_id_high: i64 = (raw_node_id >> 193).as_u64().try_into().unwrap();
 
     let distance_expression = match conn.get_database_backend() {
@@ -112,7 +112,7 @@ pub async fn closest_xor(
 pub async fn get_or_create(node_id: NodeId, conn: &DatabaseConnection) -> Result<Model> {
     // First try to lookup an existing entry.
     if let Some(node_id_model) = Entity::find()
-        .filter(Column::NodeId.eq(node_id.raw().as_slice().to_vec()))
+        .filter(Column::NodeId.eq(node_id.0.to_vec()))
         .one(conn)
         .await?
     {
@@ -121,12 +121,12 @@ pub async fn get_or_create(node_id: NodeId, conn: &DatabaseConnection) -> Result
     }
 
     // If no record exists, create one and return it
-    let raw_node_id = U256::from_big_endian(node_id.raw().as_slice());
+    let raw_node_id = U256::from_big_endian(&node_id.0);
     let node_id_high: i64 = (raw_node_id >> 193).as_u64().try_into().unwrap();
 
     let node_id_model = ActiveModel {
         id: NotSet,
-        node_id: Set(node_id.raw().into()),
+        node_id: Set(node_id.0.into()),
         node_id_high: Set(node_id_high),
     };
 

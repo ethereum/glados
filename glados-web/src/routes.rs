@@ -10,8 +10,8 @@ use entity::{
     content_audit::{self, AuditResult},
     execution_metadata, key_value, node, record,
 };
-use ethportal_api::types::content_key::{HistoryContentKey, OverlayContentKey};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
+use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, ModelTrait, PaginatorTrait,
     QueryFilter, QueryOrder, QuerySelect,

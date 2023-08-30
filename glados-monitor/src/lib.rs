@@ -2,11 +2,11 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::{anyhow, Error, Result};
-use ethportal_api::types::content_key::{
+use ethportal_api::utils::bytes::{hex_decode, hex_encode};
+use ethportal_api::{
     BlockBodyKey, BlockHeaderKey, BlockReceiptsKey, EpochAccumulatorKey, HistoryContentKey,
     OverlayContentKey,
 };
-use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use futures::future::join_all;
 use reqwest::header;
 use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection};
