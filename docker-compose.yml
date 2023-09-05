@@ -1,0 +1,63 @@
+version: '3'
+services:
+
+  glados_postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: glados
+    volumes:
+      - ${GLADOS_POSTGRES_DATA_DIR}:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - glados-net
+
+  trin:
+    hostname: trin
+    image: portalnetwork/trin:latest
+    command: "--web3-transport http --web3-http-address http://0.0.0.0:8545/"
+    ports:
+      - "8545:8545"
+    networks: 
+      - glados-net
+
+  glados_audit:
+    command: "--database-url postgres://postgres:password@glados_postgres:5432/glados --portal-client http://trin:8545"
+    build:
+      context: .
+      dockerfile: ./glados-audit/Dockerfile
+    depends_on:
+      - glados_postgres
+      - trin
+    networks:
+      - glados-net      
+
+  glados_monitor:
+    command: "--migrate --database-url postgres://postgres:password@glados_postgres:5432/glados follow-head --provider-url https://mainnet.infura.io/v3/659c8e9bfd3b437b8ab9259b56e3eb44"
+    build:
+      context: .
+      dockerfile: ./glados-monitor/Dockerfile
+    depends_on:
+      - glados_postgres
+    networks:
+      - glados-net
+
+  glados_web:
+    command: "--database-url postgres://postgres:password@glados_postgres:5432/glados"
+    build:
+      context: .
+      dockerfile: ./glados-web/Dockerfile
+    depends_on:
+      - glados_postgres
+      - glados_monitor
+      - glados_audit
+    ports:
+      - "3001:3001"
+    networks:
+      - glados-net
+
+networks:
+  glados-net:
+    driver: bridge

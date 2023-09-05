@@ -23,10 +23,17 @@ use crate::state::State;
 
 const SOCKET: &str = "0.0.0.0:3001";
 
+const ASSET_PATH_ENV_VAR: &str = "GLADOS_WEB_ASSETS_PATH";
+
 pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
-    let Some(parent) = Path::new(std::file!()).parent() else {bail!("No parent of config file")};
-    let Some(grandparent) = parent.parent() else {bail!("No grandparent of config file")};
-    let assets_path = grandparent.join("assets");
+    let assets_path = match std::env::var(ASSET_PATH_ENV_VAR) {
+        Ok(path) => Path::new(&path).to_path_buf(),
+        Err(_) => {
+            let Some(parent) = Path::new(std::file!()).parent() else {bail!("No parent of config file")};
+            let Some(grandparent) = parent.parent() else {bail!("No grandparent of config file")};
+            grandparent.join("assets")
+        }
+    };
 
     let serve_dir = get_service(ServeDir::new(assets_path)).handle_error(routes::handle_error);
 
