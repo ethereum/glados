@@ -17,8 +17,17 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Census::StartedAt).date_time().not_null())
-                    .col(ColumnDef::new(Census::Duration).unsigned().not_null())
+                    .col(
+                        ColumnDef::new(Census::StartedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Census::Duration)
+                            .integer()
+                            .unsigned()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;
