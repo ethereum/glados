@@ -213,7 +213,10 @@ impl DHTCensus {
 async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection) {
     let client = match &config.transport {
         TransportConfig::HTTP(http_url) => {
-            match HttpClientBuilder::default().build(http_url.as_ref()) {
+            match HttpClientBuilder::default()
+                .request_timeout(StdDuration::from_secs(62))
+                .build(http_url.as_ref())
+            {
                 Ok(client) => {
                     debug!(client.http_url=?http_url, "Portal JSON-RPC HTTP client initialized");
                     client
@@ -262,9 +265,10 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
         };
     }
 
-    // Give each semaphore half of the concurrency to use.
-    let ping_limiter = Arc::new(Semaphore::new(config.concurrency / 2));
-    let enumeration_limiter = Arc::new(Semaphore::new(config.concurrency / 2));
+    // Give each semaphore half of the concurrency to use, with a lower limit
+    let num_permits = std::cmp::max(config.concurrency / 2, 1);
+    let ping_limiter = Arc::new(Semaphore::new(num_permits));
+    let enumeration_limiter = Arc::new(Semaphore::new(num_permits));
 
     let ping_handle = tokio::task::spawn(orchestrate_liveliness_checks(
         to_ping_rx,
