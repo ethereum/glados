@@ -9,7 +9,7 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub started_at: DateTime<Utc>,
-    pub duration: u32,
+    pub duration: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -35,7 +35,7 @@ pub async fn create(
     let content_audit = ActiveModel {
         id: NotSet,
         started_at: Set(started_at),
-        duration: Set(duration),
+        duration: Set(duration as i32),
     };
 
     Ok(content_audit.insert(conn).await?)
