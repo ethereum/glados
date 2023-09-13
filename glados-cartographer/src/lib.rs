@@ -139,14 +139,10 @@ impl DHTCensus {
         let finished = self.finished.read().await.len();
         let errored = self.errored.read().await.len();
 
-        if known > 2 {
-            return true;
-        }
-
         if known == 0 {
             false
         } else {
-            errored + finished > 3
+            errored + finished == known
         }
     }
 
@@ -217,7 +213,10 @@ impl DHTCensus {
 async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection) {
     let client = match &config.transport {
         TransportConfig::HTTP(http_url) => {
-            match HttpClientBuilder::default().build(http_url.as_ref()) {
+            match HttpClientBuilder::default()
+                .request_timeout(StdDuration::from_secs(62))
+                .build(http_url.as_ref())
+            {
                 Ok(client) => {
                     debug!(client.http_url=?http_url, "Portal JSON-RPC HTTP client initialized");
                     client
@@ -247,19 +246,13 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
     );
 
     // Initialize our search with a random-ish set of ENRs
-    // let initial_enrs = match client.recursive_find_nodes(target).await {
-    //     Ok(initial_enrs) => initial_enrs,
-    //     Err(err) => {
-    //         error!(target.node_id=?H256::from(target.raw()), err=?err, "Error during census initialization");
-    //         return;
-    //     }
-    // };
-
-    let initial_enrs = vec![
-        generate_random_remote_enr().1,
-        generate_random_remote_enr().1,
-        generate_random_remote_enr().1,
-    ];
+    let initial_enrs = match client.recursive_find_nodes(target).await {
+        Ok(initial_enrs) => initial_enrs,
+        Err(err) => {
+            error!(target.node_id=?H256::from(target.raw()), err=?err, "Error during census initialization");
+            return;
+        }
+    };
 
     for enr in initial_enrs {
         census.add_known(NodeId(enr.node_id().raw())).await;
@@ -272,7 +265,10 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
         };
     }
 
-    let limiter = Arc::new(Semaphore::new(config.concurrency));
+    // Give each semaphore half of the concurrency to use, with a lower limit
+    let num_permits = std::cmp::max(config.concurrency / 2, 1);
+    let ping_limiter = Arc::new(Semaphore::new(num_permits));
+    let enumeration_limiter = Arc::new(Semaphore::new(num_permits));
 
     let ping_handle = tokio::task::spawn(orchestrate_liveliness_checks(
         to_ping_rx,
@@ -280,14 +276,14 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
         census.clone(),
         config.to_owned(),
         conn.to_owned(),
-        limiter.clone(),
+        ping_limiter.clone(),
     ));
     let enumerate_handle = tokio::task::spawn(orchestrate_routing_table_enumerations(
         to_enumerate_rx,
         to_ping_tx.clone(),
         census.clone(),
         config.to_owned(),
-        limiter.clone(),
+        enumeration_limiter.clone(),
     ));
 
     let mut interval = time::interval(StdDuration::from_secs(5));
@@ -304,7 +300,8 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
             pending = stats.pending,
             elapsed = stats.duration.num_seconds(),
             rps = stats.requests_per_second,
-            ap = limiter.available_permits(),
+            ap_enumeration = enumeration_limiter.available_permits(),
+            ap_ping = ping_limiter.available_permits(),
             "Census progress",
         );
 
@@ -336,7 +333,6 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
     enumerate_handle.abort();
 
     let duration: u32 = census.duration().num_seconds().try_into().unwrap();
-    info!("Duration: {}", duration);
 
     let census_model = match census::create(census.started_at, duration, &conn).await {
         Ok(census_model) => census_model,
@@ -386,13 +382,11 @@ async fn orchestrate_liveliness_checks(
     limiter: Arc<Semaphore>,
 ) {
     while let Some(enr) = to_ping_rx.recv().await {
-        error!("In liveness, acquiring permit");
         let permit = limiter
             .clone()
             .acquire_owned()
             .await
             .expect("Unable to acquire permit");
-        error!("In liveness, acquired permit");
         let handle = do_liveliness_check(
             enr,
             to_enumerate_tx.clone(),
@@ -416,7 +410,10 @@ async fn do_liveliness_check(
 ) {
     let client = match config.transport {
         TransportConfig::HTTP(http_url) => {
-            match HttpClientBuilder::default().build(http_url.as_ref()) {
+            match HttpClientBuilder::default()
+                .request_timeout(StdDuration::from_secs(2))
+                .build(http_url.as_ref())
+            {
                 Ok(client) => client,
                 Err(err) => {
                     error!(client.http_url=?http_url, err=?err, "Error initializing Portal JSON-RPC HTTP client");
@@ -463,7 +460,7 @@ async fn do_liveliness_check(
             }
         }
         Err(err) => {
-            debug!(node_id=?H256::from(enr.node_id().raw()), err=?err, "Liveliness failed");
+            warn!(node_id=?H256::from(enr.node_id().raw()), err=?err, "Liveliness failed");
 
             // Add node to error list.
             census.add_errored(NodeId(enr.node_id().raw())).await;
@@ -479,18 +476,17 @@ async fn orchestrate_routing_table_enumerations(
     limiter: Arc<Semaphore>,
 ) {
     while let Some(enr) = to_enumerate_rx.recv().await {
-        error!("In enumeration, acquiring permit");
         let permit = limiter
             .clone()
             .acquire_owned()
             .await
             .expect("Unable to acquire permit");
-        error!("In enumeration, acquired permit");
         let handle =
             do_routing_table_enumeration(enr, to_ping_tx.clone(), census.clone(), config.clone());
         tokio::spawn(async move {
             handle.await;
             drop(permit);
+            info!("Finished enumeration, dropping permit");
         });
     }
 }
@@ -503,7 +499,10 @@ async fn do_routing_table_enumeration(
 ) {
     let client = match config.transport {
         TransportConfig::HTTP(http_url) => {
-            match HttpClientBuilder::default().build(http_url.as_ref()) {
+            match HttpClientBuilder::default()
+                .request_timeout(StdDuration::from_secs(2))
+                .build(http_url.as_ref())
+            {
                 Ok(client) => client,
                 Err(err) => {
                     error!(client.http_url=?http_url, err=?err, "Error initializing Portal JSON-RPC HTTP client");

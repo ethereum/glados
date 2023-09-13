@@ -8,7 +8,7 @@ const DEFAULT_DB_URL: &str = "sqlite::memory:";
 const DEFAULT_CENSUS_INTERVAL: &str = "900";
 
 // Number of concurrent requests that can be in progress towards the connected portal client.
-const DEFAULT_CONCURRENCY: &str = "1";
+const DEFAULT_CONCURRENCY: &str = "4";
 
 #[derive(Clone, Debug, Eq, Parser, PartialEq)]
 #[command(author, version, about, long_about = None)]

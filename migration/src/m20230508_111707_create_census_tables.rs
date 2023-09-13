@@ -22,12 +22,7 @@ impl MigrationTrait for Migration {
                             .timestamp_with_time_zone()
                             .not_null(),
                     )
-                    .col(
-                        ColumnDef::new(Census::Duration)
-                            .integer()
-                            .unsigned()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(Census::Duration).integer().not_null())
                     .to_owned(),
             )
             .await?;
@@ -55,7 +50,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(CensusNode::RecordId).integer().not_null())
                     .col(
                         ColumnDef::new(CensusNode::SurveyedAt)
-                            .date_time()
+                            .timestamp_with_time_zone()
                             .not_null(),
                     )
                     .col(
