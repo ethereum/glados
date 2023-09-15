@@ -486,7 +486,6 @@ async fn orchestrate_routing_table_enumerations(
         tokio::spawn(async move {
             handle.await;
             drop(permit);
-            info!("Finished enumeration, dropping permit");
         });
     }
 }
