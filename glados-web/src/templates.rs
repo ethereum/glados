@@ -89,6 +89,10 @@ pub struct ContentKeyDetailTemplate {
     pub contentaudit_list: Vec<content_audit::Model>,
 }
 
+#[derive(Template)]
+#[template(path = "local_node_metrics.html")]
+pub struct MetricsTemplate {}
+
 pub struct HtmlTemplate<T: Template>(pub T);
 
 impl<T> IntoResponse for HtmlTemplate<T>

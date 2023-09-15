@@ -19,12 +19,11 @@ use sea_orm::{
 use std::sync::Arc;
 use std::{fmt::Display, io};
 use tracing::error;
-use tracing::info;
 
 use crate::templates::{
     ContentAuditDetailTemplate, ContentDashboardTemplate, ContentIdDetailTemplate,
     ContentIdListTemplate, ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate,
-    HtmlTemplate, IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate,
+    HtmlTemplate, IndexTemplate, MetricsTemplate, NetworkDashboardTemplate, NodeDetailTemplate,
 };
 use crate::{state::State, templates::AuditTuple};
 
@@ -510,12 +509,16 @@ pub async fn contentkey_detail(
     Ok(HtmlTemplate(template))
 }
 
+pub async fn metrics() -> Result<HtmlTemplate<MetricsTemplate>, StatusCode> {
+    let template = MetricsTemplate {};
+    Ok(HtmlTemplate(template))
+}
+
 pub async fn contentaudit_detail(
     Path(audit_id): Path<String>,
     Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
     let audit_id = audit_id.parse::<i32>().unwrap();
-    info!("Audit ID: {}", audit_id);
     let audit = content_audit::Entity::find_by_id(audit_id)
         .one(&state.database_connection)
         .await
