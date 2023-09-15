@@ -1,5 +1,6 @@
 pub use sea_orm_migration::prelude::*;
 
+mod m20230508_111707_create_census_tables;
 mod m20230511_104804_create_node;
 mod m20230511_104811_create_record;
 mod m20230511_104814_create_content;
@@ -21,6 +22,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20230511_104830_create_content_audit::Migration),
             Box::new(m20230511_104838_create_execution_metadata::Migration),
             Box::new(m20230511_104937_create_key_value::Migration),
+            Box::new(m20230508_111707_create_census_tables::Migration),
         ]
     }
 }
