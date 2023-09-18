@@ -2,27 +2,36 @@
 
 {% block title %}Content ID: {{ content_id.id_as_hex() }}{% endblock %}
 
+{% block head %}
+<link href="/static/css/glados_pages.css" rel="stylesheet">
+{% endblock %}
 {% block content %}
-  <div class="row">
+<ul>
+    <div class="row">
     <h1>Content ID: {{ content_id.id_as_hex() }}</h1>
-  </div>
-  <div class="row">
-    <div class="col">
-      <ul>
-        <li>Database ID: {{ content_id.id }}</li>
-        <li>ID: {{ content_id.id_as_hex() }}</li>
-      </ul>
     </div>
-    <div class="col">
-      <h3>Content Keys</h3>
-      <ul>
-        {% for content in contentkey_list %}
-          <li><a href="/content/key/{{content.key_as_hex() }}">{{ content.key_as_hex() }}</a></li>
-        {% else %}
-          <li>No content keys found</li>
-        {% endfor %}
-      </ul>
+    <div class="card shadow-sm content-card">
+        <div class="card-body">
+            <div class="row">
+                <div class="col">
+                    <ul>
+                        <li>Database ID: {{ content_id.id }}</li>
+                        <li>ID: {{ content_id.id_as_hex() }}</li>
+                    </ul>
+                </div>
+                <div class="col">
+                    <h3>Content Keys</h3>
+                    <ul>
+                        {% for content in contentkey_list %}
+                        <li><a href="/content/key/{{content.key_as_hex() }}">{{ content.key_as_hex() }}</a></li>
+                        {% else %}
+                        <li>No content keys found</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
-</div>
+</ul>
+
 {% endblock %}
