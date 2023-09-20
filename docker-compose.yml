@@ -5,7 +5,7 @@ services:
     image: postgres:latest
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${GLADOS_POSTGRES_PASSWORD}
       POSTGRES_DB: glados
     volumes:
       - ${GLADOS_POSTGRES_DATA_DIR}:/var/lib/postgresql/data
@@ -24,7 +24,7 @@ services:
       - glados-net
 
   glados_audit:
-    command: "--database-url postgres://postgres:password@glados_postgres:5432/glados --portal-client http://trin:8545"
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://trin:8545"
     build:
       context: .
       dockerfile: ./glados-audit/Dockerfile
@@ -35,7 +35,7 @@ services:
       - glados-net      
 
   glados_monitor:
-    command: "--migrate --database-url postgres://postgres:password@glados_postgres:5432/glados follow-head --provider-url https://mainnet.infura.io/v3/659c8e9bfd3b437b8ab9259b56e3eb44"
+    command: "--migrate --database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados follow-head --provider-url https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}"
     build:
       context: .
       dockerfile: ./glados-monitor/Dockerfile
@@ -45,7 +45,7 @@ services:
       - glados-net
 
   glados_web:
-    command: "--database-url postgres://postgres:password@glados_postgres:5432/glados"
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados"
     build:
       context: .
       dockerfile: ./glados-web/Dockerfile
