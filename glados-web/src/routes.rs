@@ -66,7 +66,7 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
             Alias::new("client_count"),
         )
         .expr_as(
-            Expr::cust("CAST(COALESCE(substr(value, 2, 1), 'unknown') AS TEXT)"),
+            Expr::cust("CAST(COALESCE(substr(substr(value, 1, 2), -1, 1), 'unknown') AS TEXT)"),
             Alias::new("client_name"),
         )
         .from_subquery(
@@ -110,7 +110,9 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
             Expr::col((left_table.clone(), Alias::new("record_id")))
                 .equals((right_table.clone(), Alias::new("record_id"))),
         )
-        .add_group_by([Expr::cust("substr(value, 2, 1)")]);
+        .add_group_by([Expr::cust(
+            "substr(value, CASE WHEN substr(value, 1, 1) < 128 THEN 1 ELSE 2 END, 1)",
+        )]);
 
     let pie_chart_data = PieChartResult::find_by_statement(builder.build(&client_count))
         .all(&state.database_connection)
