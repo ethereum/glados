@@ -6,11 +6,13 @@ use axum::{
 
 use entity::{client_info, content, content_audit, key_value, node, record};
 
-use crate::routes::Stats;
+use crate::routes::{PieChartResult, Stats};
 
 #[derive(Template)]
 #[template(path = "index.html")]
-pub struct IndexTemplate {}
+pub struct IndexTemplate {
+    pub pie_chart_client_count: Vec<PieChartResult>,
+}
 
 #[derive(Template)]
 #[template(path = "network_dashboard.html")]
