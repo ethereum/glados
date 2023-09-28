@@ -126,7 +126,8 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
         .map_err(|e| {
             error!(key.count=KEY_COUNT, err=?e, "Could not look up latest keys");
             StatusCode::INTERNAL_SERVER_ERROR
-        }).unwrap();
+        })
+        .unwrap();
 
     // Run queries for content dashboard data concurrently
     let (
