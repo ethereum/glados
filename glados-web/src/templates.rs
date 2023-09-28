@@ -12,6 +12,12 @@ use crate::routes::{PieChartResult, Stats};
 #[template(path = "index.html")]
 pub struct IndexTemplate {
     pub pie_chart_client_count: Vec<PieChartResult>,
+    pub stats: [Stats; 3],
+    pub contentid_list: Vec<content::Model>,
+    pub audits_of_recent_content: Vec<AuditTuple>,
+    pub recent_audits: Vec<AuditTuple>,
+    pub recent_audit_successes: Vec<AuditTuple>,
+    pub recent_audit_failures: Vec<AuditTuple>,
 }
 
 #[derive(Template)]
