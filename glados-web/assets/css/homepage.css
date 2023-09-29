@@ -4,12 +4,6 @@ body {
     color: #333333;
 }
 
-.container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
 .header {
     text-align: center;
     margin-bottom: 30px;
@@ -43,7 +37,7 @@ h1 {
 
 .graphBox {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: 3fr 1fr;
     grid-gap: 30px;
 }
 
@@ -52,5 +46,5 @@ h1 {
     padding: 20px;
     border-radius: 20px;
     box-shadow: 0 7px 25px rgba(0, 0, 0, 0.08);
-    height: 300px;
+    height: 325px;
 }

@@ -117,8 +117,21 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
         .await
         .unwrap();
 
+    // Run queries for content dashboard data concurrently
+    let (hour_stats, day_stats, week_stats) = tokio::join!(
+        get_audit_stats(Period::Hour, &state.database_connection),
+        get_audit_stats(Period::Day, &state.database_connection),
+        get_audit_stats(Period::Week, &state.database_connection),
+    );
+
+    // Get results from queries
+    let hour_stats = hour_stats.unwrap();
+    let day_stats = day_stats.unwrap();
+    let week_stats = week_stats.unwrap();
+
     let template = IndexTemplate {
         pie_chart_client_count: pie_chart_data,
+        stats: [hour_stats, day_stats, week_stats],
     };
     HtmlTemplate(template)
 }

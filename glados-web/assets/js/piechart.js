@@ -66,7 +66,7 @@ function PieChart(data, {
 
     svg.append("g")
         .attr("font-family", "sans-serif")
-        .attr("font-size", 35)
+        .attr("font-size", 15)
         .attr("text-anchor", "middle")
         .selectAll("text")
         .data(arcs)
@@ -114,8 +114,8 @@ function pie_chart_count(pie_chart_client_count) {
     const chart = PieChart(char_array, {
         name: d => d.name,
         value: d => d.value,
-        width: 500,
-        height: 500,
+        width: 210,
+        height: 210,
         title: title
     });
 

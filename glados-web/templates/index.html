@@ -4,41 +4,67 @@
 
 {% block head %}
 <script src="/static/js/d3.min.js"></script>
-<link rel="stylesheet" href="/static/css/homepage.css">
+<link href="/static/css/homepage.css" rel="stylesheet">
 <script src="/static/js/piechart.js"></script>
 {% endblock %}
 
 {% block content %}
 <div class="container">
-  <div class="header">
-    <h1>Glados</h1>
-  </div>
-
-  <div class="menu">
-    <a href="/content/">Content Dashboard</a>
-    <a href="/network/">Network Explorer</a>
-  </div>
-
-  <div class="graphBox">
-    <div class="col">
-      <div id="graph1" class="box"></div>
+    <div class="header">
+        <h1>Glados</h1>
     </div>
-    <div class="col">
-      <div class="box">
-        <h3 style="text-align: center">Client Count</h3>
-        <div id="graph2"></div>
-      </div>
+    <div class="menu">
+        <a href="/content/">Content Dashboard</a>
+        <a href="/network/">Network Explorer</a>
     </div>
-  </div>
+    <div class="graphBox">
+        <div class="col">
+            <div class="box">
+                <h2>Audit stats</h2>
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th scope="col">Period</th>
+                        <th scope="col">New content</th>
+                        <th scope="col">Total audits</th>
+                        <th scope="col">Total audit passes</th>
+                        <th scope="col">Total audit failures</th>
+                        <th scope="col"><span class="badge text-bg-success">Pass rate</span> (%)</th>
+                        <th scope="col"><span class="badge text-bg-danger">Failure rate</span> (%)</th>
+                        <th scope="col">Audits per minute</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for stat in stats %}
+                    <tr>
+                        <th scope="row">{{ stat.period.to_string() }}</th>
+                        <td>{{ stat.new_content }}</td>
+                        <td>{{ stat.total_audits }}</td>
+                        <td>{{ stat.total_passes }}</td>
+                        <td>{{ stat.total_failures }}</td>
+                        <td>{{ stat.passes_per_100 }}%</td>
+                        <td>{{ stat.failures_per_100 }}%</td>
+                        <td>{{ stat.audits_per_minute }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div id="graph1"></div>
+        </div>
+        <div class="col">
+            <div class="box">
+                <h3 style="text-align: center">Client Count</h3>
+                <div id="graph2" style="display: flex; justify-content: center; align-items: center;"></div>
+            </div>
+        </div>
+    </div>
 </div>
-
 
 <script>
 
-   pie_chart_count({{ pie_chart_client_count|json|safe }})
+    pie_chart_count({{ pie_chart_client_count|json|safe }})
 
 </script>
-
-
 
 {% endblock %}
