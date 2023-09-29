@@ -117,24 +117,8 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
         .await
         .unwrap();
 
-    const KEY_COUNT: u64 = 20;
-    let contentid_list = content::Entity::find()
-        .order_by_desc(content::Column::FirstAvailableAt)
-        .limit(KEY_COUNT)
-        .all(&state.database_connection)
-        .await
-        .map_err(|e| {
-            error!(key.count=KEY_COUNT, err=?e, "Could not look up latest keys");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })
-        .unwrap();
-
     // Run queries for content dashboard data concurrently
-    let (
-        hour_stats,
-        day_stats,
-        week_stats,
-    ) = tokio::join!(
+    let (hour_stats, day_stats, week_stats) = tokio::join!(
         get_audit_stats(Period::Hour, &state.database_connection),
         get_audit_stats(Period::Day, &state.database_connection),
         get_audit_stats(Period::Week, &state.database_connection),
