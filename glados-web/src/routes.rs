@@ -131,28 +131,16 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
 
     // Run queries for content dashboard data concurrently
     let (
-        audits_of_recent_content,
-        recent_audits,
-        recent_audit_successes,
-        recent_audit_failures,
         hour_stats,
         day_stats,
         week_stats,
     ) = tokio::join!(
-        get_audits_for_recent_content(KEY_COUNT, &state.database_connection),
-        get_recent_audits(KEY_COUNT, &state.database_connection),
-        get_recent_audit_successes(KEY_COUNT, &state.database_connection),
-        get_recent_audit_failures(KEY_COUNT, &state.database_connection),
         get_audit_stats(Period::Hour, &state.database_connection),
         get_audit_stats(Period::Day, &state.database_connection),
         get_audit_stats(Period::Week, &state.database_connection),
     );
 
     // Get results from queries
-    let audits_of_recent_content: Vec<AuditTuple> = audits_of_recent_content.unwrap();
-    let recent_audits: Vec<AuditTuple> = recent_audits.unwrap();
-    let recent_audit_successes: Vec<AuditTuple> = recent_audit_successes.unwrap();
-    let recent_audit_failures: Vec<AuditTuple> = recent_audit_failures.unwrap();
     let hour_stats = hour_stats.unwrap();
     let day_stats = day_stats.unwrap();
     let week_stats = week_stats.unwrap();
@@ -160,11 +148,6 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
     let template = IndexTemplate {
         pie_chart_client_count: pie_chart_data,
         stats: [hour_stats, day_stats, week_stats],
-        contentid_list,
-        audits_of_recent_content,
-        recent_audits,
-        recent_audit_successes,
-        recent_audit_failures,
     };
     HtmlTemplate(template)
 }
