@@ -206,6 +206,7 @@ impl PortalResponse {
             PortalResponse::Regular(response) => {
                 let query_result = serde_json::from_value::<QueryResult>(response.clone())
                     .map_err(JsonRpcError::Malformed)?;
+
                 Ok(Some(query_result.content))
             }
         }
