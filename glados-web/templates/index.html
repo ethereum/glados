@@ -4,8 +4,10 @@
 
 {% block head %}
 <script src="/static/js/d3.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
 <link href="/static/css/homepage.css" rel="stylesheet">
 <script src="/static/js/piechart.js"></script>
+<script src="/static/js/radiusdensity.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -59,12 +61,18 @@
             </div>
         </div>
     </div>
+    <br>
+    <div class="card shadow-sm card-box">
+        <div class="card-body">
+            <div id="my_dataviz"></div>
+        </div>
+    </div>
+    <div id="hover" style="position: absolute; opacity: 0;" ></div>
 </div>
 
 <script>
 
     pie_chart_count({{ pie_chart_client_count|json|safe }})
-
+    radius_node_id_scatter_chart({{ average_radius_chart|json|safe }})
 </script>
-
 {% endblock %}

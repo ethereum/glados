@@ -13,16 +13,17 @@ use entity::{
 };
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
-use migration::{Alias, JoinType};
-use sea_orm::sea_query::{Expr, Query, SeaRc};
-use sea_orm::{
-    ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, DynIden, EntityTrait,
-    FromQueryResult, LoaderTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
-};
+use migration::{Alias, JoinType, SqliteQueryBuilder};
+use sea_orm::entity::prelude::*;
+use sea_orm::sea_query::{Expr, PostgresQueryBuilder, Query, SeaRc, SimpleExpr};
+use sea_orm::{ColIdx, ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, DynIden, EntityTrait, FromQueryResult, LoaderTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, TryGetable, TryGetError};
 use serde::Serialize;
 use std::fmt::Formatter;
 use std::sync::Arc;
 use std::{fmt::Display, io};
+use enr::k256::elliptic_curve::bigint::Encoding;
+use enr::k256::U256;
+use sea_orm::DatabaseBackend::Sqlite;
 use tracing::error;
 use tracing::info;
 
@@ -38,6 +39,26 @@ use crate::{state::State, templates::AuditTuple};
 //
 pub async fn handle_error(_err: io::Error) -> impl IntoResponse {
     (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong...")
+}
+
+#[derive(FromQueryResult, Serialize, Debug)]
+pub struct RadiusChartData {
+    pub data_radius: Vec<u8>,
+    pub node_id: Vec<u8>,
+}
+
+#[derive(FromQueryResult, Serialize, Debug)]
+pub struct CalculatedRadiusChartData {
+    pub data_radius: f64,
+    pub node_id: u64,
+    pub node_id_string: String,
+}
+
+impl TryGetable for RadiusChartData {
+    fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
+        let mut data_radius = [0u8; 32];
+        Ok(Self { data_radius })
+    }
 }
 
 #[derive(FromQueryResult, Serialize)]
@@ -103,8 +124,8 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
                     } else {
                         "convert_from(key, 'UTF8')"
                     })
-                    // Uses a CAST to TEXT on the table in order to do a comparison to the binary value, both SQLite and Postgres both need to be casted in order to be compared
-                    .eq("c"),
+                        // Uses a CAST to TEXT on the table in order to do a comparison to the binary value, both SQLite and Postgres both need to be casted in order to be compared
+                        .eq("c"),
                 )
                 .take(),
             right_table.clone(),
@@ -117,6 +138,77 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
         .all(&state.database_connection)
         .await
         .unwrap();
+
+    let mut average_radius = Query::select();
+    average_radius
+        .expr_as(
+            Expr::col(census_node::Column::DataRadius),
+            Alias::new("data_radius"),
+        )
+        .expr(Expr::col((node::Entity, node::Column::NodeId)))
+        .from(census_node::Entity)
+        .from(node::Entity)
+        .from(record::Entity)
+        .from_subquery(
+            Query::select()
+                .from(census::Entity)
+                .expr_as(Expr::max(Expr::col(census::Column::Id)), Alias::new("id"))
+                .take(),
+            Alias::new("max_census_id"),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::CensusId))
+                .eq(Expr::col((Alias::new("max_census_id"), Alias::new("id")))),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::RecordId))
+                .eq(Expr::col((record::Entity, record::Column::Id))),
+        )
+        .and_where(
+            Expr::col((record::Entity, record::Column::NodeId))
+                .eq(Expr::col((node::Entity, node::Column::Id))),
+        );
+
+    let radius_chart_data = RadiusChartData::find_by_statement(builder.build(&average_radius))
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+
+    let mut radius_percentages: Vec<CalculatedRadiusChartData> = vec![];
+    for i in radius_chart_data {
+        let radius_high_bytes: [u8; 4] = [
+            i.data_radius[0],
+            i.data_radius[1],
+            i.data_radius[2],
+            i.data_radius[3],
+        ];
+        let radius_int = u32::from_be_bytes(radius_high_bytes);
+        let node_id_high_bytes: [u8; 8] = [
+            i.node_id[0],
+            i.node_id[1],
+            i.node_id[2],
+            i.node_id[3],
+            i.node_id[4],
+            i.node_id[5],
+            i.node_id[6],
+            i.node_id[7],
+        ];
+
+        let percentage = (radius_int as f64 / u32::MAX as f64) * 100.0;
+        let formatted_percentage = format!("{:.2}", percentage);
+
+        let mut node_id_bytes: [u8; 32] = [0; 32];
+        if i.node_id.len() == 32 {
+            node_id_bytes.copy_from_slice(&i.node_id);
+        }
+
+        let node_id_string = hex_encode(node_id_bytes);
+        radius_percentages.push(CalculatedRadiusChartData {
+            data_radius: formatted_percentage.parse().unwrap(),
+            node_id: u64::from_be_bytes(node_id_high_bytes),
+            node_id_string,
+        });
+    }
 
     // Run queries for content dashboard data concurrently
     let (hour_stats, day_stats, week_stats) = tokio::join!(
@@ -132,6 +224,7 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
 
     let template = IndexTemplate {
         pie_chart_client_count: pie_chart_data,
+        average_radius_chart: radius_percentages,
         stats: [hour_stats, day_stats, week_stats],
     };
     HtmlTemplate(template)
@@ -390,12 +483,12 @@ pub async fn get_audits_for_recent_content(
             .unzip();
 
     let client_info = audits
-            .load_one(client_info::Entity, conn)
-            .await
-            .map_err(|e| {
-                error!(key.count=audits.len(), err=?e, "Could not look up client info for recent audits");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+        .load_one(client_info::Entity, conn)
+        .await
+        .map_err(|e| {
+            error!(key.count=audits.len(), err=?e, "Could not look up client info for recent audits");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let audit_tuples: Vec<AuditTuple> = itertools::izip!(audits, recent_content, client_info)
         .filter_map(|(audit, con, info)| {
@@ -670,6 +763,7 @@ impl Display for Period {
         write!(f, "Last {time_period}")
     }
 }
+
 impl Period {
     fn cutoff_time(&self) -> DateTime<Utc> {
         let duration = match self {
