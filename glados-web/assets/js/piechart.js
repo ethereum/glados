@@ -111,8 +111,8 @@ function pie_chart_count(pie_chart_client_count) {
         return hasData ? `${d.name}\n${d3.format(",")(d.value)}` : "";
     };
 
-    const singleClient = new Set(char_array.map(d => d.name));
-    const colors = singleClient.size > 1 ? undefined : ["red"];
+    const clients = new Set(char_array.map(d => d.name));
+    const colors = clients.size > 1 ? undefined : ["white"];
 
     const chart = PieChart(char_array, {
         name: d => d.name,
