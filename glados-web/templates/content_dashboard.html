@@ -35,8 +35,8 @@
                             <td>{{ stat.total_audits }}</td>
                             <td>{{ stat.total_passes }}</td>
                             <td>{{ stat.total_failures }}</td>
-                            <td>{{ stat.passes_per_100 }}%</td>
-                            <td>{{ stat.failures_per_100 }}%</td>
+                            <td>{{ "{:.1}"|format(stat.pass_percent) }}%</td>
+                            <td>{{ "{:.1}"|format(stat.fail_percent) }}%</td>
                             <td>{{ stat.audits_per_minute }}</td>
                         </tr>
                         {% endfor %}
