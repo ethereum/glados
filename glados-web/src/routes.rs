@@ -669,9 +669,9 @@ pub struct Stats {
     pub new_content: u32,
     pub total_audits: u32,
     pub total_passes: u32,
-    pub passes_per_100: u32,
+    pub pass_percent: f32,
     pub total_failures: u32,
-    pub failures_per_100: u32,
+    pub fail_percent: f32,
     pub audits_per_minute: u32,
 }
 
@@ -709,18 +709,23 @@ async fn get_audit_stats(period: Period, conn: &DatabaseConnection) -> Result<St
     let audits_per_minute = (60 * total_audits)
         .checked_div(period.total_seconds())
         .unwrap_or(0);
-    let passes_per_100 = (100 * total_passes).checked_div(total_audits).unwrap_or(0);
-    let failures_per_100 = (100 * total_failures)
-        .checked_div(total_audits)
-        .unwrap_or(0);
+    let (pass_percent, fail_percent) = if total_audits == 0 {
+        (0.0, 0.0)
+    } else {
+        let total_audits = total_audits as f32;
+        (
+            (total_passes as f32) * 100.0 / total_audits,
+            (total_failures as f32) * 100.0 / total_audits,
+        )
+    };
     Ok(Stats {
         period,
         new_content,
         total_audits,
         total_passes,
-        passes_per_100,
+        pass_percent,
         total_failures,
-        failures_per_100,
+        fail_percent,
         audits_per_minute,
     })
 }
