@@ -2,6 +2,7 @@ use axum::{
     extract::{Extension, Path},
     http::StatusCode,
     response::IntoResponse,
+    Json,
 };
 use chrono::{DateTime, Duration, Utc};
 use entity::{census, census_node, client_info};
@@ -543,6 +544,19 @@ pub async fn contentkey_list(
         })?;
     let template = ContentKeyListTemplate { contentkey_list };
     Ok(HtmlTemplate(template))
+}
+
+/// Returns the success rate for the last hour as a percentage.
+pub async fn hourly_success_rate(
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<f32>, StatusCode> {
+    let stats = get_audit_stats(Period::Hour, &state.database_connection)
+        .await
+        .map_err(|e| {
+            error!("Could not look up hourly stats: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    Ok(Json(stats.pass_percent))
 }
 
 /// Retrieves key details to display.
