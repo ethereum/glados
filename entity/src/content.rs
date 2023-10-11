@@ -13,6 +13,7 @@ use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
 pub enum SubProtocol {
     History = 0,
     State = 1,
+    Beacon = 2,
 }
 
 impl SubProtocol {
@@ -20,6 +21,7 @@ impl SubProtocol {
         match self {
             SubProtocol::History => "History".to_string(),
             SubProtocol::State => "State".to_string(),
+            SubProtocol::Beacon => "Beacon".to_string(),
         }
     }
 }
@@ -61,6 +63,7 @@ impl Related<super::execution_metadata::Entity> for Entity {
 impl ActiveModelBehavior for ActiveModel {}
 
 pub async fn get_or_create<T: OverlayContentKey>(
+    sub_protocol: SubProtocol,
     content_key: &T,
     available_at: DateTime<Utc>,
     conn: &DatabaseConnection,
@@ -81,8 +84,8 @@ pub async fn get_or_create<T: OverlayContentKey>(
         id: NotSet,
         content_id: Set(content_key.content_id().to_vec()),
         content_key: Set(content_key.to_bytes()),
-        protocol_id: Set(SubProtocol::History),
         first_available_at: Set(available_at),
+        protocol_id: Set(sub_protocol),
     };
     Ok(content_key.insert(conn).await?)
 }

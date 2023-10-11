@@ -1,6 +1,9 @@
 use anyhow::Error;
 use chrono::{DateTime, Utc};
-use entity::{content, execution_metadata};
+use entity::{
+    content::{self, SubProtocol},
+    execution_metadata,
+};
 use ethportal_api::{
     utils::bytes::hex_encode, BlockBodyKey, BlockHeaderKey, BlockReceiptsKey, HistoryContentKey,
     OverlayContentKey,
@@ -65,7 +68,7 @@ pub async fn store_content_key<T: OverlayContentKey>(
     conn: &DatabaseConnection,
 ) -> Option<content::Model> {
     // Store key
-    match content::get_or_create(key, available_at, conn).await {
+    match content::get_or_create(SubProtocol::History, key, available_at, conn).await {
         Ok(content_model) => {
             log_record_outcome(key, name, DbOutcome::Success);
             // Store metadata

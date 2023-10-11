@@ -215,7 +215,7 @@ async fn add_to_queue(
             content_key,
         };
         if let Err(e) = tx.send(task).await {
-            debug!(audit.strategy=?strategy, err=?e, "Could not send key for audit, channel might be full or closed.")
+            error!(audit.strategy=?strategy, err=?e, "Could not send key for audit, channel might be full or closed.")
         }
     }
 }
