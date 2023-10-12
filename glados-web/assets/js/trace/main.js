@@ -31,7 +31,7 @@ function createGraphData(trace) {
 
     if (Object.keys(trace).length === 0) {
         return {
-            nodes: [{ id: "local", group: colors.orange, timestamp: 0 }],
+            nodes: [{ id: "local", group: colors.orange, durationMs: 0 }],
             links: [],
         }
     }
@@ -70,7 +70,7 @@ function createGraphData(trace) {
     Object.keys(responses).forEach((nodeId, _) => {
 
         let node = responses[nodeId];
-        let timestamp = node.duration;
+        let durationMs = node.durationMs;
         let respondedWith = node.respondedWith;
         if (!Array.isArray(respondedWith)) {
             return;
@@ -92,8 +92,8 @@ function createGraphData(trace) {
             }
             nodes.push({
                 id: nodeId,
-                group: group,
-                timestamp: timestamp,
+                group,
+                durationMs,
                 ...metadata[nodeId]
             });
             nodesSeen.push(nodeId);
@@ -188,11 +188,11 @@ function computeSuccessfulRoute(trace) {
 // Generates a string to appear on hover-over of a node.
 function generateNodeMetadata(node) {
 
-    let timestamp = node.timestamp;
+    let durationMs = node.durationMs;
     let client = node.client;
     let metadata = `${node.id}\n`;
-    if (timestamp !== undefined) {
-        metadata += `${timestamp} ms\n`;
+    if (durationMs !== undefined) {
+        metadata += `${durationMs} ms\n`;
     }
     if (client !== undefined) {
         metadata += `${client}`;

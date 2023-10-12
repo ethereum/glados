@@ -4,7 +4,6 @@
 
 {% block content %}
 <script src="/static/js/d3.min.js"></script>
-<script src="https://unpkg.com/@multiformats/multiaddr/dist/index.min.js"></script>
 <script src="/static/js/trace/enr.js"></script>
 <script src="/static/js/trace/graph.js"></script>
 <script src="/static/js/trace/main.js"></script>
@@ -23,29 +22,6 @@
         </div>
     </div>
     <div id="no-trace" hidden="true">No Trace Available</div>
-    <div class="row" id="metadata">
-        <div class="col">
-            <text>Nodes Contacted:</text>
-            <text id="nodes-contacted"> </text>
-            </br>
-            <text>Response Rate:</text>
-            <text id="nodes-responded"></text>
-        </div>
-        <div class="col">
-            <text>Trin Nodes Contacted:</text>
-            <text id="trin-nodes-contacted"></text>
-            </br>
-            <text>Trin Nodes Response Rate:</text>
-            <text id="trin-nodes-responded"></text>
-        </div>
-        <div class="col">
-            <text>Non-Trin Nodes Contacted:</text>
-            <text id="non-trin-nodes-contacted"></text>
-            </br>
-            <text>Non-Trin Nodes Response Rate:</text>
-            <text id="non-trin-nodes-responded"></text>
-        </div>
-    </div>
 </div>
 
 <div id="trace" class="row">
