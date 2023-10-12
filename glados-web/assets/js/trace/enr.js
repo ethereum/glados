@@ -37,7 +37,6 @@
                     exports.ENR = void 0;
                     const RLP = __importStar(require("rlp"));
                     const base64url_1 = __importDefault(require("base64url"));
-                    const convert_1 = __importStar("@multiformats/multiaddr/convert");
                     class ENR extends Map {
                         _nodeId;
                         constructor(kvs = {}) {
@@ -81,7 +80,7 @@
                         get ip() {
                             const raw = this.get("ip");
                             if (raw) {
-                                return (0, convert_1.convertToString)("ip4", toNewUint8Array(raw));
+                                return toNewUint8Array(raw).reduce((acc, n) => {acc.push(n); return acc;}, []).join(".")
                             }
                             else {
                                 return undefined;
@@ -90,7 +89,7 @@
                         get udp() {
                             const raw = this.get("udp");
                             if (raw) {
-                                return Number((0, convert_1.convertToString)("udp", toNewUint8Array(raw)));
+                                return (new DataView(toNewUint8Array(raw).buffer)).getInt16();
                             }
                             else {
                                 return undefined;
