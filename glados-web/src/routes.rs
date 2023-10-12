@@ -639,7 +639,18 @@ pub async fn contentaudit_detail(
         .unwrap()
         .expect("Failed to get audit content key");
 
-    let template = ContentAuditDetailTemplate { audit, content };
+    let execution_metadata = content
+        .find_related(execution_metadata::Entity)
+        .one(&state.database_connection)
+        .await
+        .unwrap()
+        .expect("Failed to get audit metadata");
+
+    let template = ContentAuditDetailTemplate {
+        audit,
+        content,
+        execution_metadata,
+    };
     HtmlTemplate(template)
 }
 

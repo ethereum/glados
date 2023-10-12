@@ -14,8 +14,13 @@
         <h1>Audit #{{ audit.id }}</h1>
         <div class="col">
             <ul>
-                <li>Content Key: {{ content.key_as_hex() }}</li>
-                <li>Content ID: {{ content.id_as_hex() }}</li>
+                <li>Content Key: <a href="/content/key/{{content.key_as_hex() }}/">{{ content.key_as_hex() }}</a></li>
+                <li>Content ID: <a href="/content/id/{{content.id_as_hex() }}/">{{ content.id_as_hex() }}</a></li>
+                <li>Block:
+                    <a href="https://etherscan.io/block/{{ execution_metadata.block_number }}">
+                        {{ execution_metadata.block_number }}
+                    </a>
+                </li>
                 <li>Started: {{ audit.created_at }}</li>
                 <li>Result: {{ audit.result.as_text() }}</li>
             </ul>

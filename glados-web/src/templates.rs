@@ -4,7 +4,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 
-use entity::{client_info, content, content_audit, key_value, node, record};
+use entity::{client_info, content, content_audit, execution_metadata, key_value, node, record};
 
 use crate::routes::{PieChartResult, Stats};
 
@@ -73,6 +73,7 @@ pub struct ContentIdDetailTemplate {
 pub struct ContentAuditDetailTemplate {
     pub audit: content_audit::Model,
     pub content: content::Model,
+    pub execution_metadata: execution_metadata::Model,
 }
 
 #[derive(Template)]

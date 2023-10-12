@@ -8,15 +8,16 @@
   </div>
   <div class="row">
     <div class="col">
-      <ul>
-        <li>Database ID: {{ content_key_model.id }}</li>
-        <li>Content Key: {{ content_key }}</li>
-        <li>Content Id: {{ content_id }}</li>
-        <li>Kind: {{ content_kind }}</li>
-        {% if block_number.is_some() %}
-            <li>Block number: {{ block_number.unwrap() }}</li>
-        {% else %}{% endif %}
-      </ul>
+        <ul>
+            <li>Database ID: {{ content_key_model.id }}</li>
+            <li>Content Key: {{ content_key }}</li>
+            <li>Content Id: {{ content_id }}</li>
+            <li>Kind: {{ content_kind }}</li>
+            {% if block_number.is_some() %}
+            <li>Block number: <a href="https://etherscan.io/block/{{ block_number.unwrap() }}">{{ block_number.unwrap()
+                    }}</a></li>
+            {% else %}{% endif %}
+        </ul>
     </div>
     <div class="col">
       <h3>Content Audits</h3>
