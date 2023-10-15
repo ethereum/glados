@@ -8,11 +8,11 @@ WORKDIR /glados
 ARG GIT_HASH=unknown
 ENV GIT_HASH=$GIT_HASH
 
-RUN apt-get update
-RUN apt-get install clang -y
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends clang ca-certificates \
+    && update-ca-certificates
 
-RUN apt-get install -y --no-install-recommends ca-certificates
-RUN update-ca-certificates
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
 COPY . .
 

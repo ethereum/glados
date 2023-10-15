@@ -8,11 +8,11 @@ WORKDIR /glados
 ARG GIT_HASH=unknown
 ENV GIT_HASH=$GIT_HASH
 
-RUN apt-get update 
-RUN apt-get install clang -y
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends clang ca-certificates \
+    && update-ca-certificates
 
-RUN apt-get install -y --no-install-recommends ca-certificates
-RUN update-ca-certificates
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
 COPY . .
 
@@ -25,7 +25,7 @@ RUN apt-get install libssl-dev -y
 
 # copy build artifacts from build stage
 COPY --from=builder /glados/target/release/glados-monitor /usr/bin/
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/a
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 ENV RUST_LOG=info
 

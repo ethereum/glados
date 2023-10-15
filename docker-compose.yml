@@ -5,10 +5,10 @@ services:
     image: postgres:latest
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${GLADOS_POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${GLADOS_POSTGRES_PASSWORD?Glados Postgres Password Required}
       POSTGRES_DB: glados
     volumes:
-      - ${GLADOS_POSTGRES_DATA_DIR}:/var/lib/postgresql/data
+      - ${GLADOS_POSTGRES_DATA_DIR?Glados Postgres Data Directory Required}:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     networks:
@@ -25,9 +25,7 @@ services:
 
   glados_audit:
     command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://trin:8545"
-    build:
-      context: .
-      dockerfile: ./glados-audit/Dockerfile
+    image: glados-audit:latest
     depends_on:
       - glados_postgres
       - trin
@@ -35,26 +33,31 @@ services:
       - glados-net      
 
   glados_monitor:
-    command: "--migrate --database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados follow-head --provider-url https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}"
-    build:
-      context: .
-      dockerfile: ./glados-monitor/Dockerfile
+    command: "--migrate --database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados follow-head --provider-url https://mainnet.infura.io/v3/${INFURA_PROJECT_ID?Infura Project ID Required}"
+    image: glados-monitor:latest
     depends_on:
       - glados_postgres
     networks:
       - glados-net
 
   glados_web:
-    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados"
-    build:
-      context: .
-      dockerfile: ./glados-web/Dockerfile
+    command: "--database-url postgres://postgres:password@glados_postgres:5432/glados"
+    image: glados-web:latest
     depends_on:
       - glados_postgres
       - glados_monitor
       - glados_audit
     ports:
       - "3001:3001"
+    networks:
+      - glados-net
+
+  glados_cartographer:
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --transport http --http-url http://trin:8545 --concurrency 10"
+    image: glados-cartographer:latest
+    depends_on:
+      - glados_postgres
+      - trin
     networks:
       - glados-net
 
