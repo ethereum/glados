@@ -1,0 +1,77 @@
+version: '3'
+services:
+
+  glados_postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${GLADOS_POSTGRES_PASSWORD?Glados Postgres Password Required}
+      POSTGRES_DB: glados
+    volumes:
+      - ${GLADOS_POSTGRES_DATA_DIR?Glados Postgres Data Directory Required}:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - glados-net
+
+  trin:
+    hostname: trin
+    image: portalnetwork/trin:latest
+    environment:
+      RUST_LOG: info
+    command: "--web3-transport http --web3-http-address http://0.0.0.0:8545/ --mb 0 --bootnodes default"
+    ports:
+      - "8545:8545"
+    networks: 
+      - glados-net
+
+  glados_audit:
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://trin:8545 --concurrency 8 --latest-strategy-weight 2"
+    image: portalnetwork/glados-audit:latest
+    environment:
+      RUST_LOG: warn,glados_audit=info
+    depends_on:
+      - glados_postgres
+      - trin
+    networks:
+      - glados-net      
+
+  glados_monitor:
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados follow-head --provider-url https://mainnet.infura.io/v3/${INFURA_PROJECT_ID?Infura Project ID Required}"
+    image: portalnetwork/glados-monitor:latest
+    environment:
+      RUST_LOG: warn,glados_monitor=info
+    depends_on:
+      - glados_audit
+      - glados_postgres
+    networks:
+      - glados-net
+
+  glados_web:
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados"
+    image: portalnetwork/glados-web:latest
+    environment:
+      RUST_LOG: warn,glados_web=info
+    depends_on:
+      - glados_monitor
+      - glados_postgres
+    ports:
+      - "3001:3001"
+    networks:
+      - glados-net
+
+  glados_cartographer:
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --transport http --http-url http://trin:8545 --concurrency 10"
+    image: portalnetwork/glados-cartographer:latest
+    environment:
+      RUST_LOG: warn,glados_cartographer=info
+    depends_on:
+      - glados_web
+      - glados_postgres
+      - trin
+    networks:
+      - glados-net
+
+networks:
+  glados-net:
+    driver: bridge

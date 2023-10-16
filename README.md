@@ -37,6 +37,10 @@ The `glados-web` crate implements a web application to display information from 
 
 For specific examples, see the [SETUP_GUIDE.md](/SETUP_GUIDE.md).
 
+### Quick Deploy via Docker:
+
+See the [DOCKER_GUIDE.md](/DOCKER_GUIDE.md)
+
 ### Basics
 
 When using SQLite you can use an ephemeral in-memory database or one persisted to disk.  This value is referred to as the `DATABASE_URL`
