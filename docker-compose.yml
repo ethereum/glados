@@ -17,15 +17,19 @@ services:
   trin:
     hostname: trin
     image: portalnetwork/trin:latest
-    command: "--web3-transport http --web3-http-address http://0.0.0.0:8545/"
+    environment:
+      RUST_LOG: info
+    command: "--web3-transport http --web3-http-address http://0.0.0.0:8545/ --mb 0 --bootnodes default"
     ports:
       - "8545:8545"
     networks: 
       - glados-net
 
   glados_audit:
-    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://trin:8545"
-    image: glados-audit:latest
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://trin:8545 --concurrency 8 --latest-strategy-weight 2"
+    image: portalnetwork/glados-audit:latest
+    environment:
+      RUST_LOG: warn,glados_audit=info
     depends_on:
       - glados_postgres
       - trin
@@ -33,20 +37,24 @@ services:
       - glados-net      
 
   glados_monitor:
-    command: "--migrate --database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados follow-head --provider-url https://mainnet.infura.io/v3/${INFURA_PROJECT_ID?Infura Project ID Required}"
-    image: glados-monitor:latest
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados follow-head --provider-url https://mainnet.infura.io/v3/${INFURA_PROJECT_ID?Infura Project ID Required}"
+    image: portalnetwork/glados-monitor:latest
+    environment:
+      RUST_LOG: warn,glados_monitor=info
     depends_on:
+      - glados_audit
       - glados_postgres
     networks:
       - glados-net
 
   glados_web:
-    command: "--database-url postgres://postgres:password@glados_postgres:5432/glados"
-    image: glados-web:latest
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados"
+    image: portalnetwork/glados-web:latest
+    environment:
+      RUST_LOG: warn,glados_web=info
     depends_on:
-      - glados_postgres
       - glados_monitor
-      - glados_audit
+      - glados_postgres
     ports:
       - "3001:3001"
     networks:
@@ -54,8 +62,11 @@ services:
 
   glados_cartographer:
     command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --transport http --http-url http://trin:8545 --concurrency 10"
-    image: glados-cartographer:latest
+    image: portalnetwork/glados-cartographer:latest
+    environment:
+      RUST_LOG: warn,glados_cartographer=info
     depends_on:
+      - glados_web
       - glados_postgres
       - trin
     networks:
