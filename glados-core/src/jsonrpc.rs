@@ -1,8 +1,8 @@
 use std::str::FromStr;
 use std::{path::PathBuf, time::Duration};
 
+use entity::content;
 use ethereum_types::{H256, U256};
-use ethportal_api::OverlayContentKey;
 use jsonrpsee::{
     core::{client::ClientT, params::ArrayParams},
     http_client::{HttpClient, HttpClientBuilder},
@@ -17,7 +17,7 @@ use serde_json::{
 
 use ethportal_api::utils::bytes::{hex_decode, hex_encode, ByteUtilsError};
 use thiserror::Error;
-use tracing::error;
+use tracing::{error, info};
 use url::Url;
 
 use ethportal_api::types::enr::Enr;
@@ -287,12 +287,16 @@ impl PortalApi {
         })
     }
 
-    pub async fn get_content<T: OverlayContentKey>(
+    pub async fn get_content(
         self,
-        content_key: &T,
+        content: &content::Model,
     ) -> Result<Option<Content>, JsonRpcError> {
-        let method = "portal_historyRecursiveFindContent";
-        let key = hex_encode(content_key.to_bytes());
+        let method = match content.protocol_id {
+            content::SubProtocol::History => "portal_historyRecursiveFindContent",
+            content::SubProtocol::State => "portal_stateRecursiveFindContent",
+            content::SubProtocol::Beacon => "portal_beaconRecursiveFindContent",
+        };
+        let key = hex_encode(content.content_key.clone());
         let param = to_raw_value(&key).map_err(|e| JsonRpcError::InvalidJson {
             source: e,
             input: key.to_string(),
@@ -312,15 +316,20 @@ impl PortalApi {
         }
     }
 
-    pub async fn get_content_with_trace<T: OverlayContentKey>(
+    pub async fn get_content_with_trace(
         self,
-        content_key: &T,
+        content: &content::Model,
     ) -> Result<(Option<Content>, String), JsonRpcError> {
-        let params = Some(vec![to_raw_value(&hex_encode(content_key.to_bytes()))?]);
-        match self
-            .make_request("portal_historyTraceRecursiveFindContent", params)
-            .await
-        {
+        let params = Some(vec![to_raw_value(&hex_encode(
+            content.content_key.clone(),
+        ))?]);
+        let method = match content.protocol_id {
+            content::SubProtocol::History => "portal_historyTraceRecursiveFindContent",
+            content::SubProtocol::State => "portal_stateTraceRecursiveFindContent",
+            content::SubProtocol::Beacon => "portal_beaconTraceRecursiveFindContent",
+        };
+        info!("Making request to method: {}", method);
+        match self.make_request(method, params).await {
             Ok(result) => {
                 let query_result: TracedQueryResult = serde_json::from_str(&result)?;
                 let trace = query_result.trace.to_string();

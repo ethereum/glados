@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, TimeZone, Utc};
-use ethportal_api::HistoryContentKey;
 use glados_core::db::store_block_keys;
 use rand::{thread_rng, Rng};
 use sea_orm::{
@@ -188,17 +187,9 @@ async fn add_to_queue(
         "Adding items to audit task channel."
     );
     for content_key_model in items {
-        // Create key from database bytes.
-        let content_key = match HistoryContentKey::try_from(content_key_model.content_key) {
-            Ok(key) => key,
-            Err(err) => {
-                error!(database.id=?content_key_model.id, err=?err, "Could not decode content key from database record");
-                continue;
-            }
-        };
         let task = AuditTask {
             strategy: strategy.clone(),
-            content_key,
+            content: content_key_model,
         };
         if let Err(e) = tx.send(task).await {
             error!(audit.strategy=?strategy, err=?e, "Could not send key for audit, channel might be full or closed.")
@@ -487,7 +478,7 @@ mod tests {
         // Await strategy results
         while let Some(task) = rx.recv().await {
             let key_model = content::Entity::find()
-                .filter(content::Column::ContentKey.eq(task.content_key.to_bytes()))
+                .filter(content::Column::ContentKey.eq(task.content.content_key))
                 .one(&conn)
                 .await
                 .unwrap()
@@ -529,7 +520,7 @@ mod tests {
         // Await strategy results
         while let Some(task) = rx.recv().await {
             let key_model = content::Entity::find()
-                .filter(content::Column::ContentKey.eq(task.content_key.to_bytes()))
+                .filter(content::Column::ContentKey.eq(task.content.content_key))
                 .one(&conn)
                 .await
                 .unwrap()
@@ -561,7 +552,7 @@ mod tests {
         // Await strategy results
         while let Some(task) = rx.recv().await {
             let key_model = content::Entity::find()
-                .filter(content::Column::ContentKey.eq(task.content_key.to_bytes()))
+                .filter(content::Column::ContentKey.eq(task.content.content_key))
                 .one(&conn)
                 .await
                 .unwrap()
