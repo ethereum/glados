@@ -1,7 +1,10 @@
 use anyhow::Result;
+use chrono::Utc;
 use cli::Args;
-use ethportal_api::utils::bytes::{hex_decode, hex_encode};
-use ethportal_api::{HistoryContentKey, OverlayContentKey};
+use ethportal_api::{
+    utils::bytes::{hex_decode, hex_encode},
+    HistoryContentKey,
+};
 use sea_orm::DatabaseConnection;
 use std::{
     collections::HashMap,
@@ -11,6 +14,7 @@ use std::{
     },
     thread::available_parallelism,
 };
+
 use tokio::{
     sync::mpsc::{self, Receiver},
     time::{sleep, Duration},
@@ -18,7 +22,8 @@ use tokio::{
 use tracing::{debug, error, info, warn};
 
 use entity::{
-    client_info, content,
+    client_info,
+    content::{self, SubProtocol},
     content_audit::{self, SelectionStrategy},
     execution_metadata, node,
 };
@@ -117,7 +122,7 @@ impl AuditConfig {
 #[derive(Clone, Debug)]
 pub struct AuditTask {
     pub strategy: SelectionStrategy,
-    pub content_key: HistoryContentKey,
+    pub content: content::Model,
 }
 
 // Associates strategies with their channels and weights.
@@ -141,7 +146,8 @@ pub async fn run_glados_command(conn: DatabaseConnection, command: cli::Command)
 
     let task = AuditTask {
         strategy: SelectionStrategy::SpecificContentKey,
-        content_key,
+        content: content::get_or_create(SubProtocol::History, &content_key, Utc::now(), &conn)
+            .await?,
     };
     let client = PortalClient::from(portal_client).await?;
     let active_threads = Arc::new(AtomicU8::new(0));
@@ -274,16 +280,16 @@ async fn perform_single_audit(
     let client_info = client.client_info.clone();
 
     debug!(
-        content.key = hex_encode(task.content_key.to_bytes()),
+        content.key = hex_encode(&task.content.content_key),
         client.url = client.api.client_url.clone(),
         "auditing content",
     );
     let (content_response, trace) = if client.clone().supports_trace() {
-        match client.api.get_content_with_trace(&task.content_key).await {
+        match client.api.get_content_with_trace(&task.content).await {
             Ok(c) => c,
             Err(e) => {
                 error!(
-                    content.key=hex_encode(task.content_key.to_bytes()),
+                    content.key=hex_encode(&task.content.content_key),
                     err=?e,
                     "Problem requesting content with trace from Portal node."
                 );
@@ -292,11 +298,11 @@ async fn perform_single_audit(
             }
         }
     } else {
-        match client.api.get_content(&task.content_key).await {
+        match client.api.get_content(&task.content).await {
             Ok(c) => (c, "".to_owned()),
             Err(e) => {
                 error!(
-                    content.key=hex_encode(task.content_key.to_bytes()),
+                    content.key=hex_encode(task.content.content_key),
                     err=?e,
                     "Problem requesting content from Portal node."
                 );
@@ -308,36 +314,14 @@ async fn perform_single_audit(
 
     // If content was absent audit result is 'fail'.
     let audit_result = match content_response {
-        Some(content_bytes) => content_is_valid(&task.content_key, &content_bytes.raw),
+        Some(content_bytes) => content_is_valid(&task.content, &content_bytes.raw),
         None => false,
-    };
-
-    let content_key_model = match content::get(&task.content_key, &conn).await {
-        Ok(Some(m)) => m,
-        Ok(None) => {
-            error!(
-                content.key=?task.content_key,
-                audit.pass=?audit_result,
-                "Content key not found in db."
-            );
-            active_threads.fetch_sub(1, Ordering::Relaxed);
-            return;
-        }
-        Err(e) => {
-            error!(
-                content.key=?task.content_key,
-                err=?e,
-                "Could not look up content key in db."
-            );
-            active_threads.fetch_sub(1, Ordering::Relaxed);
-            return;
-        }
     };
 
     let client_info_id = match client_info::get_or_create(client_info, &conn).await {
         Ok(client_info) => client_info.id,
         Err(error) => {
-            error!(content.key=?task.content_key,
+            error!(content.key=?task.content,
                 err=?error,
                 "Could not create/lookup client info in db."
             );
@@ -356,7 +340,7 @@ async fn perform_single_audit(
         }
     };
     if let Err(e) = content_audit::create(
-        content_key_model.id,
+        task.content.id,
         client_info_id,
         node_id,
         audit_result,
@@ -367,7 +351,7 @@ async fn perform_single_audit(
     .await
     {
         error!(
-            content.key=?task.content_key,
+            content.key=?task.content,
             err=?e,
             "Could not create audit entry in db."
         );
@@ -375,26 +359,54 @@ async fn perform_single_audit(
         return;
     };
 
-    // Display audit result with block metadata.
-    match execution_metadata::get(content_key_model.id, &conn).await {
+    // Display audit result.
+    match task.content.protocol_id {
+        SubProtocol::History => {
+            display_history_audit_result(task.content, audit_result, &conn).await;
+        }
+        SubProtocol::Beacon => {
+            info!(
+                content.key = hex_encode(task.content.content_key),
+                audit.pass = audit_result,
+                content.protocol = "Beacon",
+            );
+        }
+        SubProtocol::State => {
+            info!(
+                content.key = hex_encode(task.content.content_key),
+                audit.pass = audit_result,
+                content.protocol = "State",
+            );
+        }
+    }
+
+    active_threads.fetch_sub(1, Ordering::Relaxed);
+}
+
+async fn display_history_audit_result(
+    content: content::Model,
+    audit_result: bool,
+    conn: &DatabaseConnection,
+) {
+    match execution_metadata::get(content.id, conn).await {
         Ok(Some(b)) => {
             info!(
-                content.key=hex_encode(task.content_key.to_bytes()),
+                content.key=hex_encode(content.content_key),
                 audit.pass=?audit_result,
                 block = b.block_number,
+                "History content audit"
             );
         }
         Ok(None) => {
-            error!(
-                content.key=hex_encode(task.content_key.to_bytes()),
+            info!(
+                content.key=hex_encode(content.content_key),
                 audit.pass=?audit_result,
-                "Block metadata absent for key."
+                "Block metadata absent for history key."
             );
         }
         Err(e) => error!(
-                content.key=hex_encode(task.content_key.to_bytes()),
-                err=?e,
-                "Problem getting block metadata."),
+                    content.key=hex_encode(content.content_key),
+                    err=?e,
+                    "Problem getting block metadata for history key."),
     };
-    active_threads.fetch_sub(1, Ordering::Relaxed);
 }
