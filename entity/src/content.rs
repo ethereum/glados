@@ -127,6 +127,6 @@ impl Model {
             .to_rfc2822()
     }
     pub fn available_at_humanized(&self) -> String {
-        utils::time_ago(self.first_available_at)
+        utils::time_ago(self.first_available_at, Utc::now())
     }
 }

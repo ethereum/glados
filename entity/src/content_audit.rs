@@ -2,6 +2,7 @@
 use crate::content;
 use crate::utils;
 use anyhow::{bail, Result};
+use chrono::Utc;
 use chrono::{DateTime, FixedOffset};
 use clap::ValueEnum;
 use ethportal_api::OverlayContentKey;
@@ -171,7 +172,7 @@ impl Model {
         self.created_at.with_timezone(&chrono::Local).to_rfc2822()
     }
     pub fn created_at_humanized(&self) -> String {
-        utils::time_ago(self.created_at)
+        utils::time_ago(self.created_at, Utc::now())
     }
     /// A convenience method for displaying the strategy.
     ///

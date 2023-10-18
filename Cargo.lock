@@ -1448,6 +1448,7 @@ dependencies = [
  "migration",
  "primitive-types 0.10.1",
  "rand 0.8.5",
+ "rstest 0.16.0",
  "sea-orm",
  "sea-query",
  "tokio",
@@ -2137,7 +2138,7 @@ dependencies = [
  "jsonrpc",
  "jsonrpsee",
  "reth-ipc",
- "rstest",
+ "rstest 0.11.0",
  "rustc-hex",
  "serde",
  "serde_json",
@@ -4173,6 +4174,32 @@ dependencies = [
  "quote",
  "rustc_version 0.4.0",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "rstest"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b07f2d176c472198ec1e6551dc7da28f1c089652f66a7b722676c2238ebc0edf"
+dependencies = [
+ "futures",
+ "futures-timer",
+ "rstest_macros",
+ "rustc_version 0.4.0",
+]
+
+[[package]]
+name = "rstest_macros"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7229b505ae0706e64f37ffc54a9c163e11022a6636d58fe1f3f52018257ff9f7"
+dependencies = [
+ "cfg-if 1.0.0",
+ "proc-macro2",
+ "quote",
+ "rustc_version 0.4.0",
+ "syn 1.0.109",
+ "unicode-ident",
 ]
 
 [[package]]
