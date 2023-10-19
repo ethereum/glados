@@ -2181,7 +2181,7 @@ dependencies = [
  "enr 0.8.1",
  "entity",
  "env_logger 0.9.3",
- "ethereum-types 0.14.1",
+ "ethereum-types 0.12.1",
  "ethportal-api",
  "glados-core",
  "itertools",

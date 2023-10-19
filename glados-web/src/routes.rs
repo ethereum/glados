@@ -11,6 +11,8 @@ use entity::{
     content_audit::{self, AuditResult},
     execution_metadata, key_value, node, record,
 };
+use ethportal_api::jsonrpsee::core::__reexports::serde_json;
+use ethportal_api::types::distance::{Distance, Metric, XorMetric};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use migration::{Alias, JoinType};
@@ -687,6 +689,69 @@ impl Period {
             Period::Week => 604800,
         }
     }
+}
+
+#[derive(FromQueryResult, Serialize, Debug)]
+pub struct DeadZoneData {
+    pub data_radius: Vec<u8>,
+    pub raw: String,
+    pub node_id: Vec<u8>,
+}
+
+pub async fn is_content_in_deadzone(
+    Path(content_key): Path<String>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<String>>, StatusCode> {
+    let builder = state.database_connection.get_database_backend();
+    let mut average_radius = Query::select();
+    average_radius
+        .expr_as(
+            Expr::col(census_node::Column::DataRadius),
+            Alias::new("data_radius"),
+        )
+        .expr(Expr::col((node::Entity, node::Column::NodeId)))
+        .expr(Expr::col((record::Entity, record::Column::Raw)))
+        .from(census_node::Entity)
+        .from(node::Entity)
+        .from(record::Entity)
+        .from_subquery(
+            Query::select()
+                .from(census::Entity)
+                .expr_as(Expr::max(Expr::col(census::Column::Id)), Alias::new("id"))
+                .take(),
+            Alias::new("max_census_id"),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::CensusId))
+                .eq(Expr::col((Alias::new("max_census_id"), Alias::new("id")))),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::RecordId))
+                .eq(Expr::col((record::Entity, record::Column::Id))),
+        )
+        .and_where(
+            Expr::col((record::Entity, record::Column::NodeId))
+                .eq(Expr::col((node::Entity, node::Column::Id))),
+        );
+
+    let dead_zone_data = DeadZoneData::find_by_statement(builder.build(&average_radius))
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+
+    let content_key: ethportal_api::HistoryContentKey =
+        serde_json::from_value(serde_json::json!(content_key)).unwrap();
+
+    let mut enrs: Vec<String> = vec![];
+    for i in dead_zone_data {
+        let radius = Distance::from(crate::U256::from_big_endian(&i.data_radius));
+        let node_id = Distance::from(crate::U256::from_big_endian(&i.node_id));
+        if XorMetric::distance(&content_key.content_id(), &node_id.big_endian()) <= radius {
+            enrs.push(i.raw);
+        }
+    }
+
+    Ok(Json(enrs))
 }
 
 pub struct Stats {
