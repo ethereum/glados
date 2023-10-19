@@ -27,29 +27,6 @@
         </div>
     </div>
     <div id="no-trace" hidden="true">No Trace Available</div>
-    <div class="row" id="metadata">
-        <div class="col">
-            <text>Nodes Contacted:</text>
-            <text id="nodes-contacted"> </text>
-            </br>
-            <text>Response Rate:</text>
-            <text id="nodes-responded"></text>
-        </div>
-        <div class="col">
-            <text>Trin Nodes Contacted:</text>
-            <text id="trin-nodes-contacted"></text>
-            </br>
-            <text>Trin Nodes Response Rate:</text>
-            <text id="trin-nodes-responded"></text>
-        </div>
-        <div class="col">
-            <text>Non-Trin Nodes Contacted:</text>
-            <text id="non-trin-nodes-contacted"></text>
-            </br>
-            <text>Non-Trin Nodes Response Rate:</text>
-            <text id="non-trin-nodes-responded"></text>
-        </div>
-    </div>
 </div>
 
 <div id="trace" class="row">
@@ -65,6 +42,8 @@
             <text>No Progress</text>
             <div class="legend-dot" id="found-content"></div>
             <text>Content Found</text>
+            <div class="legend-dot" id="cancelled"></div>
+            <text>Request Cancelled</text>
         </div>
 
     </div>
@@ -92,9 +71,7 @@
 <script>
     $(document).ready(function () {
 
-        try {
             let trace_string = "{{ audit.trace }}".replace(/&quot;/g, '"');
-            console.log(trace_string);
             let trace = JSON.parse(trace_string);
 
             let heightTaken = $('#top-of-audit-detail').height();
@@ -107,20 +84,6 @@
 
             generateTable(graphData.nodes);
 
-            let metadata = graphData.metadata;
-            let nodesResponded = metadata.nodesResponded / metadata.nodesContacted;
-            $('#nodes-contacted').text(metadata.nodesContacted);
-            $('#nodes-responded').text(Math.round(nodesResponded * 100) + '%');
-
-            let trinNodesResponded = metadata.trinNodesResponded / metadata.trinNodesContacted;
-            $('#trin-nodes-contacted').text(metadata.trinNodesContacted);
-            $('#trin-nodes-responded').text(Math.round(trinNodesResponded * 100) + '%');
-
-            let nonTrinNodesContacted = metadata.nodesContacted - metadata.trinNodesContacted;
-            let nonTrinNodesResponseRate = (metadata.nodesResponded - metadata.trinNodesResponded) / nonTrinNodesContacted;
-            $('#non-trin-nodes-contacted').text(nonTrinNodesContacted);
-            $('#non-trin-nodes-responded').text(Math.round(nonTrinNodesResponseRate * 100) + '%');
-
             $('#trin-button').on("mouseenter", function () {
                 $('#trin-button').css('background-color', 'lightgray');
                 highlightTrinNodes();
@@ -128,12 +91,6 @@
                 $('#trin-button').css('background-color', 'white');
                 unHighlight();
             });
-        } catch (e) {
-            console.error(e);
-            $('#no-trace').attr('hidden', false);
-            $('#metadata').attr('hidden', true);
-            $('#trace').attr('hidden', true);
-        }
     });
 </script>
 
