@@ -82,7 +82,7 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
             get(routes::hourly_success_rate),
         )
         .route(
-            "/is-content-in-deadzone/:content_key",
+            "/api/is-content-in-deadzone/:content_key",
             get(routes::is_content_in_deadzone),
         )
         .nest_service("/static/", serve_dir.clone())
