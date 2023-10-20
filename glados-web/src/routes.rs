@@ -1,11 +1,11 @@
 use axum::{
-    extract::{Extension, Path},
+    extract::{Extension, Path, Query as HttpQuery},
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
 use chrono::{DateTime, Duration, Utc};
-use entity::{census, census_node, client_info};
+use entity::{census, census_node, client_info, content_audit::SelectionStrategy};
 use entity::{
     content,
     content_audit::{self, AuditResult},
@@ -15,13 +15,16 @@ use ethportal_api::jsonrpsee::core::__reexports::serde_json;
 use ethportal_api::types::distance::{Distance, Metric, XorMetric};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
-use migration::{Alias, JoinType, Order};
-use sea_orm::sea_query::{Expr, Query, SeaRc};
+use migration::{Alias, IntoCondition, JoinType, Order};
+use sea_orm::{
+    sea_query::{Expr, Query, SeaRc},
+    RelationTrait,
+};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, DynIden, EntityTrait,
     FromQueryResult, LoaderTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
 use std::sync::Arc;
 use std::{fmt::Display, io};
@@ -29,9 +32,10 @@ use tracing::error;
 use tracing::info;
 
 use crate::templates::{
-    ContentAuditDetailTemplate, ContentDashboardTemplate, ContentIdDetailTemplate,
-    ContentIdListTemplate, ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate,
-    HtmlTemplate, IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate,
+    AuditDashboardTemplate, AuditTableTemplate, ContentAuditDetailTemplate,
+    ContentDashboardTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
+    ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate, HtmlTemplate,
+    IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate,
 };
 use crate::{state::State, templates::AuditTuple};
 
@@ -654,6 +658,11 @@ pub async fn contentkey_list(
     Ok(HtmlTemplate(template))
 }
 
+pub async fn contentaudit_dashboard() -> Result<HtmlTemplate<AuditDashboardTemplate>, StatusCode> {
+    let template = AuditDashboardTemplate {};
+    Ok(HtmlTemplate(template))
+}
+
 /// Returns the success rate for the last hour as a percentage.
 pub async fn hourly_success_rate(
     Extension(state): Extension<Arc<State>>,
@@ -759,6 +768,107 @@ pub async fn contentaudit_detail(
         content,
         execution_metadata,
     };
+    HtmlTemplate(template)
+}
+
+#[derive(Deserialize)]
+pub struct AuditFilters {
+    strategy: StrategyFilter,
+    content_type: ContentTypeFilter,
+    success: SuccessFilter,
+}
+
+#[derive(Deserialize)]
+pub enum StrategyFilter {
+    All,
+    Random,
+    Latest,
+    Oldest,
+}
+
+#[derive(Deserialize)]
+pub enum SuccessFilter {
+    All,
+    Success,
+    Failure,
+}
+
+#[derive(Deserialize)]
+pub enum ContentTypeFilter {
+    All,
+    Headers,
+    Bodies,
+    Receipts,
+}
+
+pub async fn contentaudit_filter(
+    Extension(state): Extension<Arc<State>>,
+    filters: HttpQuery<AuditFilters>,
+) -> impl IntoResponse {
+    let audits = content_audit::Entity::find();
+
+    let audits = match filters.strategy {
+        StrategyFilter::All => audits,
+        StrategyFilter::Random => {
+            audits.filter(content_audit::Column::StrategyUsed.eq(SelectionStrategy::Random))
+        }
+        StrategyFilter::Latest => {
+            audits.filter(content_audit::Column::StrategyUsed.eq(SelectionStrategy::Latest))
+        }
+        StrategyFilter::Oldest => audits.filter(
+            content_audit::Column::StrategyUsed.eq(SelectionStrategy::SelectOldestUnaudited),
+        ),
+    };
+    let audits = match filters.success {
+        SuccessFilter::All => audits,
+        SuccessFilter::Success => {
+            audits.filter(content_audit::Column::Result.eq(AuditResult::Success))
+        }
+        SuccessFilter::Failure => {
+            audits.filter(content_audit::Column::Result.eq(AuditResult::Failure))
+        }
+    };
+    let audits = match filters.content_type {
+        ContentTypeFilter::All => audits,
+
+        ContentTypeFilter::Headers => audits.join(
+            JoinType::InnerJoin,
+            content_audit::Relation::Content
+                .def()
+                .on_condition(|_left, _right| {
+                    Expr::cust("get_byte(content.content_key, 0) = 0x00").into_condition()
+                }),
+        ),
+
+        ContentTypeFilter::Bodies => audits.join(
+            JoinType::InnerJoin,
+            content_audit::Relation::Content
+                .def()
+                .on_condition(|_left, _right| {
+                    Expr::cust("get_byte(content.content_key, 0) = 0x01").into_condition()
+                }),
+        ),
+        ContentTypeFilter::Receipts => audits.join(
+            JoinType::InnerJoin,
+            content_audit::Relation::Content
+                .def()
+                .on_condition(|_left, _right| {
+                    Expr::cust("get_byte(content.content_key, 0) = 0x02").into_condition()
+                }),
+        ),
+    };
+    let audits = audits
+        .order_by_desc(content_audit::Column::CreatedAt)
+        .limit(100)
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+
+    let audits = get_audit_tuples_from_audit_models(audits, &state.database_connection)
+        .await
+        .unwrap();
+
+    let template = AuditTableTemplate { audits };
     HtmlTemplate(template)
 }
 

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Content Dashboard{% endblock %}
+{% block head %}
+<link href="/static/css/glados_pages.css" rel="stylesheet">
+{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col">
+        <ul>
+            <br />
+            <h1 class="header">Audit Dashboard</h1>
+            <div id="content-buttons" class="btn-group mr-2" role="group">
+                <button id="all-content-button" filter="All" class="btn btn-outline-secondary" type="button">All
+                </button>
+                <button id="headers-button" filter="Headers" class="btn btn-outline-secondary"
+                    type="button">Headers</button>
+                <button id="bodies-button" filter="Bodies" class="btn btn-outline-secondary"
+                    type="button">Bodies</button>
+                <button id="receipts-button" filter="Receipts" class="btn btn-outline-secondary"
+                    type="button">Receipts</button>
+            </div>
+            <div id="strategy-buttons" class="btn-group">
+                <button id="all-strategy-button" filter="All" class="btn btn-outline-secondary"
+                    type="button">All</button>
+                <button id="latest-button" filter="Latest" class="btn btn-outline-secondary"
+                    type="button">Latest</button>
+                <button id="random-button" filter="Random" class="btn btn-outline-secondary"
+                    type="button">Random</button>
+                <button id="oldest-button" filter="Oldest" class="btn btn-outline-secondary" type="button">Oldest
+                    Unaudited</button>
+            </div>
+            <div id="success-buttons" class="btn-group">
+                <button id="all-success-button" filter="All" class="btn btn-outline-secondary"
+                    type="button">All</button>
+                <button id="success-button" filter="Success" class="btn btn-outline-secondary" type="button">Success
+                </button>
+                <button id="failure-button" filter="Failure" class="btn btn-outline-secondary"
+                    type="button">Failure</button>
+            </div>
+
+        </ul>
+    </div>
+</div>
+<div id="audit-table"></div>
+<style>
+    .btn-outline-secondary.active {
+        background-color: #474747;
+    }
+</style>
+<script>
+
+    $(document).ready(function () {
+
+        const contentGroup = document.querySelector('#content-buttons');
+        const strategyGroup = document.querySelector('#strategy-buttons');
+        const successGroup = document.querySelector('#success-buttons');
+
+        const activateButton = (btn, group) => {
+            // Deactivate all buttons in the group
+            group.querySelectorAll('.btn').forEach(button => {
+                button.classList.remove('active');
+            });
+            // Activate the clicked button
+            btn.classList.add('active');
+        };
+
+        const handleButtonClick = (event, group) => {
+            if (event.target.classList.contains('btn')) {
+                activateButton(event.target, group);
+            }
+
+            // Store the active button in each group in session storage
+            sessionStorage.setItem('content-filter', `#${contentGroup.querySelector('.active').id}`);
+            sessionStorage.setItem('strategy-filter', `#${strategyGroup.querySelector('.active').id}`);
+            sessionStorage.setItem('success-filter', `#${successGroup.querySelector('.active').id}`);
+
+            // Get the active button's filter string in each group
+            const selectedContent = contentGroup.querySelector('.active').getAttribute('filter');
+            const selectedStrategy = strategyGroup.querySelector('.active').getAttribute('filter');
+            const selectedSuccess = successGroup.querySelector('.active').getAttribute('filter');
+
+            updateDashboard(selectedStrategy, selectedContent, selectedSuccess);
+
+        };
+
+        // Check whether the browser's session storage contains a filter for the given group, otherwise use default
+        const setInitialButton = (filter, defaultButton, group) => {
+            if (sessionStorage.getItem(filter) !== null) {
+                activateButton(document.querySelector(`${sessionStorage.getItem(filter)}`), group);
+            } else {
+                activateButton(document.querySelector(defaultButton), group);
+            }
+        }
+
+        // Attach event listeners to each button group
+        contentGroup.addEventListener('click', (event) => handleButtonClick(event, contentGroup));
+        strategyGroup.addEventListener('click', (event) => handleButtonClick(event, strategyGroup));
+        successGroup.addEventListener('click', (event) => handleButtonClick(event, successGroup));
+
+        setInitialButton('content-filter', '#all-content-button', contentGroup);
+        setInitialButton('strategy-filter', '#all-strategy-button', strategyGroup);
+        setInitialButton('success-filter', '#all-success-button', successGroup);
+
+        const selectedContent = contentGroup.querySelector('.active').getAttribute('filter');
+        const selectedStrategy = strategyGroup.querySelector('.active').getAttribute('filter');
+        const selectedSuccess = successGroup.querySelector('.active').getAttribute('filter');
+
+        updateDashboard(selectedStrategy, selectedContent, selectedSuccess);
+
+    });
+
+    function updateDashboard(strategy, content_type, success) {
+
+        const baseUrl = "filter/";
+        const params = {
+            strategy: strategy,
+            content_type: content_type,
+            success: success,
+        };
+
+        const queryString = new URLSearchParams(params).toString();
+
+        fetch(`${baseUrl}?${queryString}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(data => {
+                document.getElementById('audit-table').innerHTML = data;
+            })
+            .catch(error => {
+                console.log('There was a problem with the fetch operation:', error.message);
+            });
+    }
+
+</script>
+
+
+{% endblock %}
