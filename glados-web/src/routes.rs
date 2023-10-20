@@ -704,8 +704,8 @@ pub async fn is_content_in_deadzone(
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<Vec<String>>, StatusCode> {
     let builder = state.database_connection.get_database_backend();
-    let mut average_radius = Query::select();
-    average_radius
+    let mut select_dead_zone_data = Query::select();
+    select_dead_zone_data
         .expr(Expr::col((census_node::Entity, census_node::Column::DataRadius)))
         .expr(Expr::col((node::Entity, node::Column::NodeId)))
         .expr(Expr::col((record::Entity, record::Column::Raw)))
@@ -743,7 +743,7 @@ pub async fn is_content_in_deadzone(
                 .eq(Expr::col((node::Entity, node::Column::Id))),
         );
 
-    let dead_zone_data_vec = DeadZoneData::find_by_statement(builder.build(&average_radius))
+    let dead_zone_data_vec = DeadZoneData::find_by_statement(builder.build(&select_dead_zone_data))
         .all(&state.database_connection)
         .await
         .unwrap();
