@@ -77,6 +77,8 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
             get(routes::contentkey_detail),
         )
         .route("/audit/id/:audit_id", get(routes::contentaudit_detail))
+        .route("/audits/", get(routes::contentaudit_dashboard))
+        .route("/audits/filter/", get(routes::contentaudit_filter))
         .route(
             "/api/hourly-success-rate/",
             get(routes::hourly_success_rate),
