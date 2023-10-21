@@ -13,17 +13,16 @@ use entity::{
 };
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
-use migration::{Alias, JoinType, SqliteQueryBuilder};
-use sea_orm::entity::prelude::*;
-use sea_orm::sea_query::{Expr, PostgresQueryBuilder, Query, SeaRc, SimpleExpr};
-use sea_orm::{ColIdx, ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, DynIden, EntityTrait, FromQueryResult, LoaderTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, TryGetable, TryGetError};
+use migration::{Alias, JoinType};
+use sea_orm::sea_query::{Expr, Query, SeaRc};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, DynIden, EntityTrait,
+    FromQueryResult, LoaderTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
+};
 use serde::Serialize;
 use std::fmt::Formatter;
 use std::sync::Arc;
 use std::{fmt::Display, io};
-use enr::k256::elliptic_curve::bigint::Encoding;
-use enr::k256::U256;
-use sea_orm::DatabaseBackend::Sqlite;
 use tracing::error;
 use tracing::info;
 
@@ -52,13 +51,6 @@ pub struct CalculatedRadiusChartData {
     pub data_radius: f64,
     pub node_id: u64,
     pub node_id_string: String,
-}
-
-impl TryGetable for RadiusChartData {
-    fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-        let mut data_radius = [0u8; 32];
-        Ok(Self { data_radius })
-    }
 }
 
 #[derive(FromQueryResult, Serialize)]

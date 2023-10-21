@@ -6,7 +6,7 @@ use axum::{
 
 use entity::{client_info, content, content_audit, execution_metadata, key_value, node, record};
 
-use crate::routes::{CalculatedRadiusChartData, PieChartResult, RadiusChartData, Stats};
+use crate::routes::{CalculatedRadiusChartData, PieChartResult, Stats};
 
 #[derive(Template)]
 #[template(path = "index.html")]
