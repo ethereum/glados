@@ -5,7 +5,9 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, Duration, Utc};
-use entity::{census, census_node, client_info, content_audit::SelectionStrategy};
+use entity::{
+    census, census_node, client_info, content::SubProtocol, content_audit::SelectionStrategy,
+};
 use entity::{
     content,
     content_audit::{self, AuditResult},
@@ -18,7 +20,7 @@ use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use migration::{Alias, IntoCondition, JoinType, Order};
 use sea_orm::{
     sea_query::{Expr, Query, SeaRc},
-    RelationTrait,
+    RelationTrait, Select,
 };
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, DynIden, EntityTrait,
@@ -801,10 +803,12 @@ pub enum ContentTypeFilter {
     Receipts,
 }
 
+/// Takes an AuditFilter object generated from http query params
+/// Conditionally creates a query based on the filters
 pub async fn contentaudit_filter(
     Extension(state): Extension<Arc<State>>,
     filters: HttpQuery<AuditFilters>,
-) -> impl IntoResponse {
+) -> Result<HtmlTemplate<AuditTableTemplate>, StatusCode> {
     let audits = content_audit::Entity::find();
 
     let audits = match filters.strategy {
@@ -835,41 +839,70 @@ pub async fn contentaudit_filter(
             JoinType::InnerJoin,
             content_audit::Relation::Content
                 .def()
-                .on_condition(|_left, _right| {
-                    Expr::cust("get_byte(content.content_key, 0) = 0x00").into_condition()
+                .on_condition(|_left, right| {
+                    Expr::cust("get_byte(content.content_key, 0) = 0x00")
+                        .and(
+                            Expr::col((right, content::Column::ProtocolId))
+                                .eq(SubProtocol::History),
+                        )
+                        .into_condition()
                 }),
         ),
-
         ContentTypeFilter::Bodies => audits.join(
             JoinType::InnerJoin,
             content_audit::Relation::Content
                 .def()
-                .on_condition(|_left, _right| {
-                    Expr::cust("get_byte(content.content_key, 0) = 0x01").into_condition()
+                .on_condition(|_left, right| {
+                    Expr::cust("get_byte(content.content_key, 0) = 0x01")
+                        .and(
+                            Expr::col((right, content::Column::ProtocolId))
+                                .eq(SubProtocol::History),
+                        )
+                        .into_condition()
                 }),
         ),
         ContentTypeFilter::Receipts => audits.join(
             JoinType::InnerJoin,
             content_audit::Relation::Content
                 .def()
-                .on_condition(|_left, _right| {
-                    Expr::cust("get_byte(content.content_key, 0) = 0x02").into_condition()
+                .on_condition(|_left, right| {
+                    Expr::cust("get_byte(content.content_key, 0) = 0x02")
+                        .and(
+                            Expr::col((right, content::Column::ProtocolId))
+                                .eq(SubProtocol::History),
+                        )
+                        .into_condition()
                 }),
         ),
     };
-    let audits = audits
-        .order_by_desc(content_audit::Column::CreatedAt)
-        .limit(100)
-        .all(&state.database_connection)
-        .await
-        .unwrap();
 
-    let audits = get_audit_tuples_from_audit_models(audits, &state.database_connection)
-        .await
-        .unwrap();
+    let (hour_stats, day_stats, week_stats, filtered_audits) = tokio::join!(
+        get_filtered_audit_stats(audits.clone(), Period::Hour, &state.database_connection),
+        get_filtered_audit_stats(audits.clone(), Period::Day, &state.database_connection),
+        get_filtered_audit_stats(audits.clone(), Period::Week, &state.database_connection),
+        audits
+            .order_by_desc(content_audit::Column::CreatedAt)
+            .limit(30)
+            .all(&state.database_connection),
+    );
 
-    let template = AuditTableTemplate { audits };
-    HtmlTemplate(template)
+    let filtered_audits = filtered_audits.map_err(|e| {
+        error!(err=?e, "Could not look up audit stats");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let hour_stats = hour_stats?;
+    let day_stats = day_stats?;
+    let week_stats = week_stats?;
+
+    let filtered_audits: Vec<AuditTuple> =
+        get_audit_tuples_from_audit_models(filtered_audits, &state.database_connection).await?;
+
+    let template = AuditTableTemplate {
+        stats: [hour_stats, day_stats, week_stats],
+        audits: filtered_audits,
+    };
+
+    Ok(HtmlTemplate(template))
 }
 
 pub enum Period {
@@ -989,6 +1022,59 @@ pub struct Stats {
     pub total_failures: u32,
     pub fail_percent: f32,
     pub audits_per_minute: u32,
+}
+
+async fn get_filtered_audit_stats(
+    filtered: Select<content_audit::Entity>,
+    period: Period,
+    conn: &DatabaseConnection,
+) -> Result<Stats, StatusCode> {
+    let cutoff = period.cutoff_time();
+
+    let total_audits = filtered
+        .clone()
+        .filter(content_audit::Column::CreatedAt.gt(cutoff))
+        .count(conn)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Could not look up audit stats");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })? as u32;
+
+    let total_passes = filtered
+        .filter(content_audit::Column::CreatedAt.gt(cutoff))
+        .filter(content_audit::Column::Result.eq(AuditResult::Success))
+        .count(conn)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Could not look up audit stats");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })? as u32;
+
+    let total_failures = total_audits - total_passes;
+
+    let audits_per_minute = 0;
+
+    let (pass_percent, fail_percent) = if total_audits == 0 {
+        (0.0, 0.0)
+    } else {
+        let total_audits = total_audits as f32;
+        (
+            (total_passes as f32) * 100.0 / total_audits,
+            (total_failures as f32) * 100.0 / total_audits,
+        )
+    };
+
+    Ok(Stats {
+        period,
+        new_content: 0,
+        total_audits,
+        total_passes,
+        pass_percent,
+        total_failures,
+        fail_percent,
+        audits_per_minute,
+    })
 }
 
 async fn get_audit_stats(period: Period, conn: &DatabaseConnection) -> Result<Stats, StatusCode> {
