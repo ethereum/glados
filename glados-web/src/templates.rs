@@ -57,12 +57,6 @@ pub struct ContentDashboardTemplate {
 }
 
 #[derive(Template)]
-#[template(path = "audit_table.html")]
-pub struct AuditTableTemplate {
-    pub audits: Vec<AuditTuple>,
-}
-
-#[derive(Template)]
 #[template(path = "contentid_list.html")]
 pub struct ContentIdListTemplate {
     pub contentid_list: Vec<content::Model>,
@@ -92,6 +86,13 @@ pub struct ContentKeyListTemplate {
 #[derive(Template)]
 #[template(path = "audit_dashboard.html")]
 pub struct AuditDashboardTemplate {}
+
+#[derive(Template)]
+#[template(path = "audit_table.html")]
+pub struct AuditTableTemplate {
+    pub stats: [Stats; 3],
+    pub audits: Vec<AuditTuple>,
+}
 
 #[derive(Template)]
 #[template(path = "contentkey_detail.html")]
