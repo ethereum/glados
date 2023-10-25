@@ -11,9 +11,11 @@ use entity::{
     content_audit::{self, AuditResult},
     execution_metadata, key_value, node, record,
 };
+use ethportal_api::jsonrpsee::core::__reexports::serde_json;
+use ethportal_api::types::distance::{Distance, Metric, XorMetric};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
-use migration::{Alias, JoinType};
+use migration::{Alias, JoinType, Order};
 use sea_orm::sea_query::{Expr, Query, SeaRc};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, DynIden, EntityTrait,
@@ -103,8 +105,8 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
                     } else {
                         "convert_from(key, 'UTF8')"
                     })
-                    // Uses a CAST to TEXT on the table in order to do a comparison to the binary value, both SQLite and Postgres both need to be casted in order to be compared
-                    .eq("c"),
+                        // Uses a CAST to TEXT on the table in order to do a comparison to the binary value, both SQLite and Postgres both need to be casted in order to be compared
+                        .eq("c"),
                 )
                 .take(),
             right_table.clone(),
@@ -390,12 +392,12 @@ pub async fn get_audits_for_recent_content(
             .unzip();
 
     let client_info = audits
-            .load_one(client_info::Entity, conn)
-            .await
-            .map_err(|e| {
-                error!(key.count=audits.len(), err=?e, "Could not look up client info for recent audits");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+        .load_one(client_info::Entity, conn)
+        .await
+        .map_err(|e| {
+            error!(key.count=audits.len(), err=?e, "Could not look up client info for recent audits");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let audit_tuples: Vec<AuditTuple> = itertools::izip!(audits, recent_content, client_info)
         .filter_map(|(audit, con, info)| {
@@ -670,6 +672,7 @@ impl Display for Period {
         write!(f, "Last {time_period}")
     }
 }
+
 impl Period {
     fn cutoff_time(&self) -> DateTime<Utc> {
         let duration = match self {
@@ -687,6 +690,78 @@ impl Period {
             Period::Week => 604800,
         }
     }
+}
+
+#[derive(FromQueryResult, Serialize, Debug)]
+pub struct DeadZoneData {
+    pub data_radius: Vec<u8>,
+    pub raw: String,
+    pub node_id: Vec<u8>,
+}
+
+pub async fn is_content_in_deadzone(
+    Path(content_key): Path<String>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<String>>, StatusCode> {
+    let builder = state.database_connection.get_database_backend();
+    let mut select_dead_zone_data = Query::select();
+    select_dead_zone_data
+        .expr(Expr::col((census_node::Entity, census_node::Column::DataRadius)))
+        .expr(Expr::col((node::Entity, node::Column::NodeId)))
+        .expr(Expr::col((record::Entity, record::Column::Raw)))
+        .from(census_node::Entity)
+        .from(node::Entity)
+        .from(record::Entity)
+        .from_subquery(
+            Query::select()
+                .from(census::Entity)
+                .expr_as(Expr::col(census::Column::StartedAt), Alias::new("started_at"))
+                .expr_as(Expr::col(census::Column::Duration), Alias::new("duration"))
+                .order_by(census::Column::StartedAt, Order::Desc)
+                .limit(1)
+                .take(),
+            Alias::new("latest_census"),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::SurveyedAt))
+                .gte(Expr::col((Alias::new("latest_census"), Alias::new("started_at")))),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::SurveyedAt))
+                .lt(Expr::cust(if builder == DbBackend::Sqlite {
+                    "STRFTIME('%Y-%m-%dT%H:%M:%S.%f', DATETIME(latest_census.started_at, '+' || latest_census.duration || ' seconds'))"
+                } else {
+                    "latest_census.started_at + latest_census.duration * interval '1 second'"
+                })),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::RecordId))
+                .eq(Expr::col((record::Entity, record::Column::Id))),
+        )
+        .and_where(
+            Expr::col((record::Entity, record::Column::NodeId))
+                .eq(Expr::col((node::Entity, node::Column::Id))),
+        );
+
+    let dead_zone_data_vec = DeadZoneData::find_by_statement(builder.build(&select_dead_zone_data))
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+
+    let content_key: ethportal_api::HistoryContentKey =
+        serde_json::from_value(serde_json::json!(content_key)).unwrap();
+    let content_id = content_key.content_id();
+
+    let mut enrs: Vec<String> = vec![];
+    for dead_zone_data in dead_zone_data_vec {
+        let radius = Distance::from(crate::U256::from_big_endian(&dead_zone_data.data_radius));
+        let node_id = Distance::from(crate::U256::from_big_endian(&dead_zone_data.node_id));
+        if XorMetric::distance(&content_id, &node_id.big_endian()) <= radius {
+            enrs.push(dead_zone_data.raw);
+        }
+    }
+
+    Ok(Json(enrs))
 }
 
 pub struct Stats {
