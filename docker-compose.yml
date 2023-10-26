@@ -13,6 +13,7 @@ services:
       - "5432:5432"
     networks:
       - glados-net
+    restart: always
 
   trin:
     hostname: trin
@@ -22,8 +23,9 @@ services:
     command: "--web3-transport http --web3-http-address http://0.0.0.0:8545/ --mb 0 --bootnodes default"
     ports:
       - "8545:8545"
-    networks: 
+    networks:
       - glados-net
+    restart: always
 
   glados_audit:
     command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://trin:8545 --concurrency 8 --latest-strategy-weight 2"
@@ -34,7 +36,8 @@ services:
       - glados_postgres
       - trin
     networks:
-      - glados-net      
+      - glados-net
+    restart: always
 
   glados_monitor:
     command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados follow-head --provider-url https://mainnet.infura.io/v3/${INFURA_PROJECT_ID?Infura Project ID Required}"
@@ -46,6 +49,7 @@ services:
       - glados_postgres
     networks:
       - glados-net
+    restart: always
 
   glados_web:
     command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados"
@@ -59,6 +63,7 @@ services:
       - "3001:3001"
     networks:
       - glados-net
+    restart: always
 
   glados_cartographer:
     command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --transport http --http-url http://trin:8545 --concurrency 10"
@@ -71,6 +76,7 @@ services:
       - trin
     networks:
       - glados-net
+    restart: always
 
 networks:
   glados-net:
