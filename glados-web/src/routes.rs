@@ -40,13 +40,13 @@ pub async fn handle_error(_err: io::Error) -> impl IntoResponse {
     (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong...")
 }
 
-#[derive(FromQueryResult, Serialize, Debug)]
+#[derive(FromQueryResult, Debug)]
 pub struct RadiusChartData {
     pub data_radius: Vec<u8>,
     pub node_id: Vec<u8>,
 }
 
-#[derive(FromQueryResult, Serialize, Debug)]
+#[derive(Serialize, Debug)]
 pub struct CalculatedRadiusChartData {
     pub data_radius: f64,
     pub node_id: u64,
@@ -131,8 +131,8 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
         .await
         .unwrap();
 
-    let mut average_radius = Query::select();
-    average_radius
+    let mut radius_density = Query::select();
+    radius_density
         .expr_as(
             Expr::col(census_node::Column::DataRadius),
             Alias::new("data_radius"),
@@ -161,7 +161,7 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
                 .eq(Expr::col((node::Entity, node::Column::Id))),
         );
 
-    let radius_chart_data = RadiusChartData::find_by_statement(builder.build(&average_radius))
+    let radius_chart_data = RadiusChartData::find_by_statement(builder.build(&radius_density))
         .all(&state.database_connection)
         .await
         .unwrap();

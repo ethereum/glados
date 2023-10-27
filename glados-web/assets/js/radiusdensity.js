@@ -3,8 +3,8 @@ function radius_node_id_scatter_chart(data) {
         width = 450 - margin.left - margin.right,
         height = 400 - margin.top - margin.bottom;
 
-// append the svg object to the body of the page
-    const svg = d3.select("#my_dataviz")
+    // append the svg object to the body of the page
+    const svg = d3.select("#census-scatterplot")
         .append("svg")
         .attr("width", width + margin.left + margin.right)
         .attr("height", height + margin.top + margin.bottom)
@@ -12,7 +12,7 @@ function radius_node_id_scatter_chart(data) {
         .attr("transform",
             `translate(${margin.left}, ${margin.top})`);
 
-// Add X axis
+    // Add X axis
     const x = d3.scaleLinear()
         .domain([0, 18446744073709551615])
         .range([ 0, width ]);
@@ -25,7 +25,7 @@ function radius_node_id_scatter_chart(data) {
         .attr("dy", ".15em")
         .attr("transform", "rotate(-55)");
 
-// Add Y axis
+    // Add Y axis
     const y = d3.scaleLinear()
         .domain([0, 100])
         .range([ height, 0]);
@@ -53,7 +53,7 @@ function radius_node_id_scatter_chart(data) {
             .style("opacity", 0);
     }
 
-// Add dots
+    // Add dots
     svg.append('g')
         .selectAll("dot")
         .data(data) // the .filter part is just to keep a few dots on the chart, not all of them
