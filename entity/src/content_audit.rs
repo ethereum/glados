@@ -2,8 +2,8 @@
 use crate::content;
 use crate::utils;
 use anyhow::{bail, Result};
+use chrono::DateTime;
 use chrono::Utc;
-use chrono::{DateTime, FixedOffset};
 use clap::ValueEnum;
 use ethportal_api::OverlayContentKey;
 use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
@@ -56,7 +56,7 @@ pub struct Model {
     pub content_key: i32,
     pub client_info: Option<i32>,
     pub node: Option<i32>,
-    pub created_at: DateTime<FixedOffset>,
+    pub created_at: DateTime<Utc>,
     pub strategy_used: Option<SelectionStrategy>,
     pub result: AuditResult,
     pub trace: String,
@@ -125,7 +125,7 @@ pub async fn create(
         content_key: Set(content_key_model_id),
         client_info: Set(Some(client_info_id)),
         node: Set(Some(node_id)),
-        created_at: Set(chrono::offset::Utc::now().into()),
+        created_at: Set(Utc::now()),
         result: Set(audit_result),
         strategy_used: Set(Some(strategy_used)),
         trace: Set(trace_string),
