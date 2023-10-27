@@ -1,9 +1,9 @@
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, Utc};
 use std::fmt::Write;
 
 /// Returns a string representing the time elapsed since the given time.
 /// eg "2m1w2d3h4m5s ago"
-pub fn time_ago(past: DateTime<FixedOffset>, present: DateTime<Utc>) -> String {
+pub fn time_ago(past: DateTime<Utc>, present: DateTime<Utc>) -> String {
     let duration = present.signed_duration_since(past);
     if duration.num_seconds() < 0 {
         return "Time is in the future".to_string();
@@ -53,10 +53,7 @@ mod test {
     #[case(31798861, "1y3d1h1m ago")]
     fn test_time_ago(#[case] seconds_ago: i64, #[case] expected_result: &str) {
         assert_eq!(
-            time_ago(
-                (Utc::now() - Duration::seconds(seconds_ago)).into(),
-                Utc::now()
-            ),
+            time_ago(Utc::now() - Duration::seconds(seconds_ago), Utc::now()),
             expected_result
         );
     }
