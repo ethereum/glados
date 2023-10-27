@@ -6,7 +6,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
+        let _ = manager
             .create_table(
                 Table::create()
                     .table(Record::Table)
@@ -25,12 +25,6 @@ impl MigrationTrait for Migration {
                             .col(Record::NodeId)
                             .col(Record::SequenceNumber),
                     )
-                    .index(
-                        Index::create()
-                            .unique()
-                            .name("idx_record-node_id")
-                            .col(Record::NodeId),
-                    )
                     .col(ColumnDef::new(Record::Raw).text().not_null())
                     .col(ColumnDef::new(Record::SequenceNumber).integer().not_null())
                     .foreign_key(
@@ -41,6 +35,15 @@ impl MigrationTrait for Migration {
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade),
                     )
+                    .to_owned(),
+            )
+            .await;
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_record-node_id")
+                    .table(Record::Table)
+                    .col(Record::NodeId)
                     .to_owned(),
             )
             .await
