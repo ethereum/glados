@@ -38,12 +38,22 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await;
-        manager
+        let _ = manager
             .create_index(
                 Index::create()
                     .name("idx_record-node_id")
                     .table(Record::Table)
                     .col(Record::NodeId)
+                    .to_owned(),
+            )
+            .await;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_record-seqno")
+                    .table(Record::Table)
+                    .col(Record::SequenceNumber)
                     .to_owned(),
             )
             .await
