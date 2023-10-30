@@ -69,6 +69,98 @@ impl Display for PieChartResult {
     }
 }
 
+async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusChartData> {
+    let builder = state.database_connection.get_database_backend();
+    let mut radius_density = Query::select();
+    radius_density
+        .expr(Expr::col((
+            census_node::Entity,
+            census_node::Column::DataRadius,
+        )))
+        .expr(Expr::col((
+            census_node::Entity,
+            census_node::Column::DataRadius,
+        )))
+        .expr(Expr::col((node::Entity, node::Column::NodeId)))
+        .from(census_node::Entity)
+        .from(node::Entity)
+        .from(record::Entity)
+        .from_subquery(
+            Query::select()
+                .from(census::Entity)
+                .expr_as(Expr::col(census::Column::StartedAt), Alias::new("started_at"))
+                .expr_as(Expr::col(census::Column::Duration), Alias::new("duration"))
+                .order_by(census::Column::StartedAt, Order::Desc)
+                .limit(1)
+                .take(),
+            Alias::new("latest_census"),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::SurveyedAt))
+                .gte(Expr::col((Alias::new("latest_census"), Alias::new("started_at")))),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::SurveyedAt))
+                .lt(Expr::cust(if builder == DbBackend::Sqlite {
+                    "STRFTIME('%Y-%m-%dT%H:%M:%S.%f', DATETIME(latest_census.started_at, '+' || latest_census.duration || ' seconds'))"
+                } else {
+                    "latest_census.started_at + latest_census.duration * interval '1 second'"
+                })),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::RecordId))
+                .eq(Expr::col((record::Entity, record::Column::Id))),
+        )
+        .and_where(
+            Expr::col((record::Entity, record::Column::NodeId))
+                .eq(Expr::col((node::Entity, node::Column::Id))),
+        );
+
+    let radius_chart_data = RadiusChartData::find_by_statement(builder.build(&radius_density))
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+
+    let mut radius_percentages: Vec<CalculatedRadiusChartData> = vec![];
+    for i in radius_chart_data {
+        let radius_high_bytes: [u8; 4] = [
+            i.data_radius[0],
+            i.data_radius[1],
+            i.data_radius[2],
+            i.data_radius[3],
+        ];
+        let radius_int = u32::from_be_bytes(radius_high_bytes);
+        let node_id_high_bytes: [u8; 8] = [
+            i.node_id[0],
+            i.node_id[1],
+            i.node_id[2],
+            i.node_id[3],
+            i.node_id[4],
+            i.node_id[5],
+            i.node_id[6],
+            i.node_id[7],
+        ];
+
+        let percentage = (radius_int as f64 / u32::MAX as f64) * 100.0;
+        let formatted_percentage = format!("{:.2}", percentage);
+
+        let mut node_id_bytes: [u8; 32] = [0; 32];
+        if i.node_id.len() == 32 {
+            node_id_bytes.copy_from_slice(&i.node_id);
+        }
+
+        let node_id_string = hex_encode(node_id_bytes);
+        radius_percentages.push(CalculatedRadiusChartData {
+            data_radius: formatted_percentage.parse().unwrap(),
+            node_id: u64::from_be_bytes(node_id_high_bytes),
+            node_id_string,
+        });
+    }
+
+    radius_percentages
+}
+
+
 pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
     let left_table: DynIden = SeaRc::new(Alias::new("left_table"));
     let right_table: DynIden = SeaRc::new(Alias::new("right_table"));
@@ -131,98 +223,8 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
         .await
         .unwrap();
 
-    async fn root(state: &Arc<State>) -> Vec<CalculatedRadiusChartData> {
-        let builder = state.database_connection.get_database_backend();
-        let mut radius_density = Query::select();
-        radius_density
-            .expr(Expr::col((
-                census_node::Entity,
-                census_node::Column::DataRadius,
-            )))
-            .expr(Expr::col((
-                census_node::Entity,
-                census_node::Column::DataRadius,
-            )))
-            .expr(Expr::col((node::Entity, node::Column::NodeId)))
-            .from(census_node::Entity)
-            .from(node::Entity)
-            .from(record::Entity)
-            .from_subquery(
-                Query::select()
-                    .from(census::Entity)
-                    .expr_as(Expr::col(census::Column::StartedAt), Alias::new("started_at"))
-                    .expr_as(Expr::col(census::Column::Duration), Alias::new("duration"))
-                    .order_by(census::Column::StartedAt, Order::Desc)
-                    .limit(1)
-                    .take(),
-                Alias::new("latest_census"),
-            )
-            .and_where(
-                Expr::col((census_node::Entity, census_node::Column::SurveyedAt))
-                    .gte(Expr::col((Alias::new("latest_census"), Alias::new("started_at")))),
-            )
-            .and_where(
-                Expr::col((census_node::Entity, census_node::Column::SurveyedAt))
-                    .lt(Expr::cust(if builder == DbBackend::Sqlite {
-                        "STRFTIME('%Y-%m-%dT%H:%M:%S.%f', DATETIME(latest_census.started_at, '+' || latest_census.duration || ' seconds'))"
-                    } else {
-                        "latest_census.started_at + latest_census.duration * interval '1 second'"
-                    })),
-            )
-            .and_where(
-                Expr::col((census_node::Entity, census_node::Column::RecordId))
-                    .eq(Expr::col((record::Entity, record::Column::Id))),
-            )
-            .and_where(
-                Expr::col((record::Entity, record::Column::NodeId))
-                    .eq(Expr::col((node::Entity, node::Column::Id))),
-            );
 
-        let radius_chart_data = RadiusChartData::find_by_statement(builder.build(&radius_density))
-            .all(&state.database_connection)
-            .await
-            .unwrap();
-
-        let mut radius_percentages: Vec<CalculatedRadiusChartData> = vec![];
-        for i in radius_chart_data {
-            let radius_high_bytes: [u8; 4] = [
-                i.data_radius[0],
-                i.data_radius[1],
-                i.data_radius[2],
-                i.data_radius[3],
-            ];
-            let radius_int = u32::from_be_bytes(radius_high_bytes);
-            let node_id_high_bytes: [u8; 8] = [
-                i.node_id[0],
-                i.node_id[1],
-                i.node_id[2],
-                i.node_id[3],
-                i.node_id[4],
-                i.node_id[5],
-                i.node_id[6],
-                i.node_id[7],
-            ];
-
-            let percentage = (radius_int as f64 / u32::MAX as f64) * 100.0;
-            let formatted_percentage = format!("{:.2}", percentage);
-
-            let mut node_id_bytes: [u8; 32] = [0; 32];
-            if i.node_id.len() == 32 {
-                node_id_bytes.copy_from_slice(&i.node_id);
-            }
-
-            let node_id_string = hex_encode(node_id_bytes);
-            radius_percentages.push(CalculatedRadiusChartData {
-                data_radius: formatted_percentage.parse().unwrap(),
-                node_id: u64::from_be_bytes(node_id_high_bytes),
-                node_id_string,
-            });
-        }
-
-        radius_percentages
-    }
-
-    let radius_percentages = root(&state).await;
+    let radius_percentages = generate_radius_graph_data(&state).await;
     // Run queries for content dashboard data concurrently
     let (hour_stats, day_stats, week_stats) = tokio::join!(
         get_audit_stats(Period::Hour, &state.database_connection),
