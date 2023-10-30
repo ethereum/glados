@@ -160,7 +160,6 @@ async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusC
     radius_percentages
 }
 
-
 pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
     let left_table: DynIden = SeaRc::new(Alias::new("left_table"));
     let right_table: DynIden = SeaRc::new(Alias::new("right_table"));
@@ -222,7 +221,6 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
         .all(&state.database_connection)
         .await
         .unwrap();
-
 
     let radius_percentages = generate_radius_graph_data(&state).await;
     // Run queries for content dashboard data concurrently
