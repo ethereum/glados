@@ -36,7 +36,9 @@ function radius_node_id_scatter_chart(data) {
 
     function hoverAppear() {
         hover.transition()
-            .style("opacity", 0.9);
+            .style("opacity", 0.9)
+            .style("background-color", "#ccc")
+            .style("border-radius", "5px");
     }
 
     function hoverFeature(event, d) {
@@ -45,12 +47,16 @@ function radius_node_id_scatter_chart(data) {
 
         hover.html(`Node ID: ${d.node_id_string}<br>Data Radius: ${d.data_radius}%`)
             .style("left", hoverX + "px")
-            .style("top", hoverY + "px");
+            .style("top", hoverY + "px")
+            .style("background-color", "#ccc")
+            .style("border-radius", "5px");
     }
 
     function hoverGone() {
         hover.transition()
-            .style("opacity", 0);
+            .style("opacity", 0)
+            .style("background-color", "transparent")
+            .style("border-radius", "0px");
     }
 
     // Add dots
