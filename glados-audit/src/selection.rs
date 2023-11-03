@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use chrono::{DateTime, FixedOffset, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use ethportal_api::HistoryContentKey;
 use rand::{thread_rng, Rng};
 use sea_orm::{
@@ -211,14 +211,13 @@ async fn select_oldest_unaudited_content_for_audit(
     let mut interval = interval(Duration::from_secs(10));
 
     // Memory of which audits have been sent using their timestamp.
-    let mut timestamp_too_old_threshold: DateTime<FixedOffset> =
-        match Utc.timestamp_millis_opt(0i64) {
-            chrono::LocalResult::Single(time) => time.into(),
-            _ => {
-                error!("Could not convert starting for timestamp");
-                return;
-            }
-        };
+    let mut timestamp_too_old_threshold: DateTime<Utc> = match Utc.timestamp_millis_opt(0i64) {
+        chrono::LocalResult::Single(time) => time,
+        _ => {
+            error!("Could not convert starting for timestamp");
+            return;
+        }
+    };
 
     loop {
         interval.tick().await;
@@ -331,7 +330,7 @@ mod tests {
                 id: NotSet,
                 content_id: Set(content_key.content_id().to_vec()),
                 content_key: Set(content_key.to_bytes()),
-                first_available_at: Set((Utc::now() - chrono::Duration::minutes(10)).into()),
+                first_available_at: Set(Utc::now() - chrono::Duration::minutes(10)),
                 protocol_id: Set(SubProtocol::History),
             };
             let content_key_model = content_key_active_model.insert(&conn).await?;
@@ -354,7 +353,7 @@ mod tests {
                 let content_audit_active_model = content_audit::ActiveModel {
                     id: NotSet,
                     content_key: Set(content_key_model.id),
-                    created_at: Set(Utc::now().into()),
+                    created_at: Set(Utc::now()),
                     strategy_used: Set(Some(SelectionStrategy::Random)),
                     result: Set(result),
                     trace: Set("".to_owned()),

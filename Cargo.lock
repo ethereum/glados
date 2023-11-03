@@ -230,6 +230,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde",
+ "serde_json",
  "syn 1.0.109",
  "toml",
 ]
@@ -1401,6 +1402,7 @@ checksum = "cf56acd72bb22d2824e66ae8e9e5ada4d0de17a69c7fd35569dde2ada8ec9116"
 dependencies = [
  "base64 0.13.1",
  "bytes",
+ "ed25519-dalek 2.0.0",
  "hex",
  "k256 0.13.1",
  "log",
@@ -1446,6 +1448,7 @@ dependencies = [
  "migration",
  "primitive-types 0.10.1",
  "rand 0.8.5",
+ "rstest 0.16.0",
  "sea-orm",
  "sea-query",
  "tokio",
@@ -2135,7 +2138,7 @@ dependencies = [
  "jsonrpc",
  "jsonrpsee",
  "reth-ipc",
- "rstest",
+ "rstest 0.11.0",
  "rustc-hex",
  "serde",
  "serde_json",
@@ -2178,12 +2181,13 @@ dependencies = [
  "enr 0.8.1",
  "entity",
  "env_logger 0.9.3",
- "ethereum-types 0.14.1",
+ "ethereum-types 0.12.1",
  "ethportal-api",
  "glados-core",
  "itertools",
  "migration",
  "sea-orm",
+ "serde",
  "tokio",
  "tower-http",
  "tracing",
@@ -4170,6 +4174,32 @@ dependencies = [
  "quote",
  "rustc_version 0.4.0",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "rstest"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b07f2d176c472198ec1e6551dc7da28f1c089652f66a7b722676c2238ebc0edf"
+dependencies = [
+ "futures",
+ "futures-timer",
+ "rstest_macros",
+ "rustc_version 0.4.0",
+]
+
+[[package]]
+name = "rstest_macros"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7229b505ae0706e64f37ffc54a9c163e11022a6636d58fe1f3f52018257ff9f7"
+dependencies = [
+ "cfg-if 1.0.0",
+ "proc-macro2",
+ "quote",
+ "rustc_version 0.4.0",
+ "syn 1.0.109",
+ "unicode-ident",
 ]
 
 [[package]]

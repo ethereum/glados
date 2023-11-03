@@ -96,6 +96,10 @@
     background: #956955;
 }
 
+#cancelled {
+  background: #edc949;
+}
+
 .previous {
     margin-left: 10px;
 }

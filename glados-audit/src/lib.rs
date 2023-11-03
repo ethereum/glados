@@ -264,7 +264,7 @@ async fn perform_single_audit(
         client.url = client.api.client_url.clone(),
         "auditing content",
     );
-    let (content_response, trace) = if client.clone().is_trin() {
+    let (content_response, trace) = if client.clone().supports_trace() {
         match client.api.get_content_with_trace(&task.content_key).await {
             Ok(c) => c,
             Err(e) => {

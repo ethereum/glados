@@ -6,7 +6,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
+        let _ = manager
             .create_table(
                 Table::create()
                     .table(KeyValue::Table)
@@ -35,6 +35,15 @@ impl MigrationTrait for Migration {
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade),
                     )
+                    .to_owned(),
+            )
+            .await;
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_keyvalue-key")
+                    .table(KeyValue::Table)
+                    .col(KeyValue::Key)
                     .to_owned(),
             )
             .await

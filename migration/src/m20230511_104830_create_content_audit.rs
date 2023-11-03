@@ -6,7 +6,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
+        let _ = manager
             .create_table(
                 Table::create()
                     .table(ContentAudit::Table)
@@ -56,6 +56,17 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(ContentAudit::StrategyUsed).integer())
                     .col(ColumnDef::new(ContentAudit::Trace).string().default(""))
+                    .to_owned(),
+            )
+            .await;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_contentaudit-time-result")
+                    .table(ContentAudit::Table)
+                    .col(ContentAudit::CreatedAt)
+                    .col(ContentAudit::Result)
                     .to_owned(),
             )
             .await

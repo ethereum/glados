@@ -1,30 +1,43 @@
 use axum::{
-    extract::{Extension, Path},
+    extract::{Extension, Path, Query as HttpQuery},
     http::StatusCode,
     response::IntoResponse,
+    Json,
 };
 use chrono::{DateTime, Duration, Utc};
-use entity::client_info;
+use entity::{
+    census, census_node, client_info, content::SubProtocol, content_audit::SelectionStrategy,
+};
 use entity::{
     content,
     content_audit::{self, AuditResult},
     execution_metadata, key_value, node, record,
 };
+use ethportal_api::jsonrpsee::core::__reexports::serde_json;
+use ethportal_api::types::distance::{Distance, Metric, XorMetric};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
+use migration::{Alias, IntoCondition, JoinType, Order};
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, ModelTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect,
+    sea_query::{Expr, Query, SeaRc},
+    RelationTrait, Select,
 };
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, DynIden, EntityTrait,
+    FromQueryResult, LoaderTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
+};
+use serde::{Deserialize, Serialize};
+use std::fmt::Formatter;
 use std::sync::Arc;
 use std::{fmt::Display, io};
 use tracing::error;
 use tracing::info;
 
 use crate::templates::{
-    ContentAuditDetailTemplate, ContentDashboardTemplate, ContentIdDetailTemplate,
-    ContentIdListTemplate, ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate,
-    HtmlTemplate, IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate,
+    AuditDashboardTemplate, AuditTableTemplate, ContentAuditDetailTemplate,
+    ContentDashboardTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
+    ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate, HtmlTemplate,
+    IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate,
 };
 use crate::{state::State, templates::AuditTuple};
 
@@ -35,8 +48,206 @@ pub async fn handle_error(_err: io::Error) -> impl IntoResponse {
     (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong...")
 }
 
-pub async fn root(Extension(_state): Extension<Arc<State>>) -> impl IntoResponse {
-    let template = IndexTemplate {};
+#[derive(FromQueryResult, Debug)]
+pub struct RadiusChartData {
+    pub data_radius: Vec<u8>,
+    pub node_id: Vec<u8>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct CalculatedRadiusChartData {
+    pub data_radius: f64,
+    pub node_id: u64,
+    pub node_id_string: String,
+}
+
+#[derive(FromQueryResult, Serialize)]
+pub struct PieChartResult {
+    pub client_name: String,
+    pub client_count: i32,
+}
+
+impl Display for PieChartResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Client Name {} Client Count {}",
+            self.client_name, self.client_count
+        )
+    }
+}
+
+async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusChartData> {
+    let builder = state.database_connection.get_database_backend();
+    let mut radius_density = Query::select();
+    radius_density
+        .expr(Expr::col((
+            census_node::Entity,
+            census_node::Column::DataRadius,
+        )))
+        .expr(Expr::col((
+            census_node::Entity,
+            census_node::Column::DataRadius,
+        )))
+        .expr(Expr::col((node::Entity, node::Column::NodeId)))
+        .from(census_node::Entity)
+        .from(node::Entity)
+        .from(record::Entity)
+        .from_subquery(
+            Query::select()
+                .from(census::Entity)
+                .expr_as(Expr::col(census::Column::StartedAt), Alias::new("started_at"))
+                .expr_as(Expr::col(census::Column::Duration), Alias::new("duration"))
+                .order_by(census::Column::StartedAt, Order::Desc)
+                .limit(1)
+                .take(),
+            Alias::new("latest_census"),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::SurveyedAt))
+                .gte(Expr::col((Alias::new("latest_census"), Alias::new("started_at")))),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::SurveyedAt))
+                .lt(Expr::cust(if builder == DbBackend::Sqlite {
+                    "STRFTIME('%Y-%m-%dT%H:%M:%S.%f', DATETIME(latest_census.started_at, '+' || latest_census.duration || ' seconds'))"
+                } else {
+                    "latest_census.started_at + latest_census.duration * interval '1 second'"
+                })),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::RecordId))
+                .eq(Expr::col((record::Entity, record::Column::Id))),
+        )
+        .and_where(
+            Expr::col((record::Entity, record::Column::NodeId))
+                .eq(Expr::col((node::Entity, node::Column::Id))),
+        );
+
+    let radius_chart_data = RadiusChartData::find_by_statement(builder.build(&radius_density))
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+
+    let mut radius_percentages: Vec<CalculatedRadiusChartData> = vec![];
+    for i in radius_chart_data {
+        let radius_high_bytes: [u8; 4] = [
+            i.data_radius[0],
+            i.data_radius[1],
+            i.data_radius[2],
+            i.data_radius[3],
+        ];
+        let radius_int = u32::from_be_bytes(radius_high_bytes);
+        let node_id_high_bytes: [u8; 8] = [
+            i.node_id[0],
+            i.node_id[1],
+            i.node_id[2],
+            i.node_id[3],
+            i.node_id[4],
+            i.node_id[5],
+            i.node_id[6],
+            i.node_id[7],
+        ];
+
+        let percentage = (radius_int as f64 / u32::MAX as f64) * 100.0;
+        let formatted_percentage = format!("{:.2}", percentage);
+
+        let mut node_id_bytes: [u8; 32] = [0; 32];
+        if i.node_id.len() == 32 {
+            node_id_bytes.copy_from_slice(&i.node_id);
+        }
+
+        let node_id_string = hex_encode(node_id_bytes);
+        radius_percentages.push(CalculatedRadiusChartData {
+            data_radius: formatted_percentage.parse().unwrap(),
+            node_id: u64::from_be_bytes(node_id_high_bytes),
+            node_id_string,
+        });
+    }
+
+    radius_percentages
+}
+
+pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
+    let left_table: DynIden = SeaRc::new(Alias::new("left_table"));
+    let right_table: DynIden = SeaRc::new(Alias::new("right_table"));
+    let builder = state.database_connection.get_database_backend();
+    let mut client_count = Query::select();
+    client_count
+        .expr_as(
+            Expr::cust("CAST(COUNT(*) AS INT)"),
+            Alias::new("client_count"),
+        )
+        .expr_as(
+            Expr::cust("CAST(COALESCE(substr(substr(value, 1, 2), length(substr(value, 1, 2)), 1), 'unknown') AS TEXT)"),
+            Alias::new("client_name"),
+        )
+        .from_subquery(
+            Query::select()
+                .expr_as(
+                    Expr::col(census_node::Column::RecordId),
+                    Alias::new("record_id"),
+                )
+                .from(census_node::Entity)
+                .from_subquery(
+                    Query::select()
+                        .from(census::Entity)
+                        .expr_as(Expr::max(Expr::col(census::Column::Id)), Alias::new("id"))
+                        .take(),
+                    Alias::new("max_census_id"),
+                )
+                .and_where(
+                    Expr::col((Alias::new("census_node"), Alias::new("census_id")))
+                        .eq(Expr::col((Alias::new("max_census_id"), Alias::new("id")))),
+                )
+                .take(),
+            left_table.clone(),
+        )
+        .join_subquery(
+            JoinType::LeftJoin,
+            Query::select()
+                .from(key_value::Entity)
+                .column(key_value::Column::RecordId)
+                .column(key_value::Column::Value)
+                .and_where(
+                    Expr::cust(if builder == DbBackend::Sqlite {
+                        "CAST(key AS TEXT)"
+                    } else {
+                        "convert_from(key, 'UTF8')"
+                    })
+                        // Uses a CAST to TEXT on the table in order to do a comparison to the binary value, both SQLite and Postgres both need to be casted in order to be compared
+                        .eq("c"),
+                )
+                .take(),
+            right_table.clone(),
+            Expr::col((left_table.clone(), Alias::new("record_id")))
+                .equals((right_table.clone(), Alias::new("record_id"))),
+        )
+        .add_group_by([Expr::cust("substr(substr(value, 1, 2), length(substr(value, 1, 2)), 1)")]);
+
+    let pie_chart_data = PieChartResult::find_by_statement(builder.build(&client_count))
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+
+    let radius_percentages = generate_radius_graph_data(&state).await;
+    // Run queries for content dashboard data concurrently
+    let (hour_stats, day_stats, week_stats) = tokio::join!(
+        get_audit_stats(Period::Hour, &state.database_connection),
+        get_audit_stats(Period::Day, &state.database_connection),
+        get_audit_stats(Period::Week, &state.database_connection),
+    );
+
+    // Get results from queries
+    let hour_stats = hour_stats.unwrap();
+    let day_stats = day_stats.unwrap();
+    let week_stats = week_stats.unwrap();
+
+    let template = IndexTemplate {
+        pie_chart_client_count: pie_chart_data,
+        average_radius_chart: radius_percentages,
+        stats: [hour_stats, day_stats, week_stats],
+    };
     HtmlTemplate(template)
 }
 
@@ -293,12 +504,12 @@ pub async fn get_audits_for_recent_content(
             .unzip();
 
     let client_info = audits
-            .load_one(client_info::Entity, conn)
-            .await
-            .map_err(|e| {
-                error!(key.count=audits.len(), err=?e, "Could not look up client info for recent audits");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+        .load_one(client_info::Entity, conn)
+        .await
+        .map_err(|e| {
+            error!(key.count=audits.len(), err=?e, "Could not look up client info for recent audits");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let audit_tuples: Vec<AuditTuple> = itertools::izip!(audits, recent_content, client_info)
         .filter_map(|(audit, con, info)| {
@@ -449,6 +660,24 @@ pub async fn contentkey_list(
     Ok(HtmlTemplate(template))
 }
 
+pub async fn contentaudit_dashboard() -> Result<HtmlTemplate<AuditDashboardTemplate>, StatusCode> {
+    let template = AuditDashboardTemplate {};
+    Ok(HtmlTemplate(template))
+}
+
+/// Returns the success rate for the last hour as a percentage.
+pub async fn hourly_success_rate(
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<f32>, StatusCode> {
+    let stats = get_audit_stats(Period::Hour, &state.database_connection)
+        .await
+        .map_err(|e| {
+            error!("Could not look up hourly stats: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    Ok(Json(stats.pass_percent))
+}
+
 /// Retrieves key details to display.
 ///
 /// At present this assumes it is a HistoryContentKey.
@@ -529,8 +758,151 @@ pub async fn contentaudit_detail(
         .unwrap()
         .expect("Failed to get audit content key");
 
-    let template = ContentAuditDetailTemplate { audit, content };
+    let execution_metadata = content
+        .find_related(execution_metadata::Entity)
+        .one(&state.database_connection)
+        .await
+        .unwrap()
+        .expect("Failed to get audit metadata");
+
+    let template = ContentAuditDetailTemplate {
+        audit,
+        content,
+        execution_metadata,
+    };
     HtmlTemplate(template)
+}
+
+#[derive(Deserialize)]
+pub struct AuditFilters {
+    strategy: StrategyFilter,
+    content_type: ContentTypeFilter,
+    success: SuccessFilter,
+}
+
+#[derive(Deserialize)]
+pub enum StrategyFilter {
+    All,
+    Random,
+    Latest,
+    Oldest,
+}
+
+#[derive(Deserialize)]
+pub enum SuccessFilter {
+    All,
+    Success,
+    Failure,
+}
+
+#[derive(Deserialize)]
+pub enum ContentTypeFilter {
+    All,
+    Headers,
+    Bodies,
+    Receipts,
+}
+
+/// Takes an AuditFilter object generated from http query params
+/// Conditionally creates a query based on the filters
+pub async fn contentaudit_filter(
+    Extension(state): Extension<Arc<State>>,
+    filters: HttpQuery<AuditFilters>,
+) -> Result<HtmlTemplate<AuditTableTemplate>, StatusCode> {
+    let audits = content_audit::Entity::find();
+
+    let audits = match filters.strategy {
+        StrategyFilter::All => audits,
+        StrategyFilter::Random => {
+            audits.filter(content_audit::Column::StrategyUsed.eq(SelectionStrategy::Random))
+        }
+        StrategyFilter::Latest => {
+            audits.filter(content_audit::Column::StrategyUsed.eq(SelectionStrategy::Latest))
+        }
+        StrategyFilter::Oldest => audits.filter(
+            content_audit::Column::StrategyUsed.eq(SelectionStrategy::SelectOldestUnaudited),
+        ),
+    };
+    let audits = match filters.success {
+        SuccessFilter::All => audits,
+        SuccessFilter::Success => {
+            audits.filter(content_audit::Column::Result.eq(AuditResult::Success))
+        }
+        SuccessFilter::Failure => {
+            audits.filter(content_audit::Column::Result.eq(AuditResult::Failure))
+        }
+    };
+    let audits = match filters.content_type {
+        ContentTypeFilter::All => audits,
+
+        ContentTypeFilter::Headers => audits.join(
+            JoinType::InnerJoin,
+            content_audit::Relation::Content
+                .def()
+                .on_condition(|_left, right| {
+                    Expr::cust("get_byte(content.content_key, 0) = 0x00")
+                        .and(
+                            Expr::col((right, content::Column::ProtocolId))
+                                .eq(SubProtocol::History),
+                        )
+                        .into_condition()
+                }),
+        ),
+        ContentTypeFilter::Bodies => audits.join(
+            JoinType::InnerJoin,
+            content_audit::Relation::Content
+                .def()
+                .on_condition(|_left, right| {
+                    Expr::cust("get_byte(content.content_key, 0) = 0x01")
+                        .and(
+                            Expr::col((right, content::Column::ProtocolId))
+                                .eq(SubProtocol::History),
+                        )
+                        .into_condition()
+                }),
+        ),
+        ContentTypeFilter::Receipts => audits.join(
+            JoinType::InnerJoin,
+            content_audit::Relation::Content
+                .def()
+                .on_condition(|_left, right| {
+                    Expr::cust("get_byte(content.content_key, 0) = 0x02")
+                        .and(
+                            Expr::col((right, content::Column::ProtocolId))
+                                .eq(SubProtocol::History),
+                        )
+                        .into_condition()
+                }),
+        ),
+    };
+
+    let (hour_stats, day_stats, week_stats, filtered_audits) = tokio::join!(
+        get_filtered_audit_stats(audits.clone(), Period::Hour, &state.database_connection),
+        get_filtered_audit_stats(audits.clone(), Period::Day, &state.database_connection),
+        get_filtered_audit_stats(audits.clone(), Period::Week, &state.database_connection),
+        audits
+            .order_by_desc(content_audit::Column::CreatedAt)
+            .limit(30)
+            .all(&state.database_connection),
+    );
+
+    let filtered_audits = filtered_audits.map_err(|e| {
+        error!(err=?e, "Could not look up audit stats");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let hour_stats = hour_stats?;
+    let day_stats = day_stats?;
+    let week_stats = week_stats?;
+
+    let filtered_audits: Vec<AuditTuple> =
+        get_audit_tuples_from_audit_models(filtered_audits, &state.database_connection).await?;
+
+    let template = AuditTableTemplate {
+        stats: [hour_stats, day_stats, week_stats],
+        audits: filtered_audits,
+    };
+
+    Ok(HtmlTemplate(template))
 }
 
 pub enum Period {
@@ -549,6 +921,7 @@ impl Display for Period {
         write!(f, "Last {time_period}")
     }
 }
+
 impl Period {
     fn cutoff_time(&self) -> DateTime<Utc> {
         let duration = match self {
@@ -568,15 +941,140 @@ impl Period {
     }
 }
 
+#[derive(FromQueryResult, Serialize, Debug)]
+pub struct DeadZoneData {
+    pub data_radius: Vec<u8>,
+    pub raw: String,
+    pub node_id: Vec<u8>,
+}
+
+pub async fn is_content_in_deadzone(
+    Path(content_key): Path<String>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<String>>, StatusCode> {
+    let builder = state.database_connection.get_database_backend();
+    let mut select_dead_zone_data = Query::select();
+    select_dead_zone_data
+        .expr(Expr::col((census_node::Entity, census_node::Column::DataRadius)))
+        .expr(Expr::col((node::Entity, node::Column::NodeId)))
+        .expr(Expr::col((record::Entity, record::Column::Raw)))
+        .from(census_node::Entity)
+        .from(node::Entity)
+        .from(record::Entity)
+        .from_subquery(
+            Query::select()
+                .from(census::Entity)
+                .expr_as(Expr::col(census::Column::StartedAt), Alias::new("started_at"))
+                .expr_as(Expr::col(census::Column::Duration), Alias::new("duration"))
+                .order_by(census::Column::StartedAt, Order::Desc)
+                .limit(1)
+                .take(),
+            Alias::new("latest_census"),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::SurveyedAt))
+                .gte(Expr::col((Alias::new("latest_census"), Alias::new("started_at")))),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::SurveyedAt))
+                .lt(Expr::cust(if builder == DbBackend::Sqlite {
+                    "STRFTIME('%Y-%m-%dT%H:%M:%S.%f', DATETIME(latest_census.started_at, '+' || latest_census.duration || ' seconds'))"
+                } else {
+                    "latest_census.started_at + latest_census.duration * interval '1 second'"
+                })),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::RecordId))
+                .eq(Expr::col((record::Entity, record::Column::Id))),
+        )
+        .and_where(
+            Expr::col((record::Entity, record::Column::NodeId))
+                .eq(Expr::col((node::Entity, node::Column::Id))),
+        );
+
+    let dead_zone_data_vec = DeadZoneData::find_by_statement(builder.build(&select_dead_zone_data))
+        .all(&state.database_connection)
+        .await
+        .unwrap();
+
+    let content_key: ethportal_api::HistoryContentKey =
+        serde_json::from_value(serde_json::json!(content_key)).unwrap();
+    let content_id = content_key.content_id();
+
+    let mut enrs: Vec<String> = vec![];
+    for dead_zone_data in dead_zone_data_vec {
+        let radius = Distance::from(crate::U256::from_big_endian(&dead_zone_data.data_radius));
+        let node_id = Distance::from(crate::U256::from_big_endian(&dead_zone_data.node_id));
+        if XorMetric::distance(&content_id, &node_id.big_endian()) <= radius {
+            enrs.push(dead_zone_data.raw);
+        }
+    }
+
+    Ok(Json(enrs))
+}
+
 pub struct Stats {
     pub period: Period,
     pub new_content: u32,
     pub total_audits: u32,
     pub total_passes: u32,
-    pub passes_per_100: u32,
+    pub pass_percent: f32,
     pub total_failures: u32,
-    pub failures_per_100: u32,
+    pub fail_percent: f32,
     pub audits_per_minute: u32,
+}
+
+async fn get_filtered_audit_stats(
+    filtered: Select<content_audit::Entity>,
+    period: Period,
+    conn: &DatabaseConnection,
+) -> Result<Stats, StatusCode> {
+    let cutoff = period.cutoff_time();
+
+    let total_audits = filtered
+        .clone()
+        .filter(content_audit::Column::CreatedAt.gt(cutoff))
+        .count(conn)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Could not look up audit stats");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })? as u32;
+
+    let total_passes = filtered
+        .filter(content_audit::Column::CreatedAt.gt(cutoff))
+        .filter(content_audit::Column::Result.eq(AuditResult::Success))
+        .count(conn)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Could not look up audit stats");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })? as u32;
+
+    let total_failures = total_audits - total_passes;
+
+    let audits_per_minute = 0;
+
+    let (pass_percent, fail_percent) = if total_audits == 0 {
+        (0.0, 0.0)
+    } else {
+        let total_audits = total_audits as f32;
+        (
+            (total_passes as f32) * 100.0 / total_audits,
+            (total_failures as f32) * 100.0 / total_audits,
+        )
+    };
+
+    Ok(Stats {
+        period,
+        new_content: 0,
+        total_audits,
+        total_passes,
+        pass_percent,
+        total_failures,
+        fail_percent,
+        audits_per_minute,
+    })
 }
 
 async fn get_audit_stats(period: Period, conn: &DatabaseConnection) -> Result<Stats, StatusCode> {
@@ -613,18 +1111,23 @@ async fn get_audit_stats(period: Period, conn: &DatabaseConnection) -> Result<St
     let audits_per_minute = (60 * total_audits)
         .checked_div(period.total_seconds())
         .unwrap_or(0);
-    let passes_per_100 = (100 * total_passes).checked_div(total_audits).unwrap_or(0);
-    let failures_per_100 = (100 * total_failures)
-        .checked_div(total_audits)
-        .unwrap_or(0);
+    let (pass_percent, fail_percent) = if total_audits == 0 {
+        (0.0, 0.0)
+    } else {
+        let total_audits = total_audits as f32;
+        (
+            (total_passes as f32) * 100.0 / total_audits,
+            (total_failures as f32) * 100.0 / total_audits,
+        )
+    };
     Ok(Stats {
         period,
         new_content,
         total_audits,
         total_passes,
-        passes_per_100,
+        pass_percent,
         total_failures,
-        failures_per_100,
+        fail_percent,
         audits_per_minute,
     })
 }
