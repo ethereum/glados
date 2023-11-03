@@ -6,7 +6,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
+        let _ = manager
             .create_table(
                 Table::create()
                     .table(ExecutionMetadata::Table)
@@ -27,12 +27,6 @@ impl MigrationTrait for Migration {
                             .integer()
                             .not_null(),
                     )
-                    .index(
-                        Index::create()
-                            .unique()
-                            .name("idx_executionmetadata-block_number")
-                            .col(ExecutionMetadata::BlockNumber),
-                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("FK_executionmetadata_content") // Metadata points to content
@@ -47,6 +41,15 @@ impl MigrationTrait for Migration {
                             .name("idx-unique-metadata") // Content only has 1 metadata record.
                             .col(ExecutionMetadata::Content),
                     )
+                    .to_owned(),
+            )
+            .await;
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_executionmetadata-block_number")
+                    .table(ExecutionMetadata::Table)
+                    .col(ExecutionMetadata::BlockNumber)
                     .to_owned(),
             )
             .await
