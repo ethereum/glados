@@ -195,7 +195,7 @@ async fn test_audit_crud() -> Result<(), DbErr> {
         content_id: Set(key.content_id().to_vec()),
         content_key: Set(key.to_bytes()),
         protocol_id: Set(SubProtocol::History),
-        first_available_at: Set(Utc::now().into()),
+        first_available_at: Set(Utc::now()),
     };
 
     let content_model = content_key_active_model.insert(&conn).await?;
@@ -223,7 +223,7 @@ async fn test_audit_crud() -> Result<(), DbErr> {
     let content_audit_active_model = content_audit::ActiveModel {
         id: NotSet,
         content_key: Set(searched_content_model.id),
-        created_at: Set(Utc::now().into()),
+        created_at: Set(Utc::now()),
         strategy_used: Set(Some(SelectionStrategy::Random)),
         result: Set(content_audit::AuditResult::Success),
         trace: Set("".to_owned()),
@@ -268,7 +268,7 @@ async fn test_content_table_unique_constraints() {
         content_id: Set(id_a.clone()),
         content_key: Set(key_a.clone()),
         protocol_id: Set(protocol_a.clone()),
-        first_available_at: Set(Utc::now().into()),
+        first_available_at: Set(Utc::now()),
     };
     action_a.clone().insert(&conn).await.unwrap();
     assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 1);
@@ -289,7 +289,7 @@ async fn test_content_table_unique_constraints() {
         content_id: Set(id_a.clone()),
         content_key: Set(key_a.clone()),
         protocol_id: Set(protocol_b),
-        first_available_at: Set(Utc::now().into()),
+        first_available_at: Set(Utc::now()),
     };
     action_b.clone().insert(&conn).await.unwrap();
     assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
@@ -309,7 +309,7 @@ async fn test_content_table_unique_constraints() {
         content_id: Set(id_b),
         content_key: Set(key_a),
         protocol_id: Set(protocol_a.clone()),
-        first_available_at: Set(Utc::now().into()),
+        first_available_at: Set(Utc::now()),
     };
     assert!(action_c
         .clone()
@@ -335,7 +335,7 @@ async fn test_content_table_unique_constraints() {
         content_id: Set(id_a),
         content_key: Set(key_b),
         protocol_id: Set(protocol_a),
-        first_available_at: Set(Utc::now().into()),
+        first_available_at: Set(Utc::now()),
     };
     assert!(action_d
         .insert(&conn)

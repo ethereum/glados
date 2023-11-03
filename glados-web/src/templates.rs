@@ -4,13 +4,17 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 
-use entity::{client_info, content, content_audit, key_value, node, record};
+use entity::{client_info, content, content_audit, execution_metadata, key_value, node, record};
 
-use crate::routes::Stats;
+use crate::routes::{CalculatedRadiusChartData, PieChartResult, Stats};
 
 #[derive(Template)]
 #[template(path = "index.html")]
-pub struct IndexTemplate {}
+pub struct IndexTemplate {
+    pub pie_chart_client_count: Vec<PieChartResult>,
+    pub average_radius_chart: Vec<CalculatedRadiusChartData>,
+    pub stats: [Stats; 3],
+}
 
 #[derive(Template)]
 #[template(path = "network_dashboard.html")]
@@ -70,12 +74,24 @@ pub struct ContentIdDetailTemplate {
 pub struct ContentAuditDetailTemplate {
     pub audit: content_audit::Model,
     pub content: content::Model,
+    pub execution_metadata: execution_metadata::Model,
 }
 
 #[derive(Template)]
 #[template(path = "contentkey_list.html")]
 pub struct ContentKeyListTemplate {
     pub contentkey_list: Vec<content::Model>,
+}
+
+#[derive(Template)]
+#[template(path = "audit_dashboard.html")]
+pub struct AuditDashboardTemplate {}
+
+#[derive(Template)]
+#[template(path = "audit_table.html")]
+pub struct AuditTableTemplate {
+    pub stats: [Stats; 3],
+    pub audits: Vec<AuditTuple>,
 }
 
 #[derive(Template)]

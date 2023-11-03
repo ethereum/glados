@@ -24,15 +24,9 @@ Make an empty database file for glados.
 ```command
 $ touch /path/to/database.sqlite
 ```
-Start trin (see [docs](https://github.com/ethereum/trin/blob/master/docs/ubuntu_guide.md)
+Start trin (see [docs](https://ethereum.github.io/trin/developers/quick_setup.html))
 ```command
-~/trin$ RUST_LOG=debug cargo run -p trin -- \
-    --no-stun \
-    --web3-transport ipc \
-    --trusted-provider local \
-    --local-provider-url 127.0.0.1:8545 \
-    --discovery-port 9009 \
-    --bootnodes default
+~/trin$ RUST_LOG=debug cargo run -p trin
 ```
 Start `glados-monitor`, which uses chain data from the execution node and stores that in the
 glados database. For an empty database file, the `--migration` flag triggers

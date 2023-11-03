@@ -10,19 +10,20 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 
 [dependencies]
 anyhow = "1.0.68"
-askama = "0.11.1"
+askama = { version = "0.11.1", features = ["serde-json"] }
 axum = "0.6.11"
 chrono = "0.4.23"
 clap = { version = "4.0.26", features = ["derive"] }
-enr = "0.8.1"
+enr = { version = "0.8.1", features = ["k256", "ed25519"] }
 entity = { path = "../entity" }
 env_logger = "0.9.3"
-ethereum-types = "0.14.0"
+ethereum-types = "0.12.1"
 ethportal-api = "0.2.2"
 glados-core = { path = "../glados-core" }
 migration = { path = "../migration" }
 itertools = "0.10.5"
 sea-orm = "0.11.3"
+serde = "1.0.167"
 tokio = "1.22.0"
 tower-http = { version = "0.3.5", features = ["fs"] }
 tracing = "0.1.37"

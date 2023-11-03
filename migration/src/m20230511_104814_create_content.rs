@@ -6,7 +6,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
+        let _ = manager
             .create_table(
                 Table::create()
                     .table(Content::Table)
@@ -47,6 +47,16 @@ impl MigrationTrait for Migration {
                             .col(Content::ProtocolId)
                             .col(Content::ContentId),
                     )
+                    .to_owned(),
+            )
+            .await;
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_content-time-and-protocol")
+                    .table(Content::Table)
+                    .col(Content::FirstAvailableAt)
+                    .col(Content::ProtocolId)
                     .to_owned(),
             )
             .await

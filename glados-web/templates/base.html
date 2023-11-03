@@ -15,6 +15,35 @@
 {% block body %}
 
 <body>
+
+    <nav class="navbar navbar-expand-lg navbar-light" style="background-color: #ffffff;">
+        <div>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false"
+                aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav me-auto">
+                    <a class="nav-link active" style="margin-left: 20px;" href="/">Glados</a>
+                    <li class="nav-item">
+                        <a class="nav-link active" aria-current="page" style="margin-left: 20px;" href="/audits/">Audit
+                            Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" aria-current="page" style="margin-left: 20px;"
+                            href="/content/">Content Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" aria-current="page" style="margin-left: 20px;"
+                            href="/network/">Network Explorer</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <hr style="margin-top: 0;">
+
     <div id="content">
         <div id="container">
             {% block content %}{% endblock %}

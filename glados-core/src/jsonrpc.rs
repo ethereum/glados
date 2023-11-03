@@ -167,6 +167,13 @@ pub struct TracedQueryResult {
     pub trace: Value,
 }
 
+#[allow(non_snake_case)]
+#[derive(Deserialize)]
+pub struct QueryResult {
+    pub content: String,
+    pub utpTransfer: bool,
+}
+
 pub struct Content {
     pub raw: Vec<u8>,
 }
@@ -196,11 +203,12 @@ impl PortalResponse {
     fn content_response_to_string(&self) -> Result<Option<String>, JsonRpcError> {
         match self {
             PortalResponse::ContentAbsent => Ok(None),
-            PortalResponse::Regular(response) => match response.as_str() {
-                None | Some("") => Err(JsonRpcError::ContainsNone),
-                Some("0x") => Err(JsonRpcError::SpecialMessageExpected),
-                Some(s) => Ok(Some(s.to_owned())),
-            },
+            PortalResponse::Regular(response) => {
+                let query_result = serde_json::from_value::<QueryResult>(response.clone())
+                    .map_err(JsonRpcError::Malformed)?;
+
+                Ok(Some(query_result.content))
+            }
         }
     }
     /// Converts a non-content (e.g., node info) response JSON value to a string.
@@ -239,8 +247,8 @@ impl PortalClient {
         })
     }
 
-    pub fn is_trin(self) -> bool {
-        self.client_info.contains("trin")
+    pub fn supports_trace(self) -> bool {
+        self.client_info.contains("trin") || self.client_info.contains("fluffy")
     }
 }
 
