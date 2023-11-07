@@ -93,6 +93,7 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
             "/api/is-content-in-deadzone/:content_key",
             get(routes::is_content_in_deadzone),
         )
+        .route("/api/stat-history/", get(routes::get_audit_stats_handler))
         .nest_service("/static/", serve_dir.clone())
         .fallback_service(serve_dir)
         .layer(Extension(config));

@@ -6,15 +6,16 @@ use axum::{
 use entity::{client_info, content, content_audit, execution_metadata, key_value, node, record};
 
 use crate::routes::{
-    CalculatedRadiusChartData, ClientDiversityResult, PaginatedCensusListResult, RawEnr, Stats,
+    CalculatedRadiusChartData, ClientDiversityResult, PaginatedCensusListResult, RawEnr,
 };
+use glados_core::stats::AuditStats;
 
 #[derive(Template)]
 #[template(path = "index.html")]
 pub struct IndexTemplate {
     pub client_diversity_data: Vec<ClientDiversityResult>,
     pub average_radius_chart: Vec<CalculatedRadiusChartData>,
-    pub stats: [Stats; 3],
+    pub stats: [AuditStats; 3],
 }
 
 #[derive(Template)]
@@ -68,7 +69,7 @@ pub type AuditTuple = (content_audit::Model, content::Model, client_info::Model)
 #[derive(Template)]
 #[template(path = "content_dashboard.html")]
 pub struct ContentDashboardTemplate {
-    pub stats: [Stats; 3],
+    pub stats: [AuditStats; 3],
     pub contentid_list: Vec<content::Model>,
     pub audits_of_recent_content: Vec<AuditTuple>,
     pub recent_audits: Vec<AuditTuple>,
@@ -110,7 +111,7 @@ pub struct AuditDashboardTemplate {}
 #[derive(Template)]
 #[template(path = "audit_table.html")]
 pub struct AuditTableTemplate {
-    pub stats: [Stats; 3],
+    pub stats: [AuditStats; 3],
     pub audits: Vec<AuditTuple>,
 }
 

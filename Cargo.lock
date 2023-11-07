@@ -1444,13 +1444,13 @@ dependencies = [
  "env_logger 0.10.0",
  "ethereum-types 0.14.1",
  "ethportal-api",
- "glados-core",
  "migration",
  "primitive-types 0.10.1",
  "rand 0.8.5",
  "rstest 0.16.0",
  "sea-orm",
  "sea-query",
+ "serde",
  "tokio",
 ]
 
@@ -2131,7 +2131,9 @@ name = "glados-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "discv5 0.1.0",
+ "entity",
  "env_logger 0.9.3",
  "ethereum-types 0.14.1",
  "ethportal-api",
@@ -2140,6 +2142,7 @@ dependencies = [
  "reth-ipc",
  "rstest 0.11.0",
  "rustc-hex",
+ "sea-orm",
  "serde",
  "serde_json",
  "sha2 0.10.7",

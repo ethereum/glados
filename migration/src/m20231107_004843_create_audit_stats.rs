@@ -1,0 +1,131 @@
+use sea_orm_migration::prelude::*;
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let _ = manager
+            .create_table(
+                Table::create()
+                    .table(AuditStats::Table)
+                    .col(
+                        ColumnDef::new(AuditStats::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(AuditStats::Timestamp)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(AuditStats::NumAudits).integer().not_null())
+                    .col(
+                        ColumnDef::new(AuditStats::SuccessRateAll)
+                            .float()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuditStats::SuccessRateLatest)
+                            .float()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuditStats::SuccessRateRandom)
+                            .float()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuditStats::SuccessRateOldest)
+                            .float()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuditStats::SuccessRateAllHeaders)
+                            .float()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuditStats::SuccessRateAllBodies)
+                            .float()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuditStats::SuccessRateAllReceipts)
+                            .float()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuditStats::SuccessRateLatestHeaders)
+                            .float()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuditStats::SuccessRateLatestBodies)
+                            .float()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuditStats::SuccessRateLatestReceipts)
+                            .float()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuditStats::SuccessRateRandomHeaders)
+                            .float()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuditStats::SuccessRateRandomBodies)
+                            .float()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AuditStats::SuccessRateRandomReceipts)
+                            .float()
+                            .not_null(),
+                    )
+                    .to_owned(),
+            )
+            .await;
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_auditstats-time")
+                    .table(AuditStats::Table)
+                    .col(AuditStats::Timestamp)
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(AuditStats::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(Iden)]
+pub enum AuditStats {
+    Table,
+    Id,
+    Timestamp,
+    NumAudits,
+    SuccessRateAll,
+    SuccessRateLatest,
+    SuccessRateRandom,
+    SuccessRateOldest,
+    SuccessRateAllHeaders,
+    SuccessRateAllBodies,
+    SuccessRateAllReceipts,
+    SuccessRateLatestHeaders,
+    SuccessRateLatestBodies,
+    SuccessRateLatestReceipts,
+    SuccessRateRandomHeaders,
+    SuccessRateRandomBodies,
+    SuccessRateRandomReceipts,
+}
