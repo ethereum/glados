@@ -1053,7 +1053,9 @@ async fn get_filtered_audit_stats(
 
     let total_failures = total_audits - total_passes;
 
-    let audits_per_minute = 0;
+    let audits_per_minute = (60 * total_audits)
+        .checked_div(period.total_seconds())
+        .unwrap_or(0);
 
     let (pass_percent, fail_percent) = if total_audits == 0 {
         (0.0, 0.0)
