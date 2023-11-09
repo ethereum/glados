@@ -11,7 +11,6 @@
 
 <div id="top-of-audit-detail">
     <div class="row">
-        <h1>Audit #{{ audit.id }}</h1>
         <div class="col">
             <ul>
                 <li>Content Key: <a href="/content/key/{{content.key_as_hex() }}/">{{ content.key_as_hex() }}</a></li>
@@ -23,6 +22,7 @@
                 </li>
                 <li>Started: {{ audit.created_at }}</li>
                 <li>Result: {{ audit.result.as_text() }}</li>
+                <li>Strategy: {{ audit.strategy_as_text() }}</li>
             </ul>
         </div>
     </div>
@@ -71,26 +71,26 @@
 <script>
     $(document).ready(function () {
 
-            let trace_string = "{{ audit.trace }}".replace(/&quot;/g, '"');
-            let trace = JSON.parse(trace_string);
+        let trace_string = "{{ audit.trace }}".replace(/&quot;/g, '"');
+        let trace = JSON.parse(trace_string);
 
-            let heightTaken = $('#top-of-audit-detail').height();
-            let heightAvailable = Math.floor($(window).height() - heightTaken);
-            $('#trace').css('height', `${heightAvailable}px`);
+        let heightTaken = $('#top-of-audit-detail').height();
+        let heightAvailable = Math.floor($(window).height() - heightTaken);
+        $('#trace').css('height', `${heightAvailable}px`);
 
-            let graphData = createGraphData(trace);
-            let graphSvg = createGraph(graphData);
-            $('#graph').append(graphSvg);
+        let graphData = createGraphData(trace);
+        let graphSvg = createGraph(graphData);
+        $('#graph').append(graphSvg);
 
-            generateTable(graphData.nodes);
+        generateTable(graphData.nodes);
 
-            $('#trin-button').on("mouseenter", function () {
-                $('#trin-button').css('background-color', 'lightgray');
-                highlightTrinNodes();
-            }).on('mouseleave', function () {
-                $('#trin-button').css('background-color', 'white');
-                unHighlight();
-            });
+        $('#trin-button').on("mouseenter", function () {
+            $('#trin-button').css('background-color', 'lightgray');
+            highlightTrinNodes();
+        }).on('mouseleave', function () {
+            $('#trin-button').css('background-color', 'white');
+            unHighlight();
+        });
     });
 </script>
 
