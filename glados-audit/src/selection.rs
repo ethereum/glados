@@ -232,6 +232,9 @@ async fn select_oldest_unaudited_content_for_audit(
         let search_result: Vec<(content::Model, Vec<content_audit::Model>)> =
             match content::Entity::find()
                 .filter(content::Column::FirstAvailableAt.gt(timestamp_too_old_threshold))
+                .filter(
+                    content::Column::FirstAvailableAt.lt(Utc::now() - chrono::Duration::days(1)),
+                )
                 .order_by_asc(content::Column::FirstAvailableAt)
                 .find_with_related(entity::content_audit::Entity)
                 .filter(content_audit::Column::CreatedAt.is_null())
@@ -325,12 +328,17 @@ mod tests {
             let block_hash = [num; 32];
             let content_key =
                 HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey { block_hash });
-            // content table
+            // Content table test data initialization
+            // Check whether row should be new or old data
+            let available_at = match (2..=15).contains(&num) {
+                true => Utc::now() - chrono::Duration::days(1),
+                false => Utc::now() - chrono::Duration::minutes(10),
+            };
             let content_key_active_model = content::ActiveModel {
                 id: NotSet,
                 content_id: Set(content_key.content_id().to_vec()),
                 content_key: Set(content_key.to_bytes()),
-                first_available_at: Set(Utc::now() - chrono::Duration::minutes(10)),
+                first_available_at: Set(available_at),
                 protocol_id: Set(SubProtocol::History),
             };
             let content_key_model = content_key_active_model.insert(&conn).await?;
