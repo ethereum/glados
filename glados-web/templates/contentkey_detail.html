@@ -3,15 +3,15 @@
 {% block title %}Content Key: {{ content_key_model.key_as_hex() }}{% endblock %}
 
 {% block content %}
-  <div class="row">
+<div class="row">
     <h1>Content Key: {{ content_key_model.key_as_hex() }}</h1>
-  </div>
-  <div class="row">
+</div>
+<div class="row">
     <div class="col">
         <ul>
             <li>Database ID: {{ content_key_model.id }}</li>
             <li>Content Key: {{ content_key }}</li>
-            <li>Content Id: {{ content_id }}</li>
+            <li>Content Id: <a href="/content/id/{{ content_id }}/">{{ content_id }}</a></li>
             <li>Kind: {{ content_kind }}</li>
             {% if block_number.is_some() %}
             <li>Block number: <a href="https://etherscan.io/block/{{ block_number.unwrap() }}">{{ block_number.unwrap()
@@ -20,15 +20,20 @@
         </ul>
     </div>
     <div class="col">
-      <h3>Content Audits</h3>
-      <ul>
-        {% for content_audit in contentaudit_list %}
-          <li>Audit#: {{ content_audit.id }} <span class="badge text-bg-{% if content_audit.is_success() %}success{% else %}danger{% endif %}">{% if content_audit.is_success() %}Success{% else %}Fail{% endif %}</span></li>
-        {% else %}
-          <li>No audits</li>
-        {% endfor %}
-      </ul>
+        <h3>Content Audits</h3>
+        <ul>
+            {% for content_audit in contentaudit_list %}
+            <li>Audit#: <a style="margin-right: 4px;" href="/audit/id/{{ content_audit.id }}">{{ content_audit.id
+                    }}</a><span
+                    class="badge text-bg-{% if content_audit.is_success() %}success{% else %}danger{% endif %}">{% if
+                    content_audit.is_success() %} Success{% else %} Fail{% endif %}</span>
+                <span>{{ content_audit.strategy_as_text() }}</span>
+            </li>
+            {% else %}
+            <li>No audits</li>
+            {% endfor %}
+        </ul>
     </div>
-  </div>
+</div>
 </div>
 {% endblock %}
