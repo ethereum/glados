@@ -264,46 +264,12 @@ async fn perform_single_audit(
         client.url = client.api.client_url.clone(),
         "auditing content",
     );
-    let (content_response, trace) = if client.clone().supports_trace() {
-        match client.api.get_content_with_trace(&task.content_key).await {
-            Ok(c) => c,
-            Err(e) => {
-                error!(
-                    content.key=hex_encode(task.content_key.to_bytes()),
-                    err=?e,
-                    "Problem requesting content with trace from Portal node."
-                );
-                active_threads.fetch_sub(1, Ordering::Relaxed);
-                return;
-            }
-        }
-    } else {
-        match client.api.get_content(&task.content_key).await {
-            Ok(c) => (c, "".to_owned()),
-            Err(e) => {
-                error!(
-                    content.key=hex_encode(task.content_key.to_bytes()),
-                    err=?e,
-                    "Problem requesting content from Portal node."
-                );
-                active_threads.fetch_sub(1, Ordering::Relaxed);
-                return;
-            }
-        }
-    };
-
-    // If content was absent audit result is 'fail'.
-    let audit_result = match content_response {
-        Some(content_bytes) => content_is_valid(&task.content_key, &content_bytes.raw),
-        None => false,
-    };
 
     let content_key_model = match content::get(&task.content_key, &conn).await {
         Ok(Some(m)) => m,
         Ok(None) => {
             error!(
                 content.key=?task.content_key,
-                audit.pass=?audit_result,
                 "Content key not found in db."
             );
             active_threads.fetch_sub(1, Ordering::Relaxed);
@@ -327,6 +293,7 @@ async fn perform_single_audit(
                 err=?error,
                 "Could not create/lookup client info in db."
             );
+            active_threads.fetch_sub(1, Ordering::Relaxed);
             return;
         }
     };
@@ -338,19 +305,75 @@ async fn perform_single_audit(
                 err=?err,
                 "Failed to created node."
             );
+            active_threads.fetch_sub(1, Ordering::Relaxed);
             return;
         }
     };
-    if let Err(e) = content_audit::create(
+
+    let pending_audit = match content_audit::create(
         content_key_model.id,
         client_info_id,
         node_id,
-        audit_result,
         task.strategy,
-        trace,
         &conn,
     )
     .await
+    {
+        Ok(audit) => audit,
+        Err(e) => {
+            error!(
+                content.key=?task.content_key,
+                err=?e,
+                "Could not create audit entry in db."
+            );
+            active_threads.fetch_sub(1, Ordering::Relaxed);
+            return;
+        }
+    };
+    let (content_response, trace, errored) = if client.clone().supports_trace() {
+        match client.api.get_content_with_trace(&task.content_key).await {
+            Ok(c) => (c.0, c.1, false),
+            Err(e) => {
+                error!(
+                    content.key=hex_encode(task.content_key.to_bytes()),
+                    err=?e,
+                    "Problem requesting content with trace from Portal node."
+                );
+                (None, "".to_owned(), true)
+            }
+        }
+    } else {
+        match client.api.get_content(&task.content_key).await {
+            Ok(c) => (c, "".to_owned(), false),
+            Err(e) => {
+                error!(
+                    content.key=hex_encode(task.content_key.to_bytes()),
+                    err=?e,
+                    "Problem requesting content from Portal node."
+                );
+                (None, "".to_owned(), true)
+            }
+        }
+    };
+
+    let audit_result: content_audit::AuditResult = if errored {
+        content_audit::AuditResult::Errored
+    } else {
+        // If content is absent or invalid, audit is a failure.
+        match content_response {
+            Some(content) => {
+                if content_is_valid(&task.content_key, &content.raw) {
+                    content_audit::AuditResult::Success
+                } else {
+                    content_audit::AuditResult::Failure
+                }
+            }
+            None => content_audit::AuditResult::Failure,
+        }
+    };
+
+    // Update audit entry with result and trace.
+    if let Err(e) = content_audit::record_result(pending_audit.id, audit_result, trace, &conn).await
     {
         error!(
             content.key=?task.content_key,
@@ -366,14 +389,14 @@ async fn perform_single_audit(
         Ok(Some(b)) => {
             info!(
                 content.key=hex_encode(task.content_key.to_bytes()),
-                audit.pass=?audit_result,
+                audit.result=?audit_result,
                 block = b.block_number,
             );
         }
         Ok(None) => {
             error!(
                 content.key=hex_encode(task.content_key.to_bytes()),
-                audit.pass=?audit_result,
+                audit.result=?audit_result,
                 "Block metadata absent for key."
             );
         }

@@ -56,8 +56,9 @@
                                         {{ audit.id }}{% endif %}
                                     </td>
                                     <td><span
-                                            class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
-                                            if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
+                                            class="badge text-bg-{% if audit.is_success() %}success{% elseif audit.is_pending() %}warning{% else %}danger{% endif %}">
+                                            {{ audit.result.as_text() }}
+                                        </span></td>
                                     <td>{{ content.protocol_id.as_text() }}</td>
                                     <td>{{ audit.strategy_as_text() }}</td>
                                     <td><a href="/content/key/{{content.key_as_hex()}}/">{{ content.key_as_hex_short()
