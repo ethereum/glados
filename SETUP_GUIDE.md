@@ -15,18 +15,9 @@ This example uses the following:
 
 All commands are issued on `machine-a` unless otherwise stated.
 
-Important note:
-- If `glados-monitor`, `glados-audit` and `glados-web` are in `sqlite::memory:`-mode they won't be able to share a database. In-memory databases are ephemeral and only persist as long as the process is running.
-
-Start Ethereum execution client (not covered here).
-
-Make an empty database file for glados.
-```command
-$ touch /path/to/database.sqlite
-```
 Start trin (see [docs](https://ethereum.github.io/trin/developers/quick_setup.html))
 ```command
-~/trin$ RUST_LOG=debug cargo run -p trin
+~/trin$ RUST_LOG=debug cargo run -p trin -- --web3-transport http
 ```
 Start `glados-monitor`, which uses chain data from the execution node and stores that in the
 glados database. For an empty database file, the `--migration` flag triggers
@@ -34,22 +25,29 @@ database table creation.
 ```command
 ~/glados$ RUST_LOG=glados_monitor=debug cargo run -p glados-monitor -- \
     --migrate \
-    --database-url sqlite:////path/to/database.sqlite \
+    --database-url postgres://<user>:<password>@localhost:5432/<database> \
     follow-head \
-    --provider-url http://127.0.0.1:8545
+    --provider-url https://mainnet.infura.io/v3/<api-key>
 ```
 Start `glados-audit`, which takes monitoring data from the glados database,
 checks if `trin` has it, then records the outcome in the glados database.
 ```command
 ~/glados$ RUST_LOG=debug cargo run -p glados-audit -- \
-    --portal-client ipc:////path/to/trin-jsonrpc.ipc \
-    --database-url sqlite:////path/to/database.sqlite
+    --portal-client http://127.0.0.1:8545 \
+    --database-url postgres://<user>:<password>@localhost:5432/<database>
 ```
 Start `glados-web`, which takes audit data from the glados database and serves
 that for viewing.
 ```command
 ~/glados$ RUST_LOG=debug cargo run -p glados-web -- \
-    --database-url sqlite:////path/to/database.sqlite
+    --database-url postgres://<user>:<password>@localhost:5432/<database>
+```
+Start `glados-cartographer`, which takes census of all the nodes on the network
+```command
+~/glados$ RUST_LOG=debug cargo run -p glados-cartographer -- \
+  --transport http  --http-url http://127.0.0.1:8545  \
+  --database-url postgres://<user>:<password>@localhost:5432/<database>
+  
 ```
 
 On `machine-b`, listen for `glados-web`
