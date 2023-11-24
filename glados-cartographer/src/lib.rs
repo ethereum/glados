@@ -27,6 +27,9 @@ use crate::cli::TransportType;
 
 pub mod cli;
 
+use serde_json::json;
+
+
 /// Configuration created from CLI arguments.
 #[derive(Clone, Debug)]
 pub struct CartographerConfig {
@@ -97,6 +100,7 @@ struct DHTCensusRecord {
 struct DHTCensus {
     known: RwLock<HashSet<[u8; 32]>>,
     pub alive: RwLock<HashMap<[u8; 32], DHTCensusRecord>>,
+    pub node_routing_tables: RwLock<HashMap<String, Vec<String>>>,
     finished: RwLock<HashSet<[u8; 32]>>,
     errored: RwLock<HashSet<[u8; 32]>>,
     pub started_at: DateTime<Utc>,
@@ -116,6 +120,7 @@ impl DHTCensus {
     fn new() -> Self {
         let known: RwLock<HashSet<[u8; 32]>> = RwLock::new(HashSet::new());
         let alive: RwLock<HashMap<[u8; 32], DHTCensusRecord>> = RwLock::new(HashMap::new());
+        let node_routing_tables: RwLock<HashMap<String, Vec<String>>> = RwLock::new(HashMap::new());
         let finished: RwLock<HashSet<[u8; 32]>> = RwLock::new(HashSet::new());
         let errored: RwLock<HashSet<[u8; 32]>> = RwLock::new(HashSet::new());
 
@@ -124,6 +129,7 @@ impl DHTCensus {
         DHTCensus {
             known,
             alive,
+            node_routing_tables,
             finished,
             errored,
             started_at,
@@ -317,6 +323,8 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
                 rps = final_stats.requests_per_second,
                 "Census complete",
             );
+            let hi = census.node_routing_tables.read().await.clone();
+            panic!("jj {}", json!(hi));
             break;
         }
 
@@ -516,6 +524,7 @@ async fn do_routing_table_enumeration(
 
     debug!(enr.node_id=?H256::from(enr.node_id().raw()), "Enumerating Routing Table");
 
+    let mut all_found_enr: Vec<String> = vec![];
     for distance in 245..257 {
         let enrs_at_distance = match client.find_nodes(enr.to_owned(), vec![distance]).await {
             Ok(result) => result,
@@ -526,6 +535,7 @@ async fn do_routing_table_enumeration(
         };
         debug!(enr.node_id=?H256::from(enr.node_id().raw()), distance=distance, count=enrs_at_distance.len(), "Routing Table Info");
         for found_enr in enrs_at_distance {
+            all_found_enr.push(found_enr.to_base64());
             if census.is_known(NodeId(found_enr.node_id().raw())).await {
                 continue;
             } else {
@@ -535,6 +545,15 @@ async fn do_routing_table_enumeration(
                     .await
                     .expect("Error queuing liveliness check");
             }
+        }
+    }
+    let mut node_routing_tables = census.node_routing_tables.write().await;
+    match node_routing_tables.get_mut(&enr.to_base64()) {
+        Some(found_enrs) => {
+            found_enrs.append(&mut all_found_enr);
+        },
+        None => {
+            node_routing_tables.insert(enr.to_base64(), all_found_enr);
         }
     }
     census.add_finished(NodeId(enr.node_id().raw())).await;
