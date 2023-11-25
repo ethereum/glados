@@ -18,6 +18,7 @@ use ethportal_api::types::distance::{Distance, Metric, XorMetric};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use migration::{Alias, IntoCondition, JoinType, Order};
+use sea_orm::sea_query::SimpleExpr;
 use sea_orm::{
     sea_query::{Expr, Query, SeaRc},
     RelationTrait, Select,
@@ -34,10 +35,11 @@ use tracing::error;
 use tracing::info;
 
 use crate::templates::{
-    AuditDashboardTemplate, AuditTableTemplate, ContentAuditDetailTemplate,
-    ContentDashboardTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
-    ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate, HtmlTemplate,
-    IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate,
+    AuditDashboardTemplate, AuditTableTemplate, CensusExplorerPageTemplate,
+    ContentAuditDetailTemplate, ContentDashboardTemplate, ContentIdDetailTemplate,
+    ContentIdListTemplate, ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate,
+    HtmlTemplate, IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate,
+    PaginatedCensusListTemplate,
 };
 use crate::{state::State, templates::AuditTuple};
 
@@ -46,6 +48,23 @@ use crate::{state::State, templates::AuditTuple};
 //
 pub async fn handle_error(_err: io::Error) -> impl IntoResponse {
     (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong...")
+}
+
+#[derive(FromQueryResult, Debug, Clone, Copy)]
+pub struct MaxCensusId {
+    pub id: i32,
+}
+
+#[derive(FromQueryResult, Serialize, Debug, Clone)]
+pub struct PaginatedCensusListResult {
+    pub census_id: i32,
+    pub node_count: i64,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(FromQueryResult, Debug, Clone)]
+pub struct CensusCreatedAt {
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(FromQueryResult, Debug)]
@@ -62,12 +81,17 @@ pub struct CalculatedRadiusChartData {
 }
 
 #[derive(FromQueryResult, Serialize)]
-pub struct PieChartResult {
+pub struct ClientDiversityResult {
     pub client_name: String,
     pub client_count: i32,
 }
 
-impl Display for PieChartResult {
+#[derive(FromQueryResult, Serialize)]
+pub struct RawEnr {
+    pub raw: String,
+}
+
+impl Display for ClientDiversityResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -168,10 +192,66 @@ async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusC
     radius_percentages
 }
 
-pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
+async fn get_max_census_id(state: &Arc<State>) -> Option<MaxCensusId> {
+    let builder = state.database_connection.get_database_backend();
+    // we need to bounds check the requested census_id and return None if it doesn't exist
+    let max_census_id = Query::select()
+        .from(census::Entity)
+        .expr_as(Expr::max(Expr::col(census::Column::Id)), Alias::new("id"))
+        .take();
+    MaxCensusId::find_by_statement(builder.build(&max_census_id))
+        .one(&state.database_connection)
+        .await
+        .unwrap()
+}
+
+async fn get_created_data_from_census_id(state: &Arc<State>, census_id: i32) -> DateTime<Utc> {
+    let builder = state.database_connection.get_database_backend();
+    // we need to bounds check the requested census_id and return None if it doesn't exist
+    let created_data = Query::select()
+        .from(census::Entity)
+        .expr_as(
+            Expr::col(census::Column::StartedAt),
+            Alias::new("created_at"),
+        )
+        .and_where(Expr::col(census::Column::Id).eq(census_id))
+        .take();
+    let created_data = CensusCreatedAt::find_by_statement(builder.build(&created_data))
+        .one(&state.database_connection)
+        .await
+        .unwrap();
+    created_data.unwrap().created_at
+}
+
+async fn generate_client_diversity_data(
+    state: &Arc<State>,
+    census_id: Option<i32>,
+    max_census_id: MaxCensusId,
+) -> Option<Vec<ClientDiversityResult>> {
+    let builder = state.database_connection.get_database_backend();
+    let census_selection_query = match census_id {
+        Some(census_id) => {
+            if census_id >= 1 && census_id <= max_census_id.id {
+                Query::select()
+                    .from(census::Entity)
+                    .expr_as(Expr::col(census::Column::Id), Alias::new("id"))
+                    .and_where(SimpleExpr::from(Expr::col(census::Column::Id)).eq(census_id))
+                    .limit(1)
+                    .take()
+            } else {
+                return None;
+            }
+        }
+        None => Query::select()
+            .from(census::Entity)
+            .expr_as(Expr::col(census::Column::Id), Alias::new("id"))
+            .order_by(census::Column::StartedAt, Order::Desc)
+            .limit(1)
+            .take(),
+    };
+
     let left_table: DynIden = SeaRc::new(Alias::new("left_table"));
     let right_table: DynIden = SeaRc::new(Alias::new("right_table"));
-    let builder = state.database_connection.get_database_backend();
     let mut client_count = Query::select();
     client_count
         .expr_as(
@@ -190,15 +270,12 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
                 )
                 .from(census_node::Entity)
                 .from_subquery(
-                    Query::select()
-                        .from(census::Entity)
-                        .expr_as(Expr::max(Expr::col(census::Column::Id)), Alias::new("id"))
-                        .take(),
-                    Alias::new("max_census_id"),
+                    census_selection_query,
+                    Alias::new("selected_census_id"),
                 )
                 .and_where(
                     Expr::col((Alias::new("census_node"), Alias::new("census_id")))
-                        .eq(Expr::col((Alias::new("max_census_id"), Alias::new("id")))),
+                        .eq(Expr::col((Alias::new("selected_census_id"), Alias::new("id")))),
                 )
                 .take(),
             left_table.clone(),
@@ -210,13 +287,7 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
                 .column(key_value::Column::RecordId)
                 .column(key_value::Column::Value)
                 .and_where(
-                    Expr::cust(if builder == DbBackend::Sqlite {
-                        "CAST(key AS TEXT)"
-                    } else {
-                        "convert_from(key, 'UTF8')"
-                    })
-                        // Uses a CAST to TEXT on the table in order to do a comparison to the binary value, both SQLite and Postgres both need to be casted in order to be compared
-                        .eq("c"),
+                    Expr::cust("convert_from(key, 'UTF8')").eq("c"),
                 )
                 .take(),
             right_table.clone(),
@@ -225,10 +296,73 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
         )
         .add_group_by([Expr::cust("substr(substr(value, 1, 2), length(substr(value, 1, 2)), 1)")]);
 
-    let pie_chart_data = PieChartResult::find_by_statement(builder.build(&client_count))
-        .all(&state.database_connection)
-        .await
-        .unwrap();
+    Some(
+        ClientDiversityResult::find_by_statement(builder.build(&client_count))
+            .all(&state.database_connection)
+            .await
+            .unwrap(),
+    )
+}
+
+async fn generate_enr_list_from_census_id(
+    state: &Arc<State>,
+    census_id: Option<i32>,
+    max_census_id: MaxCensusId,
+) -> Option<Vec<RawEnr>> {
+    let census_selection_query = match census_id {
+        Some(census_id) => {
+            if census_id >= 1 && census_id <= max_census_id.id {
+                Query::select()
+                    .from(census::Entity)
+                    .expr_as(Expr::col(census::Column::Id), Alias::new("id"))
+                    .and_where(SimpleExpr::from(Expr::col(census::Column::Id)).eq(census_id))
+                    .limit(1)
+                    .take()
+            } else {
+                return None;
+            }
+        }
+        None => Query::select()
+            .from(census::Entity)
+            .expr_as(Expr::col(census::Column::Id), Alias::new("id"))
+            .order_by(census::Column::StartedAt, Order::Desc)
+            .limit(1)
+            .take(),
+    };
+
+    let builder = state.database_connection.get_database_backend();
+    let mut enrs_from_census = Query::select();
+    enrs_from_census
+        .expr(Expr::col((record::Entity, record::Column::Raw)))
+        .from(census_node::Entity)
+        .from(record::Entity)
+        .from_subquery(census_selection_query, Alias::new("selected_census_id"))
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::CensusId)).eq(Expr::col((
+                Alias::new("selected_census_id"),
+                Alias::new("id"),
+            ))),
+        )
+        .and_where(
+            Expr::col((census_node::Entity, census_node::Column::RecordId))
+                .eq(Expr::col((record::Entity, record::Column::Id))),
+        );
+
+    Some(
+        RawEnr::find_by_statement(builder.build(&enrs_from_census))
+            .all(&state.database_connection)
+            .await
+            .unwrap(),
+    )
+}
+
+pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
+    let client_diversity_data = match get_max_census_id(&state).await {
+        None => vec![],
+        Some(max_census_id) => generate_client_diversity_data(&state, None, max_census_id)
+            .await
+            .unwrap(),
+    };
 
     let radius_percentages = generate_radius_graph_data(&state).await;
     // Run queries for content dashboard data concurrently
@@ -244,7 +378,7 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
     let week_stats = week_stats.unwrap();
 
     let template = IndexTemplate {
-        pie_chart_client_count: pie_chart_data,
+        client_diversity_data,
         average_radius_chart: radius_percentages,
         stats: [hour_stats, day_stats, week_stats],
     };
@@ -1132,4 +1266,114 @@ async fn get_audit_stats(period: Period, conn: &DatabaseConnection) -> Result<St
         fail_percent,
         audits_per_minute,
     })
+}
+
+pub async fn census_explorer_list(
+    Path(list_census_page_id): Path<String>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<HtmlTemplate<PaginatedCensusListTemplate>, StatusCode> {
+    let max_census_id = match get_max_census_id(&state).await {
+        None => return Err(StatusCode::from_u16(404).unwrap()),
+        Some(max_census_id) => max_census_id,
+    };
+
+    let mut list_census_page_id: i32 = match list_census_page_id.parse::<i32>() {
+        Ok(list_census_page_id) => list_census_page_id,
+        Err(_) => return Err(StatusCode::from_u16(404).unwrap()),
+    };
+
+    if list_census_page_id > max_census_id.id / 50 + 1 {
+        list_census_page_id = max_census_id.id / 50 + 1;
+    }
+    if list_census_page_id < 1 {
+        list_census_page_id = 1;
+    }
+
+    let builder = state.database_connection.get_database_backend();
+    let mut paginated_census_list = Query::select();
+    paginated_census_list
+        .expr(Expr::col((
+            census_node::Entity,
+            census_node::Column::CensusId,
+        )))
+        .expr_as(
+            Expr::count(Expr::col(census_node::Column::CensusId)),
+            Alias::new("node_count"),
+        )
+        .expr_as(
+            Expr::col((census::Entity, census::Column::StartedAt)),
+            Alias::new("created_at"),
+        )
+        .from(census::Entity)
+        .from(census_node::Entity)
+        .and_where(
+            Expr::col((census::Entity, census_node::Column::Id)).eq(Expr::col((
+                census_node::Entity,
+                census_node::Column::CensusId,
+            ))),
+        )
+        .add_group_by([
+            SimpleExpr::from(Expr::col((
+                census_node::Entity,
+                census_node::Column::CensusId,
+            ))),
+            SimpleExpr::from(Expr::col((census::Entity, census::Column::StartedAt))),
+        ])
+        .order_by(census::Column::StartedAt, Order::Desc)
+        .limit(50)
+        .offset(((list_census_page_id - 1) * 50) as u64);
+
+    let paginated_census_list =
+        PaginatedCensusListResult::find_by_statement(builder.build(&paginated_census_list))
+            .all(&state.database_connection)
+            .await
+            .unwrap();
+
+    let template = PaginatedCensusListTemplate {
+        census_data: paginated_census_list,
+        list_census_page_id,
+        max_census_id: max_census_id.id,
+    };
+
+    Ok(HtmlTemplate(template))
+}
+
+pub async fn census_explorer(
+    Path(census_id): Path<String>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<HtmlTemplate<CensusExplorerPageTemplate>, StatusCode> {
+    let max_census_id = match get_max_census_id(&state).await {
+        None => return Err(StatusCode::from_u16(404).unwrap()),
+        Some(max_census_id) => max_census_id,
+    };
+
+    let census_id: Option<i32> = match census_id.parse::<i32>() {
+        Ok(census_id) => Some(census_id),
+        Err(_) => Some(max_census_id.id),
+    };
+
+    let client_diversity_data =
+        match generate_client_diversity_data(&state, census_id, max_census_id).await {
+            None => return Err(StatusCode::from_u16(404).unwrap()),
+            Some(client_diversity_data) => client_diversity_data,
+        };
+
+    let enr_list = match generate_enr_list_from_census_id(&state, census_id, max_census_id).await {
+        None => return Err(StatusCode::from_u16(404).unwrap()),
+        Some(enr_list) => enr_list,
+    };
+
+    let template = CensusExplorerPageTemplate {
+        client_diversity_data,
+        node_count: enr_list.len() as i32,
+        enr_list,
+        census_id: census_id.unwrap(),
+        max_census_id: max_census_id.id,
+        created_at: get_created_data_from_census_id(&state, census_id.unwrap())
+            .await
+            .format("%Y-%m-%d %H:%M:%S UTC")
+            .to_string(),
+    };
+
+    Ok(HtmlTemplate(template))
 }

@@ -71,10 +71,8 @@
 </div>
 
 <script>
-
-    pie_chart_count({{ pie_chart_client_count| json | safe }})
+    pie_chart_count({{ client_diversity_data| json | safe }})
     radius_node_id_scatter_chart({{ average_radius_chart| json | safe }})
-
 </script>
 
 {% endblock %}
