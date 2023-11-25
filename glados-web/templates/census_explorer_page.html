@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Glados{% endblock %}
+
+{% block head %}
+<script src="/static/js/d3.min.js"></script>
+<script src="/static/js/piechart.js"></script>
+<script src="/static/js/radiusdensity.js"></script>
+<link href="/static/css/homepage.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-9 col-md-6 col-sm-12 margin-bottom">
+            <div class="card pie-box h-100">
+                <div class="card-body">
+                    <h1 class="card-title">Census #{{ census_id }} </h1>
+                    <div class="row">
+                        <div class="col-xl-5 col-lg-6 col-md-12">
+                            <table class="table table-borderless">
+                                <tbody>
+                                <tr>
+                                    <td>Created At</td>
+                                    <td><p class="text-end">{{ created_at }}</p></td>
+                                </tr>
+                                <tr>
+                                    <td>Number of Nodes</td>
+                                    <td><p class="text-end">{{ node_count }}</p></td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="col-xl-7 col-lg-6 col-md-12">
+                            <div class="d-grid gap-2">
+                                <nav aria-label="census explorer navigation">
+                                    <ul class="pagination justify-content-center">
+                                        <li class="page-item {% if census_id == 1 %}disabled{% endif %}">
+                                            <a class="page-link" href="/census/?census-id={{ census_id - 1}}">Previous</a>
+                                        </li>
+                                        <li class="page-item {% if census_id == 1 %}active{% endif -%}"><a class="page-link" href="/census/1">1</a></li>
+                                        {% if max_census_id != 1 %}
+                                        <li class="page-item {% if census_id != 1 && census_id != max_census_id %}active{% endif %}">
+                                            {% if census_id == 1 %}
+                                            <a class="page-link" href="/census/?census-id={{ census_id + 1 }}">{{ census_id + 1 }}</a>
+                                            {% else if census_id == max_census_id %}
+                                            <a class="page-link" href="/census/?census-id={{ census_id - 1 }}">{{ census_id - 1 }}</a>
+                                            {% else %}
+                                            <a class="page-link" href="/census/?census-id={{ census_id }}">{{ census_id }}</a>
+                                            {% endif %}
+                                        </li>
+                                        <li class="page-item {% if census_id == max_census_id %}active{% endif %}"><a class="page-link" href="/census/?census-id={{ max_census_id }}">{{ max_census_id }}</a></li>
+                                        {% endif %}
+                                        <li class="page-item {% if census_id == max_census_id %}disabled{% endif %}">
+                                            <a class="page-link" href="/census/?census-id={{ census_id + 1 }}">Next</a>
+                                        </li>
+                                    </ul>
+                                </nav>
+                                <a href="/census/census-list/?page=1" class="btn btn-outline-secondary" type="button">List of all past census's</a>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 col-sm-12 margin-bottom">
+            <div class="card pie-box h-100">
+                <div class="card-body">
+                    <h3 style="text-align: center">Client Count</h3>
+                    <div id="graph2" style="display: flex; justify-content: center; align-items: center;"></div>
+                </div>
+
+            </div>
+        </div>
+        <div class="col-12 margin-bottom">
+            <div class="card pie-box h-100">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                            <tr>
+                                <th scope="col">ENR</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for enr in enr_list %}
+                            <tr>
+                                <td>{{ enr.raw }}</td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    pie_chart_count({{ client_diversity_data| json | safe }})
+</script>
+
+{% endblock %}

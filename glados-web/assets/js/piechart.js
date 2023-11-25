@@ -86,10 +86,10 @@ function PieChart(data, {
     return Object.assign(svg.node(), { scales: { color } });
 }
 
-function pie_chart_count(pie_chart_client_count) {
+function pie_chart_count(client_diversity_data) {
     const char_array = [];
 
-    pie_chart_client_count.forEach(i => {
+    client_diversity_data.forEach(i => {
         if (i.client_name === "t" || i.client_name === "\\x74") {
             char_array.push({ name: "Trin", value: i.client_count });
         } else if (i.client_name === "f" || i.client_name === "\\x66") {

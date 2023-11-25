@@ -4,7 +4,6 @@
 
 {% block head %}
 <script src="/static/js/d3.min.js"></script>
-<script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="/static/js/piechart.js"></script>
 <script src="/static/js/radiusdensity.js"></script>
 <link href="/static/css/homepage.css" rel="stylesheet">
@@ -71,10 +70,8 @@
 </div>
 
 <script>
-
-    pie_chart_count({{ pie_chart_client_count| json | safe }})
+    pie_chart_count({{ client_diversity_data| json | safe }})
     radius_node_id_scatter_chart({{ average_radius_chart| json | safe }})
-
 </script>
 
 {% endblock %}

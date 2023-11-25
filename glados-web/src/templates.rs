@@ -3,17 +3,37 @@ use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Response},
 };
-
 use entity::{client_info, content, content_audit, execution_metadata, key_value, node, record};
 
-use crate::routes::{CalculatedRadiusChartData, PieChartResult, Stats};
+use crate::routes::{
+    CalculatedRadiusChartData, ClientDiversityResult, PaginatedCensusListResult, RawEnr, Stats,
+};
 
 #[derive(Template)]
 #[template(path = "index.html")]
 pub struct IndexTemplate {
-    pub pie_chart_client_count: Vec<PieChartResult>,
+    pub client_diversity_data: Vec<ClientDiversityResult>,
     pub average_radius_chart: Vec<CalculatedRadiusChartData>,
     pub stats: [Stats; 3],
+}
+
+#[derive(Template)]
+#[template(path = "paginated_census_list.html")]
+pub struct PaginatedCensusListTemplate {
+    pub census_data: Vec<PaginatedCensusListResult>,
+    pub list_census_page_id: i32,
+    pub max_census_id: i32,
+}
+
+#[derive(Template)]
+#[template(path = "census_explorer_page.html")]
+pub struct CensusExplorerPageTemplate {
+    pub client_diversity_data: Vec<ClientDiversityResult>,
+    pub enr_list: Vec<RawEnr>,
+    pub census_id: i32,
+    pub max_census_id: i32,
+    pub node_count: i32,
+    pub created_at: String,
 }
 
 #[derive(Template)]

@@ -23,8 +23,11 @@ body {
 
 .pie-box {
     border-radius: 20px;
-    height: 100%;
     border: 2px solid white;
+}
+
+.margin-bottom {
+    margin-bottom: 1rem;
 }
 
 .card-box {
