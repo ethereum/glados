@@ -4,7 +4,6 @@
 
 {% block head %}
 <script src="/static/js/d3.min.js"></script>
-<script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="/static/js/piechart.js"></script>
 <script src="/static/js/radiusdensity.js"></script>
 <link href="/static/css/homepage.css" rel="stylesheet">
@@ -35,7 +34,7 @@
                             <tbody>
                             {% for census in census_data %}
                             <tr>
-                                <td><a class="link-primary" href="/census-explorer/{{ census.census_id }}/">{{ census.census_id }}</a></td>
+                                <td><a class="link-primary" href="/census/?census-id={{ census.census_id }}">{{ census.census_id }}</a></td>
                                 <td>{{ census.created_at }}</td>
                                 <td>{{ census.node_count }}</td>
                             </tr>
@@ -51,23 +50,23 @@
         <nav aria-label="census explorer navigation">
             <ul class="pagination justify-content-center">
                 <li class="page-item {% if list_census_page_id == 1 %}disabled{% endif %}">
-                    <a class="page-link" href="/census-explorer/paginated-census-list/{{ list_census_page_id - 1}}/">Previous</a>
+                    <a class="page-link" href="/census/census-list/?page={{ list_census_page_id - 1}}">Previous</a>
                 </li>
-                <li class="page-item {% if list_census_page_id == 1 %}active{% endif -%}"><a class="page-link" href="/census-explorer/paginated-census-list/1/">1</a></li>
+                <li class="page-item {% if list_census_page_id == 1 %}active{% endif -%}"><a class="page-link" href="/census/census-list/?page=1">1</a></li>
                 {% if max_census_id / 50 + 1 != 1 %}
                 <li class="page-item {% if list_census_page_id != 1 && list_census_page_id != max_census_id / 50 + 1 %}active{% endif %}">
                     {% if list_census_page_id == 1 %}
-                    <a class="page-link" href="/census-explorer/paginated-census-list/{{ list_census_page_id + 1 }}/">{{ list_census_page_id + 1 }}</a>
+                    <a class="page-link" href="/census/census-list/?page={{ list_census_page_id + 1 }}">{{ list_census_page_id + 1 }}</a>
                     {% else if list_census_page_id == max_census_id / 50 + 1 %}
-                    <a class="page-link" href="/census-explorer/paginated-census-list/{{ list_census_page_id - 1 }}/">{{ list_census_page_id - 1 }}</a>
+                    <a class="page-link" href="/census/census-list/?page={{ list_census_page_id - 1 }}">{{ list_census_page_id - 1 }}</a>
                     {% else %}
-                    <a class="page-link" href="/census-explorer/paginated-census-list/{{ list_census_page_id }}/">{{ list_census_page_id }}</a>
+                    <a class="page-link" href="/census/census-list/?page={{ list_census_page_id }}">{{ list_census_page_id }}</a>
                     {% endif %}
                 </li>
-                <li class="page-item {% if list_census_page_id == max_census_id / 50 + 1 %}active{% endif %}"><a class="page-link" href="/census-explorer/paginated-census-list/{{ max_census_id / 50 + 1 }}/">{{ max_census_id / 50 + 1 }}</a></li>
+                <li class="page-item {% if list_census_page_id == max_census_id / 50 + 1 %}active{% endif %}"><a class="page-link" href="/census/census-list/?page={{ max_census_id / 50 + 1 }}">{{ max_census_id / 50 + 1 }}</a></li>
                 {% endif %}
                 <li class="page-item {% if list_census_page_id == max_census_id / 50 + 1 %}disabled{% endif %}">
-                    <a class="page-link" href="/census-explorer/paginated-census-list/{{ list_census_page_id + 1 }}/">Next</a>
+                    <a class="page-link" href="/census/census-list/?page={{ list_census_page_id + 1 }}">Next</a>
                 </li>
             </ul>
         </nav>

@@ -28,6 +28,7 @@ use sea_orm::{
     FromQueryResult, LoaderTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::Formatter;
 use std::sync::Arc;
 use std::{fmt::Display, io};
@@ -1269,7 +1270,7 @@ async fn get_audit_stats(period: Period, conn: &DatabaseConnection) -> Result<St
 }
 
 pub async fn census_explorer_list(
-    Path(list_census_page_id): Path<String>,
+    page: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<HtmlTemplate<PaginatedCensusListTemplate>, StatusCode> {
     let max_census_id = match get_max_census_id(&state).await {
@@ -1277,9 +1278,12 @@ pub async fn census_explorer_list(
         Some(max_census_id) => max_census_id,
     };
 
-    let mut list_census_page_id: i32 = match list_census_page_id.parse::<i32>() {
-        Ok(list_census_page_id) => list_census_page_id,
-        Err(_) => return Err(StatusCode::from_u16(404).unwrap()),
+    let mut list_census_page_id: i32 = match page.get("page") {
+        None => return Err(StatusCode::from_u16(404).unwrap()),
+        Some(list_census_page_id) => match list_census_page_id.parse::<i32>() {
+            Ok(list_census_page_id) => list_census_page_id,
+            Err(_) => return Err(StatusCode::from_u16(404).unwrap()),
+        },
     };
 
     if list_census_page_id > max_census_id.id / 50 + 1 {
@@ -1339,7 +1343,7 @@ pub async fn census_explorer_list(
 }
 
 pub async fn census_explorer(
-    Path(census_id): Path<String>,
+    census_id: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<HtmlTemplate<CensusExplorerPageTemplate>, StatusCode> {
     let max_census_id = match get_max_census_id(&state).await {
@@ -1347,9 +1351,12 @@ pub async fn census_explorer(
         Some(max_census_id) => max_census_id,
     };
 
-    let census_id: Option<i32> = match census_id.parse::<i32>() {
-        Ok(census_id) => Some(census_id),
-        Err(_) => Some(max_census_id.id),
+    let census_id: Option<i32> = match census_id.get("census-id") {
+        None => return Err(StatusCode::from_u16(404).unwrap()),
+        Some(census_id) => match census_id.parse::<i32>() {
+            Ok(census_id) => Some(census_id),
+            Err(_) => Some(max_census_id.id),
+        },
     };
 
     let client_diversity_data =
