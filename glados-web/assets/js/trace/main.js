@@ -45,7 +45,7 @@ function createGraphData(trace) {
     Object.keys(trace.metadata).forEach((nodeId) => {
       let meta = trace.metadata[nodeId];
       let enr = meta.enr;
-      let decodedEnr = ENR.ENR.decodeTxt(enr);
+      let decodedEnr = ENR.ENR.decodeTxt(enr).enr;
 
       let ip = decodedEnr.ip || "localhost"; // Edge case for local node
       let port = decodedEnr.udp;

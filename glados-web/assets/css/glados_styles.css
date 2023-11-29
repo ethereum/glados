@@ -35,3 +35,10 @@ body {
     display: inline-block;
     border: 2px solid white;
 }
+
+.enr-card {
+    border-radius: 10px;
+    width: 98%;
+    height: auto;
+    border: 2px white;
+}
