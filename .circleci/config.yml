@@ -15,12 +15,12 @@ jobs:
       - run:
           name: Build Docker image
           no_output_timeout: 30m
-          command: docker build -f glados-web/Dockerfile -t glados-web:latest --build-arg GIT_HASH=$CIRCLE_SHA1 .
+          command: docker build -f glados-web/Dockerfile -t portalnetwork/glados-web:latest --build-arg GIT_HASH=$CIRCLE_SHA1 .
       - run:
           name: Publish docker image to Docker Hub
           command: |
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            docker push glados-web:latest
+            docker push portalnetwork/glados-web:latest
   docker-build-glados-monitor-and-publish:
     resource_class: xlarge
     executor: docker-publisher
@@ -30,12 +30,12 @@ jobs:
       - run:
           name: Build Docker image
           no_output_timeout: 30m
-          command: docker build -f glados-monitor/Dockerfile -t glados-monitor:latest --build-arg GIT_HASH=$CIRCLE_SHA1 .
+          command: docker build -f glados-monitor/Dockerfile -t portalnetwork/glados-monitor:latest --build-arg GIT_HASH=$CIRCLE_SHA1 .
       - run:
           name: Publish docker image to Docker Hub
           command: |
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            docker push glados-monitor:latest
+            docker push portalnetwork/glados-monitor:latest
   docker-build-glados-cartographer-and-publish:
     resource_class: xlarge
     executor: docker-publisher
@@ -45,12 +45,12 @@ jobs:
       - run:
           name: Build Docker image
           no_output_timeout: 30m
-          command: docker build -f glados-cartographer/Dockerfile -t glados-cartographer:latest --build-arg GIT_HASH=$CIRCLE_SHA1 .
+          command: docker build -f glados-cartographer/Dockerfile -t portalnetwork/glados-cartographer:latest --build-arg GIT_HASH=$CIRCLE_SHA1 .
       - run:
           name: Publish docker image to Docker Hub
           command: |
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            docker push glados-cartographer:latest
+            docker push portalnetwork/glados-cartographer:latest
   docker-build-glados-audit-and-publish:
     resource_class: xlarge
     executor: docker-publisher
@@ -60,12 +60,12 @@ jobs:
       - run:
           name: Build Docker image
           no_output_timeout: 30m
-          command: docker build -f glados-web/Dockerfile -t glados-audit:latest --build-arg GIT_HASH=$CIRCLE_SHA1 .
+          command: docker build -f glados-web/Dockerfile -t portalnetwork/glados-audit:latest --build-arg GIT_HASH=$CIRCLE_SHA1 .
       - run:
           name: Publish docker image to Docker Hub
           command: |
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            docker push glados-audit:latest
+            docker push portalnetwork/glados-audit:latest
   lint-build-test:
         description: |
             Check linting with Clippy and rustfmt, build the crate, and run tests.
