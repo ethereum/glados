@@ -60,7 +60,7 @@ jobs:
       - run:
           name: Build Docker image
           no_output_timeout: 30m
-          command: docker build -f glados-web/Dockerfile -t portalnetwork/glados-audit:latest --build-arg GIT_HASH=$CIRCLE_SHA1 .
+          command: docker build -f glados-audit/Dockerfile -t portalnetwork/glados-audit:latest --build-arg GIT_HASH=$CIRCLE_SHA1 .
       - run:
           name: Publish docker image to Docker Hub
           command: |
