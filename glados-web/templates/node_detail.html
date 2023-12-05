@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 
 {% block title %}Node Detail{% endblock %}
-
-{% block content %}
+{% block head %}
+{% call super() %}
 <script src="/static/js/trace/enr.js"></script>
+{% endblock %}
+{% block content %}
 
 <ul>
     <div class="row">
