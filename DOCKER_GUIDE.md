@@ -13,11 +13,13 @@ where Postgres should store its data on the host machine.
 
 - `GLADOS_POSTGRES_PASSWORD` to the password for accessing the DB.
 
+- `GLADOS_PROVIDER_URL` to the execution API provider URL.
+
 Then, from the root of this repo, run:
 
 `docker compose up -d`
 
-If successful, you should be able to navigate to `127.0.0.1:3001/` and see 
+If successful, you should be able to navigate to `127.0.0.1:3001/` and see
 the Glados web dashboard populating with data.
 
 ### Updating
@@ -26,5 +28,5 @@ the Glados web dashboard populating with data.
 
 ### Tearing Down
 
-`docker compose down` will remove the deployment. 
+`docker compose down` will remove the deployment.
 
