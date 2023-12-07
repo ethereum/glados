@@ -19,30 +19,30 @@
                     <div class="table-responsive">
                         <table class="table">
                             <thead>
-                            <tr>
-                                <th scope="col">Period</th>
-                                <th scope="col">New content</th>
-                                <th scope="col">Total audits</th>
-                                <th scope="col">Total audit passes</th>
-                                <th scope="col">Total audit failures</th>
-                                <th scope="col"><span class="badge text-bg-success">Pass rate</span> (%)</th>
-                                <th scope="col"><span class="badge text-bg-danger">Failure rate</span> (%)</th>
-                                <th scope="col">Audits per minute</th>
-                            </tr>
+                                <tr>
+                                    <th scope="col">Period</th>
+                                    <th scope="col">New content</th>
+                                    <th scope="col">Total audits</th>
+                                    <th scope="col">Total audit passes</th>
+                                    <th scope="col">Total audit failures</th>
+                                    <th scope="col"><span class="badge text-bg-success">Pass rate</span> (%)</th>
+                                    <th scope="col"><span class="badge text-bg-danger">Failure rate</span> (%)</th>
+                                    <th scope="col">Audits per minute</th>
+                                </tr>
                             </thead>
                             <tbody>
-                            {% for stat in stats %}
-                            <tr>
-                                <th scope="row">{{ stat.period.to_string() }}</th>
-                                <td>{{ stat.new_content }}</td>
-                                <td>{{ stat.total_audits }}</td>
-                                <td>{{ stat.total_passes }}</td>
-                                <td>{{ stat.total_failures }}</td>
-                                <td>{{ "{:.1}"|format(stat.pass_percent) }}%</td>
-                                <td>{{ "{:.1}"|format(stat.fail_percent) }}%</td>
-                                <td>{{ stat.audits_per_minute }}</td>
-                            </tr>
-                            {% endfor %}
+                                {% for stat in stats %}
+                                <tr>
+                                    <th scope="row">{{ stat.period.to_string() }}</th>
+                                    <td>{{ stat.new_content }}</td>
+                                    <td>{{ stat.total_audits }}</td>
+                                    <td>{{ stat.total_passes }}</td>
+                                    <td>{{ stat.total_failures }}</td>
+                                    <td>{{ "{:.1}"|format(stat.pass_percent) }}%</td>
+                                    <td>{{ "{:.1}"|format(stat.fail_percent) }}%</td>
+                                    <td>{{ stat.audits_per_minute }}</td>
+                                </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
