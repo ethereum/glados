@@ -15,12 +15,11 @@ services:
       - glados-net
     restart: always
 
-  trin:
-    hostname: trin
-    image: portalnetwork/trin:latest
-    environment:
-      RUST_LOG: info
-    command: "--web3-transport http --web3-http-address http://0.0.0.0:8545/ --mb 0 --bootnodes default"
+  portal_client:
+    extends:
+      file: docker-compose-clients.yml
+      service: ${GLADOS_PORTAL_CLIENT?Glados portal client required}
+    hostname: portal-client
     ports:
       - "8545:8545"
     networks:
@@ -28,13 +27,13 @@ services:
     restart: always
 
   glados_audit:
-    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://trin:8545 --concurrency 8 --latest-strategy-weight 2"
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://portal-client:8545 --concurrency 8 --latest-strategy-weight 2"
     image: portalnetwork/glados-audit:latest
     environment:
       RUST_LOG: warn,glados_audit=info
     depends_on:
       - glados_postgres
-      - trin
+      - portal_client
     networks:
       - glados-net
     restart: always
@@ -66,14 +65,14 @@ services:
     restart: always
 
   glados_cartographer:
-    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --transport http --http-url http://trin:8545 --concurrency 10"
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --transport http --http-url http://portal-client:8545 --concurrency 10"
     image: portalnetwork/glados-cartographer:latest
     environment:
       RUST_LOG: warn,glados_cartographer=info
     depends_on:
       - glados_web
       - glados_postgres
-      - trin
+      - portal_client
     networks:
       - glados-net
     restart: always
