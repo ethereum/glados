@@ -7,41 +7,38 @@
 {% block content %}
 <div class="row">
     <div class="col">
-        <ul>
-            <br />
-            <h1 class="header text-center">Audit Dashboard</h1>
-            <div class="d-flex justify-content-center flex-wrap">
-                <div id="content-buttons" class="btn-group mx-1" role="group">
-                    <button id="all-content-button" filter="All" class="btn btn-outline-secondary"
-                        type="button">All</button>
-                    <button id="headers-button" filter="Headers" class="btn btn-outline-secondary"
-                        type="button">Headers</button>
-                    <button id="bodies-button" filter="Bodies" class="btn btn-outline-secondary"
-                        type="button">Bodies</button>
-                    <button id="receipts-button" filter="Receipts" class="btn btn-outline-secondary"
-                        type="button">Receipts</button>
-                </div>
-                <div id="strategy-buttons" class="btn-group mx-1" role="group">
-                    <button id="all-strategy-button" filter="All" class="btn btn-outline-secondary"
-                        type="button">All</button>
-                    <button id="latest-button" filter="Latest" class="btn btn-outline-secondary"
-                        type="button">Latest</button>
-                    <button id="random-button" filter="Random" class="btn btn-outline-secondary"
-                        type="button">Random</button>
-                    <button id="oldest-button" filter="Oldest" class="btn btn-outline-secondary" type="button">Oldest
-                        Unaudited</button>
-                </div>
-                <div id="success-buttons" class="btn-group mx-1 " role="group">
-                    <button id="all-success-button" filter="All" class="btn btn-outline-secondary"
-                        type="button">All</button>
-                    <button id="success-button" filter="Success" class="btn btn-outline-secondary"
-                        type="button">Success</button>
-                    <button id="failure-button" filter="Failure" class="btn btn-outline-secondary"
-                        type="button">Failure</button>
-                </div>
+        <br />
+        <h1 class="header text-center">Audit Dashboard</h1>
+        <div class="d-flex justify-content-center flex-wrap">
+            <div id="content-buttons" class="btn-group mx-1" role="group">
+                <button id="all-content-button" filter="All" class="btn btn-outline-secondary"
+                    type="button">All</button>
+                <button id="headers-button" filter="Headers" class="btn btn-outline-secondary"
+                    type="button">Headers</button>
+                <button id="bodies-button" filter="Bodies" class="btn btn-outline-secondary"
+                    type="button">Bodies</button>
+                <button id="receipts-button" filter="Receipts" class="btn btn-outline-secondary"
+                    type="button">Receipts</button>
             </div>
-
-        </ul>
+            <div id="strategy-buttons" class="btn-group mx-1" role="group">
+                <button id="all-strategy-button" filter="All" class="btn btn-outline-secondary"
+                    type="button">All</button>
+                <button id="latest-button" filter="Latest" class="btn btn-outline-secondary"
+                    type="button">Latest</button>
+                <button id="random-button" filter="Random" class="btn btn-outline-secondary"
+                    type="button">Random</button>
+                <button id="oldest-button" filter="Oldest" class="btn btn-outline-secondary" type="button">Oldest
+                    Unaudited</button>
+            </div>
+            <div id="success-buttons" class="btn-group mx-1 " role="group">
+                <button id="all-success-button" filter="All" class="btn btn-outline-secondary"
+                    type="button">All</button>
+                <button id="success-button" filter="Success" class="btn btn-outline-secondary"
+                    type="button">Success</button>
+                <button id="failure-button" filter="Failure" class="btn btn-outline-secondary"
+                    type="button">Failure</button>
+            </div>
+        </div>
     </div>
 </div>
 <div id="audit-table"></div>
