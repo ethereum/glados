@@ -40,7 +40,7 @@ services:
     restart: always
 
   glados_monitor:
-    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados follow-head --provider-url https://mainnet.infura.io/v3/${INFURA_PROJECT_ID?Infura Project ID Required}"
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados follow-head --provider-url ${GLADOS_PROVIDER_URL?Glados monitor provider URL required}"
     image: portalnetwork/glados-monitor:latest
     environment:
       RUST_LOG: warn,glados_monitor=info
