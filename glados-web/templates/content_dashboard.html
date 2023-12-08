@@ -3,16 +3,16 @@
 {% block title %}Content Dashboard{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col">
-        <ul>
-            <h1>Content Dashboard</h1>
-            <br/>
-            <div class="card shadow-sm content-card">
+<div class="container">
+    <div class="row">
+        <div class="col">
+            <h1 class="header text-center">Content Dashboard</h1>
+            <div class="card shadow-sm pie-box">
                 <div class="card-body">
                     <h2 class="header">Audit stats</h2>
-                    <table class="table">
-                        <thead>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
                             <tr>
                                 <th scope="col">Period</th>
                                 <th scope="col">New content</th>
@@ -23,8 +23,8 @@
                                 <th scope="col"><span class="badge text-bg-danger">Failure rate</span> (%)</th>
                                 <th scope="col">Audits per minute</th>
                             </tr>
-                        </thead>
-                        <tbody>
+                            </thead>
+                            <tbody>
                             {% for stat in stats %}
                             <tr>
                                 <th scope="row">{{ stat.period.to_string() }}</th>
@@ -37,21 +37,24 @@
                                 <td>{{ stat.audits_per_minute }}</td>
                             </tr>
                             {% endfor %}
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        </ul>
+        </div>
     </div>
 </div>
-<div class="row">
-    <div class="col">
-        <ul>
-            <div class="card shadow-sm content-card">
+<br/>
+<div class="container">
+    <div class="row">
+        <div class="col">
+            <div class="card shadow-sm pie-box">
                 <div class="card-body">
                     <h2> Recent content with audits</h2>
-                    <table class="table">
-                        <thead>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
                             <tr>
                                 <th scope="col">Audit</th>
                                 <th scope="col">Result</th>
@@ -63,8 +66,8 @@
                                 <th scope="col">Audited at</th>
                                 <th scope="col">Client</th>
                             </tr>
-                        </thead>
-                        <tbody>
+                            </thead>
+                            <tbody>
                             {% for (audit, content, client_info) in audits_of_recent_content %}
                             <tr>
                                 <td>{% if audit.trace != "" %}<a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a>{%
@@ -74,11 +77,11 @@
                                 </td>
                                 <td><span
                                         class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
-                                        if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
+                                    if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
                                 <td>{{ content.protocol_id.as_text() }}</td>
                                 <td>{{ audit.strategy_as_text() }}</td>
                                 <td><a href="/content/key/{{content.key_as_hex()}}/">{{ content.key_as_hex_short()
-                                        }}</a>
+                                    }}</a>
                                 </td>
                                 <td><a href="/content/id/{{content.id_as_hex()}}/">{{ content.id_as_hex_short() }}</a>
                                 </td>
@@ -88,34 +91,37 @@
                                 <td>{{ client_info.version_info }}</td>
                             </tr>
                             {% endfor %}
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        </ul>
+        </div>
     </div>
 </div>
-<div class="row">
-    <div class="col">
-        <ul>
-            <div class="card shadow-sm content-card">
+<br/>
+<div class="container">
+    <div class="row">
+        <div class="col">
+            <div class="card shadow-sm pie-box">
                 <div class="card-body">
                     <h2>Recent Content</h2>
-                    <table class="table">
-                        <thead>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
                             <tr>
                                 <th scope="col">Sub-protocol</th>
                                 <th scope="col">Content Key</th>
                                 <th scope="col">Content ID</th>
                                 <th scope="col">Content first available</th>
                             </tr>
-                        </thead>
-                        <tbody>
+                            </thead>
+                            <tbody>
                             {% for content in contentid_list %}
                             <tr>
                                 <td>{{ content.protocol_id.as_text() }}</td>
                                 <td><a href="/content/key/{{content.key_as_hex() }}/">{{ content.key_as_hex_short()
-                                        }}</a>
+                                    }}</a>
                                 </td>
                                 <td><a href="/content/id/{{content.id_as_hex() }}/">{{ content.id_as_hex_short() }}</a>
                                 </td>
@@ -123,21 +129,24 @@
                                     }}</td>
                             </tr>
                             {% endfor %}
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        </ul>
+        </div>
     </div>
 </div>
-<div class="row">
-    <div class="col">
-        <ul>
-            <div class="card shadow-sm content-card">
+<br/>
+<div class="container">
+    <div class="row">
+        <div class="col">
+            <div class="card shadow-sm pie-box">
                 <div class="card-body">
                     <h2> Recent audits</h2>
-                    <table class="table">
-                        <thead>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
                             <tr>
                                 <th scope="col">Audit</th>
                                 <th scope="col">Result</th>
@@ -149,8 +158,8 @@
                                 <th scope="col">Audited at</th>
                                 <th scope="col">Client</th>
                             </tr>
-                        </thead>
-                        <tbody>
+                            </thead>
+                            <tbody>
                             {% for (audit, content, client_info) in recent_audits %}
                             <tr>
                                 <td>{% if audit.trace != "" %}<a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a>{%
@@ -160,11 +169,11 @@
                                 </td>
                                 <td><span
                                         class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
-                                        if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
+                                    if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
                                 <td>{{ content.protocol_id.as_text() }}</td>
                                 <td>{{ audit.strategy_as_text() }}</td>
                                 <td><a href="/content/key/{{content.key_as_hex()}}/">{{ content.key_as_hex_short()
-                                        }}</a>
+                                    }}</a>
                                 </td>
                                 <td><a href="/content/id/{{content.id_as_hex()}}/">{{ content.id_as_hex_short() }}</a>
                                 </td>
@@ -174,21 +183,24 @@
                                 <td>{{ client_info.version_info }}</td>
                             </tr>
                             {% endfor %}
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        </ul>
+        </div>
     </div>
 </div>
-<div class="row">
-    <div class="col">
-        <ul>
-            <div class="card shadow-sm content-card">
+<br/>
+<div class="container">
+    <div class="row">
+        <div class="col">
+            <div class="card shadow-sm pie-box">
                 <div class="card-body">
                     <h2> Recent audit successes</h2>
-                    <table class="table">
-                        <thead>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
                             <tr>
                                 <th scope="col">Audit</th>
                                 <th scope="col">Result</th>
@@ -200,8 +212,8 @@
                                 <th scope="col">Audited at</th>
                                 <th scope="col">Client</th>
                             </tr>
-                        </thead>
-                        <tbody>
+                            </thead>
+                            <tbody>
                             {% for (audit, content, client_info) in recent_audit_successes %}
                             <tr>
                                 <td>{% if audit.trace != "" %}<a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a>{%
@@ -211,11 +223,11 @@
                                 </td>
                                 <td><span
                                         class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
-                                        if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
+                                    if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
                                 <td>{{ content.protocol_id.as_text() }}</td>
                                 <td>{{ audit.strategy_as_text() }}</td>
                                 <td><a href="/content/key/{{content.key_as_hex()}}/">{{ content.key_as_hex_short()
-                                        }}</a>
+                                    }}</a>
                                 </td>
                                 <td><a href="/content/id/{{content.id_as_hex()}}/">{{ content.id_as_hex_short() }}</a>
                                 </td>
@@ -225,21 +237,24 @@
                                 <td>{{ client_info.version_info }}</td>
                             </tr>
                             {% endfor %}
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        </ul>
+        </div>
     </div>
 </div>
-<div class="row">
-    <div class="col">
-        <ul>
-            <div class="card shadow-sm content-card">
+<br/>
+<div class="container">
+    <div class="row">
+        <div class="col">
+            <div class="card shadow-sm pie-box">
                 <div class="card-body">
                     <h2> Recent audit failures</h2>
-                    <table class="table">
-                        <thead>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
                             <tr>
                                 <th scope="col">Audit</th>
                                 <th scope="col">Result</th>
@@ -251,8 +266,8 @@
                                 <th scope="col">Audited at</th>
                                 <th scope="col">Client</th>
                             </tr>
-                        </thead>
-                        <tbody>
+                            </thead>
+                            <tbody>
                             {% for (audit, content, client_info) in recent_audit_failures %}
                             <tr>
                                 <td>{% if audit.trace != "" %}<a href="/audit/id/{{ audit.id }}">{{ audit.id }}</a>{%
@@ -262,11 +277,11 @@
                                 </td>
                                 <td><span
                                         class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
-                                        if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
+                                    if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
                                 <td>{{ content.protocol_id.as_text() }}</td>
                                 <td>{{ audit.strategy_as_text() }}</td>
                                 <td><a href="/content/key/{{content.key_as_hex()}}/">{{ content.key_as_hex_short()
-                                        }}</a>
+                                    }}</a>
                                 </td>
                                 <td><a href="/content/id/{{content.id_as_hex()}}/">{{ content.id_as_hex_short() }}</a>
                                 </td>
@@ -276,12 +291,14 @@
                                 <td>{{ client_info.version_info }}</td>
                             </tr>
                             {% endfor %}
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        </ul>
+        </div>
     </div>
 </div>
+
 
 {% endblock %}
