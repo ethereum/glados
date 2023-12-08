@@ -11,46 +11,47 @@
 {% block content %}
 <div class="container">
     </br>
-    <div class="graphBox">
-        <div class="col">
-            <div class="card shadow-sm card-box">
+    <div class="row">
+        <div class="col-lg-9 col-md-6 col-sm-12 margin-bottom">
+            <div class="card pie-box h-100">
                 <div class="card-body">
                     <h2>Audit stats</h2>
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th scope="col">Period</th>
-                                <th scope="col">New content</th>
-                                <th scope="col">Total audits</th>
-                                <th scope="col">Total audit passes</th>
-                                <th scope="col">Total audit failures</th>
-                                <th scope="col"><span class="badge text-bg-success">Pass rate</span> (%)</th>
-                                <th scope="col"><span class="badge text-bg-danger">Failure rate</span> (%)</th>
-                                <th scope="col">Audits per minute</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for stat in stats %}
-                            <tr>
-                                <th scope="row">{{ stat.period.to_string() }}</th>
-                                <td>{{ stat.new_content }}</td>
-                                <td>{{ stat.total_audits }}</td>
-                                <td>{{ stat.total_passes }}</td>
-                                <td>{{ stat.total_failures }}</td>
-                                <td>{{ "{:.1}"|format(stat.pass_percent) }}%</td>
-                                <td>{{ "{:.1}"|format(stat.fail_percent) }}%</td>
-                                <td>{{ stat.audits_per_minute }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Period</th>
+                                    <th scope="col">New content</th>
+                                    <th scope="col">Total audits</th>
+                                    <th scope="col">Total audit passes</th>
+                                    <th scope="col">Total audit failures</th>
+                                    <th scope="col"><span class="badge text-bg-success">Pass rate</span> (%)</th>
+                                    <th scope="col"><span class="badge text-bg-danger">Failure rate</span> (%)</th>
+                                    <th scope="col">Audits per minute</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stat in stats %}
+                                <tr>
+                                    <th scope="row">{{ stat.period.to_string() }}</th>
+                                    <td>{{ stat.new_content }}</td>
+                                    <td>{{ stat.total_audits }}</td>
+                                    <td>{{ stat.total_passes }}</td>
+                                    <td>{{ stat.total_failures }}</td>
+                                    <td>{{ "{:.1}"|format(stat.pass_percent) }}%</td>
+                                    <td>{{ "{:.1}"|format(stat.fail_percent) }}%</td>
+                                    <td>{{ stat.audits_per_minute }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-
             </div>
             <div id="graph1"></div>
         </div>
-        <div class="col">
-            <div class="card shadow-sm pie-box">
+        <div class="col margin-bottom">
+            <div class="card pie-box h-100">
                 <div class="card-body">
                     <h3 style="text-align: center">Client Count</h3>
                     <div id="graph2" style="display: flex; justify-content: center; align-items: center;"></div>
@@ -58,14 +59,17 @@
 
             </div>
         </div>
-    </div>
-    <br>
-    <div class="card shadow-sm card-box">
-        <div class="card-body">
-            <div id="census-scatterplot"></div>
+        <div class="col-sm-5 margin-bottom">
+            <div class="card pie-box h-100">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <div id="census-scatterplot"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="hover" style="pointer-events: none; position: absolute; opacity: 0;"></div>
         </div>
     </div>
-    <div id="hover" style="pointer-events: none; position: absolute; opacity: 0;"></div>
 </div>
 
 <script>

@@ -15,12 +15,6 @@ body {
     margin-bottom: 10px;
 }
 
-.graphBox {
-    display: grid;
-    grid-template-columns: 3fr 1fr;
-    grid-gap: 30px;
-}
-
 .pie-box {
     border-radius: 20px;
     border: 2px solid white;
