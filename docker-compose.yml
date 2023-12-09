@@ -20,14 +20,11 @@ services:
       file: docker-compose-clients.yml
       service: ${GLADOS_PORTAL_CLIENT?Glados portal client required}
     hostname: portal-client
-    ports:
-      - "8545:8545"
-    networks:
-      - glados-net
+    network_mode: "host"
     restart: always
 
   glados_audit:
-    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://portal-client:8545 --concurrency 8 --latest-strategy-weight 2"
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://host.docker.internal:8545 --concurrency 8 --latest-strategy-weight 2"
     image: portalnetwork/glados-audit:latest
     environment:
       RUST_LOG: warn,glados_audit=info
@@ -36,6 +33,8 @@ services:
       - portal_client
     networks:
       - glados-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: always
 
   glados_monitor:
@@ -65,7 +64,7 @@ services:
     restart: always
 
   glados_cartographer:
-    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --transport http --http-url http://portal-client:8545 --concurrency 10"
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --transport http --http-url http://host.docker.internal:8545 --concurrency 10"
     image: portalnetwork/glados-cartographer:latest
     environment:
       RUST_LOG: warn,glados_cartographer=info
@@ -75,6 +74,8 @@ services:
       - portal_client
     networks:
       - glados-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: always
 
 networks:
