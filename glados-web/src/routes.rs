@@ -195,15 +195,19 @@ async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusC
 
 async fn get_max_census_id(state: &Arc<State>) -> Option<MaxCensusId> {
     let builder = state.database_connection.get_database_backend();
-    // we need to bounds check the requested census_id and return None if it doesn't exist
     let max_census_id = Query::select()
         .from(census::Entity)
         .expr_as(Expr::max(Expr::col(census::Column::Id)), Alias::new("id"))
         .take();
-    MaxCensusId::find_by_statement(builder.build(&max_census_id))
+    match MaxCensusId::find_by_statement(builder.build(&max_census_id))
         .one(&state.database_connection)
-        .await
-        .unwrap()
+        .await {
+            Ok(val) => val,
+            Err(err) => {
+                error!("{err}");
+                None
+            },
+        }
 }
 
 async fn get_created_data_from_census_id(state: &Arc<State>, census_id: i32) -> DateTime<Utc> {
