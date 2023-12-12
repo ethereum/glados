@@ -143,7 +143,7 @@ pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
         let (tx, rx) = mpsc::channel::<AuditTask>(100);
         let Some(weight) = config.weights.get(strategy) else {
             error!(strategy=?strategy, "no weight for strategy");
-            return
+            return;
         };
         let task_channel = TaskChannel {
             strategy: strategy.clone(),

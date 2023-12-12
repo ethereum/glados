@@ -201,13 +201,14 @@ async fn get_max_census_id(state: &Arc<State>) -> Option<MaxCensusId> {
         .take();
     match MaxCensusId::find_by_statement(builder.build(&max_census_id))
         .one(&state.database_connection)
-        .await {
-            Ok(val) => val,
-            Err(err) => {
-                error!("{err}");
-                None
-            },
+        .await
+    {
+        Ok(val) => val,
+        Err(err) => {
+            error!("{err}");
+            None
         }
+    }
 }
 
 async fn get_created_data_from_census_id(state: &Arc<State>, census_id: i32) -> DateTime<Utc> {

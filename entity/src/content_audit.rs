@@ -137,9 +137,8 @@ pub async fn get_audits<T: OverlayContentKey>(
     content_key: &T,
     conn: &DatabaseConnection,
 ) -> Result<Vec<Model>> {
-    let Some(content_key_model) = content::get(content_key, conn).await?
-    else {
-    bail!("Expected stored content_key found none.")
+    let Some(content_key_model) = content::get(content_key, conn).await? else {
+        bail!("Expected stored content_key found none.")
     };
     Ok(Entity::find()
         .filter(Column::ContentKey.eq(content_key_model.id))

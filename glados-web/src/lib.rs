@@ -29,8 +29,12 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
     let assets_path = match std::env::var(ASSET_PATH_ENV_VAR) {
         Ok(path) => Path::new(&path).to_path_buf(),
         Err(_) => {
-            let Some(parent) = Path::new(std::file!()).parent() else {bail!("No parent of config file")};
-            let Some(grandparent) = parent.parent() else {bail!("No grandparent of config file")};
+            let Some(parent) = Path::new(std::file!()).parent() else {
+                bail!("No parent of config file")
+            };
+            let Some(grandparent) = parent.parent() else {
+                bail!("No grandparent of config file")
+            };
             grandparent.join("assets")
         }
     };
