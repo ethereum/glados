@@ -22,21 +22,14 @@
                 <div class="card-body">
                     <h2>Latest ENR</h2>
                     <ul>
-                        <li><a href="/network/node/{{ node.node_id_as_hex() }}/enr/{{ enr.sequence_number }}/">Detail View</a></li>
                         <li>Sequence Number: {{ enr.sequence_number }}</li>
                     </ul>
                     <pre>{{ enr.raw }}</pre>
-                </div>
-            </div>
-            <br/>
-            {% match latest_enr_key_value_list %}
-            {% when Some with (key_value_list) %}
-            <div class="card shadow-sm enr-card">
-                <div class="card-body">
-                    <h3>Decoded ENR</h3>
                     <div id="enr-data-box" class="form-group"></div>
                 </div>
             </div>
+            {% match latest_enr_key_value_list %}
+            {% when Some with (key_value_list) %}
             {% when None %}
             <p>This shouldn't happen</p>
             {% endmatch %}
