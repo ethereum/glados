@@ -1,6 +1,6 @@
 function radius_node_id_scatter_chart(data) {
-    const margin = {top: 20, right: 25, bottom: 50, left: 25},
-        width = 450 - margin.left - margin.right,
+    const margin = {top: 20, right: 0, bottom: 50, left: 25},
+        width = 475 - margin.left - margin.right,
         height = 400 - margin.top - margin.bottom;
 
     // append the svg object to the body of the page
