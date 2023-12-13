@@ -1,5 +1,5 @@
 function radius_node_id_scatter_chart(data) {
-    const margin = {top: 10, right: 0, bottom: 50, left: 25},
+    const margin = {top: 10, right: 2.5, bottom: 50, left: 25},
         width = 475 - margin.left - margin.right,
         height = 425 - margin.top - margin.bottom;
 
