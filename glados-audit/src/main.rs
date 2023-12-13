@@ -1,6 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
+use glados_audit::stats::periodically_record_stats;
 use sea_orm::Database;
+use tokio::time::Duration;
 use tracing::{debug, info};
 
 use glados_audit::cli::{Args, Command};
@@ -62,6 +64,10 @@ async fn run_audit(args: Args) -> Result<()> {
     );
 
     Migrator::up(&conn, None).await?;
+    tokio::spawn(periodically_record_stats(
+        Duration::from_secs(config.stats_recording_period),
+        conn.clone(),
+    ));
     run_glados_audit(conn, config).await;
     Ok(())
 }

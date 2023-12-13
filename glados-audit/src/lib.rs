@@ -29,6 +29,7 @@ use crate::{selection::start_audit_selection_task, validation::content_is_valid}
 
 pub mod cli;
 pub(crate) mod selection;
+pub mod stats;
 pub(crate) mod validation;
 
 /// Configuration created from CLI arguments.
@@ -44,6 +45,8 @@ pub struct AuditConfig {
     pub concurrency: u8,
     /// Portal Clients
     pub portal_clients: Vec<PortalClient>,
+    /// Number of seconds between recording the current audit performance in audit_stats table.
+    pub stats_recording_period: u64,
 }
 
 impl AuditConfig {
@@ -97,6 +100,7 @@ impl AuditConfig {
             weights,
             concurrency: args.concurrency,
             portal_clients,
+            stats_recording_period: args.stats_recording_period,
         })
     }
 }

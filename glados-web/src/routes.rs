@@ -4,10 +4,8 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use chrono::{DateTime, Duration, Utc};
-use entity::{
-    census, census_node, client_info, content::SubProtocol, content_audit::SelectionStrategy,
-};
+use chrono::{DateTime, Utc};
+use entity::{audit_stats, census, census_node, client_info};
 use entity::{
     content,
     content_audit::{self, AuditResult},
@@ -17,17 +15,15 @@ use ethportal_api::jsonrpsee::core::__reexports::serde_json;
 use ethportal_api::types::distance::{Distance, Metric, XorMetric};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
-use migration::{Alias, IntoCondition, JoinType, Order};
+use glados_core::stats::{filter_audits, get_audit_stats, AuditFilters, Period};
+use migration::{Alias, JoinType, Order};
 use sea_orm::sea_query::SimpleExpr;
-use sea_orm::{
-    sea_query::{Expr, Query, SeaRc},
-    RelationTrait, Select,
-};
+use sea_orm::sea_query::{Expr, Query, SeaRc};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, DynIden, EntityTrait,
     FromQueryResult, LoaderTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::Formatter;
 use std::sync::Arc;
@@ -371,11 +367,20 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
     };
 
     let radius_percentages = generate_radius_graph_data(&state).await;
+    let open_filter = content_audit::Entity::find();
     // Run queries for content dashboard data concurrently
     let (hour_stats, day_stats, week_stats) = tokio::join!(
-        get_audit_stats(Period::Hour, &state.database_connection),
-        get_audit_stats(Period::Day, &state.database_connection),
-        get_audit_stats(Period::Week, &state.database_connection),
+        get_audit_stats(
+            open_filter.clone(),
+            Period::Hour,
+            &state.database_connection
+        ),
+        get_audit_stats(open_filter.clone(), Period::Day, &state.database_connection),
+        get_audit_stats(
+            open_filter.clone(),
+            Period::Week,
+            &state.database_connection
+        ),
     );
 
     // Get results from queries
@@ -565,6 +570,7 @@ pub async fn content_dashboard(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
+    let open_filter = content_audit::Entity::find();
     // Run queries for content dashboard data concurrently
     let (
         audits_of_recent_content,
@@ -579,9 +585,17 @@ pub async fn content_dashboard(
         get_recent_audits(KEY_COUNT, &state.database_connection),
         get_recent_audit_successes(KEY_COUNT, &state.database_connection),
         get_recent_audit_failures(KEY_COUNT, &state.database_connection),
-        get_audit_stats(Period::Hour, &state.database_connection),
-        get_audit_stats(Period::Day, &state.database_connection),
-        get_audit_stats(Period::Week, &state.database_connection),
+        get_audit_stats(
+            open_filter.clone(),
+            Period::Hour,
+            &state.database_connection
+        ),
+        get_audit_stats(open_filter.clone(), Period::Day, &state.database_connection),
+        get_audit_stats(
+            open_filter.clone(),
+            Period::Week,
+            &state.database_connection
+        ),
     );
 
     // Get results from queries
@@ -589,9 +603,18 @@ pub async fn content_dashboard(
     let recent_audits: Vec<AuditTuple> = recent_audits?;
     let recent_audit_successes: Vec<AuditTuple> = recent_audit_successes?;
     let recent_audit_failures: Vec<AuditTuple> = recent_audit_failures?;
-    let hour_stats = hour_stats?;
-    let day_stats = day_stats?;
-    let week_stats = week_stats?;
+    let hour_stats = hour_stats.map_err(|e| {
+        error!(err=?e, "Could not look up recent audits");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let day_stats = day_stats.map_err(|e| {
+        error!(err=?e, "Could not look up recent audits");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let week_stats = week_stats.map_err(|e| {
+        error!(err=?e, "Could not look up recent audits");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let template = ContentDashboardTemplate {
         stats: [hour_stats, day_stats, week_stats],
@@ -809,7 +832,8 @@ pub async fn contentaudit_dashboard() -> Result<HtmlTemplate<AuditDashboardTempl
 pub async fn hourly_success_rate(
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<f32>, StatusCode> {
-    let stats = get_audit_stats(Period::Hour, &state.database_connection)
+    let open_filter = content_audit::Entity::find();
+    let stats = get_audit_stats(open_filter, Period::Hour, &state.database_connection)
         .await
         .map_err(|e| {
             error!("Could not look up hourly stats: {e}");
@@ -913,113 +937,17 @@ pub async fn contentaudit_detail(
     HtmlTemplate(template)
 }
 
-#[derive(Deserialize)]
-pub struct AuditFilters {
-    strategy: StrategyFilter,
-    content_type: ContentTypeFilter,
-    success: SuccessFilter,
-}
-
-#[derive(Deserialize)]
-pub enum StrategyFilter {
-    All,
-    Random,
-    Latest,
-    Oldest,
-}
-
-#[derive(Deserialize)]
-pub enum SuccessFilter {
-    All,
-    Success,
-    Failure,
-}
-
-#[derive(Deserialize)]
-pub enum ContentTypeFilter {
-    All,
-    Headers,
-    Bodies,
-    Receipts,
-}
-
 /// Takes an AuditFilter object generated from http query params
 /// Conditionally creates a query based on the filters
 pub async fn contentaudit_filter(
     Extension(state): Extension<Arc<State>>,
     filters: HttpQuery<AuditFilters>,
 ) -> Result<HtmlTemplate<AuditTableTemplate>, StatusCode> {
-    let audits = content_audit::Entity::find();
-
-    let audits = match filters.strategy {
-        StrategyFilter::All => audits,
-        StrategyFilter::Random => {
-            audits.filter(content_audit::Column::StrategyUsed.eq(SelectionStrategy::Random))
-        }
-        StrategyFilter::Latest => {
-            audits.filter(content_audit::Column::StrategyUsed.eq(SelectionStrategy::Latest))
-        }
-        StrategyFilter::Oldest => audits.filter(
-            content_audit::Column::StrategyUsed.eq(SelectionStrategy::SelectOldestUnaudited),
-        ),
-    };
-    let audits = match filters.success {
-        SuccessFilter::All => audits,
-        SuccessFilter::Success => {
-            audits.filter(content_audit::Column::Result.eq(AuditResult::Success))
-        }
-        SuccessFilter::Failure => {
-            audits.filter(content_audit::Column::Result.eq(AuditResult::Failure))
-        }
-    };
-    let audits = match filters.content_type {
-        ContentTypeFilter::All => audits,
-
-        ContentTypeFilter::Headers => audits.join(
-            JoinType::InnerJoin,
-            content_audit::Relation::Content
-                .def()
-                .on_condition(|_left, right| {
-                    Expr::cust("get_byte(content.content_key, 0) = 0x00")
-                        .and(
-                            Expr::col((right, content::Column::ProtocolId))
-                                .eq(SubProtocol::History),
-                        )
-                        .into_condition()
-                }),
-        ),
-        ContentTypeFilter::Bodies => audits.join(
-            JoinType::InnerJoin,
-            content_audit::Relation::Content
-                .def()
-                .on_condition(|_left, right| {
-                    Expr::cust("get_byte(content.content_key, 0) = 0x01")
-                        .and(
-                            Expr::col((right, content::Column::ProtocolId))
-                                .eq(SubProtocol::History),
-                        )
-                        .into_condition()
-                }),
-        ),
-        ContentTypeFilter::Receipts => audits.join(
-            JoinType::InnerJoin,
-            content_audit::Relation::Content
-                .def()
-                .on_condition(|_left, right| {
-                    Expr::cust("get_byte(content.content_key, 0) = 0x02")
-                        .and(
-                            Expr::col((right, content::Column::ProtocolId))
-                                .eq(SubProtocol::History),
-                        )
-                        .into_condition()
-                }),
-        ),
-    };
-
+    let audits = filter_audits(filters.0);
     let (hour_stats, day_stats, week_stats, filtered_audits) = tokio::join!(
-        get_filtered_audit_stats(audits.clone(), Period::Hour, &state.database_connection),
-        get_filtered_audit_stats(audits.clone(), Period::Day, &state.database_connection),
-        get_filtered_audit_stats(audits.clone(), Period::Week, &state.database_connection),
+        get_audit_stats(audits.clone(), Period::Hour, &state.database_connection),
+        get_audit_stats(audits.clone(), Period::Day, &state.database_connection),
+        get_audit_stats(audits.clone(), Period::Week, &state.database_connection),
         audits
             .order_by_desc(content_audit::Column::CreatedAt)
             .limit(30)
@@ -1027,12 +955,21 @@ pub async fn contentaudit_filter(
     );
 
     let filtered_audits = filtered_audits.map_err(|e| {
-        error!(err=?e, "Could not look up audit stats");
+        error!(err=?e, "Could not look up audits");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    let hour_stats = hour_stats?;
-    let day_stats = day_stats?;
-    let week_stats = week_stats?;
+    let hour_stats = hour_stats.map_err(|e| {
+        error!(err=?e, "Could not look up audit hourly stats");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let day_stats = day_stats.map_err(|e| {
+        error!(err=?e, "Could not look up audit daily stats");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let week_stats = week_stats.map_err(|e| {
+        error!(err=?e, "Could not look up audit weekly stats");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let filtered_audits: Vec<AuditTuple> =
         get_audit_tuples_from_audit_models(filtered_audits, &state.database_connection).await?;
@@ -1043,42 +980,6 @@ pub async fn contentaudit_filter(
     };
 
     Ok(HtmlTemplate(template))
-}
-
-pub enum Period {
-    Hour,
-    Day,
-    Week,
-}
-
-impl Display for Period {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let time_period = match self {
-            Period::Hour => "hour",
-            Period::Day => "day",
-            Period::Week => "week",
-        };
-        write!(f, "Last {time_period}")
-    }
-}
-
-impl Period {
-    fn cutoff_time(&self) -> DateTime<Utc> {
-        let duration = match self {
-            Period::Hour => Duration::hours(1),
-            Period::Day => Duration::days(1),
-            Period::Week => Duration::weeks(1),
-        };
-        Utc::now() - duration
-    }
-
-    fn total_seconds(&self) -> u32 {
-        match self {
-            Period::Hour => 3600,
-            Period::Day => 86400,
-            Period::Week => 604800,
-        }
-    }
 }
 
 #[derive(FromQueryResult, Serialize, Debug)]
@@ -1153,125 +1054,18 @@ pub async fn is_content_in_deadzone(
     Ok(Json(enrs))
 }
 
-pub struct Stats {
-    pub period: Period,
-    pub new_content: u32,
-    pub total_audits: u32,
-    pub total_passes: u32,
-    pub pass_percent: f32,
-    pub total_failures: u32,
-    pub fail_percent: f32,
-    pub audits_per_minute: u32,
-}
-
-async fn get_filtered_audit_stats(
-    filtered: Select<content_audit::Entity>,
-    period: Period,
-    conn: &DatabaseConnection,
-) -> Result<Stats, StatusCode> {
-    let cutoff = period.cutoff_time();
-
-    let total_audits = filtered
-        .clone()
-        .filter(content_audit::Column::CreatedAt.gt(cutoff))
-        .count(conn)
+pub async fn get_audit_stats_handler(
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<audit_stats::Model>>, StatusCode> {
+    let stats = audit_stats::get_recent_stats(&state.database_connection)
         .await
         .map_err(|e| {
-            error!(err=?e, "Could not look up audit stats");
+            error!(err=?e, "Could not look up audit stat history");
             StatusCode::INTERNAL_SERVER_ERROR
-        })? as u32;
+        })
+        .unwrap();
 
-    let total_passes = filtered
-        .filter(content_audit::Column::CreatedAt.gt(cutoff))
-        .filter(content_audit::Column::Result.eq(AuditResult::Success))
-        .count(conn)
-        .await
-        .map_err(|e| {
-            error!(err=?e, "Could not look up audit stats");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })? as u32;
-
-    let total_failures = total_audits - total_passes;
-
-    let audits_per_minute = (60 * total_audits)
-        .checked_div(period.total_seconds())
-        .unwrap_or(0);
-
-    let (pass_percent, fail_percent) = if total_audits == 0 {
-        (0.0, 0.0)
-    } else {
-        let total_audits = total_audits as f32;
-        (
-            (total_passes as f32) * 100.0 / total_audits,
-            (total_failures as f32) * 100.0 / total_audits,
-        )
-    };
-
-    Ok(Stats {
-        period,
-        new_content: 0,
-        total_audits,
-        total_passes,
-        pass_percent,
-        total_failures,
-        fail_percent,
-        audits_per_minute,
-    })
-}
-
-async fn get_audit_stats(period: Period, conn: &DatabaseConnection) -> Result<Stats, StatusCode> {
-    let cutoff = period.cutoff_time();
-    let new_content = content::Entity::find()
-        .filter(content::Column::FirstAvailableAt.gt(cutoff))
-        .count(conn)
-        .await
-        .map_err(|e| {
-            error!(err=?e, "Could not look up audit stats");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })? as u32;
-
-    let total_audits = content_audit::Entity::find()
-        .filter(content_audit::Column::CreatedAt.gt(cutoff))
-        .count(conn)
-        .await
-        .map_err(|e| {
-            error!(err=?e, "Could not look up audit stats");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })? as u32;
-
-    let total_passes = content_audit::Entity::find()
-        .filter(content_audit::Column::CreatedAt.gt(cutoff))
-        .filter(content_audit::Column::Result.eq(AuditResult::Success))
-        .count(conn)
-        .await
-        .map_err(|e| {
-            error!(err=?e, "Could not look up audit stats");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })? as u32;
-
-    let total_failures = total_audits - total_passes;
-    let audits_per_minute = (60 * total_audits)
-        .checked_div(period.total_seconds())
-        .unwrap_or(0);
-    let (pass_percent, fail_percent) = if total_audits == 0 {
-        (0.0, 0.0)
-    } else {
-        let total_audits = total_audits as f32;
-        (
-            (total_passes as f32) * 100.0 / total_audits,
-            (total_failures as f32) * 100.0 / total_audits,
-        )
-    };
-    Ok(Stats {
-        period,
-        new_content,
-        total_audits,
-        total_passes,
-        pass_percent,
-        total_failures,
-        fail_percent,
-        audits_per_minute,
-    })
+    Ok(Json(stats))
 }
 
 pub async fn census_explorer_list(

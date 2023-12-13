@@ -2,6 +2,7 @@ use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use entity::content_audit::SelectionStrategy;
 
 const DEFAULT_DB_URL: &str = "sqlite::memory:";
+const DEFAULT_STATS_PERIOD: &str = "300";
 
 #[derive(Parser, Debug, Eq, PartialEq)]
 #[command(author, version, about, long_about = None)]
@@ -40,6 +41,8 @@ pub struct Args {
         help = "relative weight of the 'random' strategy"
     )]
     pub random_strategy_weight: u8,
+    #[arg(long, default_value = DEFAULT_STATS_PERIOD, help = "stats recording period (seconds)")]
+    pub stats_recording_period: u64,
     #[arg(short, long, action(ArgAction::Append))]
     pub portal_client: Vec<String>,
     #[command(subcommand)]
@@ -68,6 +71,7 @@ impl Default for Args {
             strategy: None,
             portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
             subcommand: None,
+            stats_recording_period: 300,
         }
     }
 }
