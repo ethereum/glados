@@ -67,7 +67,9 @@ async fn follow_chain_head(
 
         debug!(head.number=?block_number, "checking for new block");
 
-        let Ok(candidate_block_number) = w3.eth().block_number().await else {continue};
+        let Ok(candidate_block_number) = w3.eth().block_number().await else {
+            continue;
+        };
 
         if candidate_block_number <= block_number {
             debug!(head.number=?block_number, "head unchanged");
@@ -93,7 +95,9 @@ async fn retrieve_new_blocks(
     conn: DatabaseConnection,
 ) {
     loop {
-        let Some(block_number_to_retrieve) = rx.recv().await else {continue};
+        let Some(block_number_to_retrieve) = rx.recv().await else {
+            continue;
+        };
         debug!(block.number=?block_number_to_retrieve, "fetching block");
 
         let block_hash = match fetch_block_hash(block_number_to_retrieve, &w3).await {
