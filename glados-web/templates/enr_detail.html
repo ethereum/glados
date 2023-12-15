@@ -69,10 +69,12 @@
                 throw new Error("Field not found.")
             }
             return field
+        } else if (key === "c") {
+            return value
         } else {
-            // default to assuming binary data
+            // default to assuming binary data            
             return toHexString(value)
-        }
+        } 
     }
 
     let {enr: decodedEnr, seq, signature} = ENR.ENR.decodeTxt("{{ enr.raw }}");

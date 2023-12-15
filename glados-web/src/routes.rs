@@ -17,14 +17,14 @@ use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use glados_core::stats::{filter_audits, get_audit_stats, AuditFilters, Period};
 use migration::{Alias, JoinType, Order};
-use sea_orm::sea_query::SimpleExpr;
 use sea_orm::sea_query::{Expr, Query, SeaRc};
+use sea_orm::{sea_query::SimpleExpr, Statement};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, DynIden, EntityTrait,
     FromQueryResult, LoaderTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Formatter;
 use std::sync::Arc;
 use std::{fmt::Display, io};
@@ -1139,6 +1139,108 @@ pub async fn census_explorer_list(
     };
 
     Ok(HtmlTemplate(template))
+}
+
+#[derive(Debug, Clone, FromQueryResult)]
+pub struct NodeStatus {
+    enr: String,
+    census_time: DateTime<Utc>,
+    census_id: i32,
+    node_id: Vec<u8>,
+    present: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CensusTimeSeriesData {
+    node_ids: Vec<String>,
+    censuses: Vec<CensusStatuses>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CensusStatuses {
+    census_id: i32,
+    time: DateTime<Utc>,
+    enr_statuses: Vec<Option<String>>,
+}
+
+pub async fn census_timeseries(
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<CensusTimeSeriesData>, StatusCode> {
+    let node_statuses: Vec<NodeStatus> =
+        NodeStatus::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "SELECT 
+                c.started_at AS census_time, 
+                c.id AS census_id,
+                n.node_id,
+                r.raw as enr,
+                CASE 
+                    WHEN r.id IS NOT NULL THEN true 
+                    ELSE false 
+                END AS present
+            FROM 
+                (SELECT * FROM census WHERE started_at >= NOW() - INTERVAL '1 day') AS c
+            LEFT JOIN 
+                census_node AS cn ON c.id = cn.census_id
+            LEFT JOIN 
+                record AS r ON r.id = cn.record_id
+            LEFT JOIN 
+                node AS n ON n.id = r.node_id
+            ORDER BY 
+                c.started_at, n.node_id;",
+            [],
+        ))
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Failed to lookup census node timeseries data");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let census_node_timeseries: CensusTimeSeriesData = transform_data(node_statuses);
+
+    Ok(Json(census_node_timeseries))
+}
+
+/// Decouples census data from node data, now including ENR strings.
+fn transform_data(node_statuses: Vec<NodeStatus>) -> CensusTimeSeriesData {
+    let mut node_set: HashSet<String> = HashSet::new();
+    let mut census_map: HashMap<i32, (DateTime<Utc>, HashMap<String, Option<String>>)> =
+        HashMap::new();
+
+    for status in node_statuses {
+        let hex_id = hex_encode(status.node_id);
+        node_set.insert(hex_id.clone());
+        let enr_opt = if status.present {
+            Some(status.enr)
+        } else {
+            None
+        };
+        let entry = census_map
+            .entry(status.census_id)
+            .or_insert((status.census_time, HashMap::new()));
+        entry.1.insert(hex_id, enr_opt);
+    }
+
+    let node_ids: Vec<String> = node_set.into_iter().collect();
+    let mut censuses: Vec<CensusStatuses> = vec![];
+
+    for (census_id, (time, enr_statuses_map)) in census_map {
+        let enr_statuses = node_ids
+            .iter()
+            .map(|node_id| enr_statuses_map.get(node_id).cloned().unwrap_or(None))
+            .collect();
+
+        censuses.push(CensusStatuses {
+            census_id,
+            time,
+            enr_statuses,
+        });
+    }
+
+    censuses.sort_by_key(|c| c.time);
+
+    CensusTimeSeriesData { node_ids, censuses }
 }
 
 pub async fn census_explorer(
