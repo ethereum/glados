@@ -8,6 +8,8 @@
 <script src="/static/js/trace/enr.js"></script>
 <script src="/static/js/radiusdensity.js"></script>
 <script src="/static/js/stats_history.js"></script>
+<script src="/static/js/census-timeseries.js"></script>
+<link href="/static/css/homepage.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -75,10 +77,23 @@
         <div class="col-lg-7 col-md-12 col-sm-12 margin-bottom">
             <div class="card pie-box h-100">
                 <div class="card-body">
-                     <div id="stats-history-graph"> </div>
+                    <div id="stats-history-graph"> </div>
                 </div>
             </div>
         </div>
+    </div>
+    <div class="row">
+        <div class="col-lg-12 col-md-12 col-sm-12 margin-bottom">
+            <div id="census-timeseries-graph"> </div>
+            <br />
+            <br />
+            <br />
+            <br />
+            <br />
+            <br />
+        </div>
+        <br />
+        <br />
     </div>
 </div>
 
@@ -86,6 +101,7 @@
     pie_chart_count({{ client_diversity_data| json | safe }})
     radius_node_id_scatter_chart({{ average_radius_chart| json | safe }})
     statsHistoryChart()
+    censusTimeSeriesChart()
 
 </script>
 

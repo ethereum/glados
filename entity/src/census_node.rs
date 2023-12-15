@@ -26,6 +26,14 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Census,
+    #[sea_orm(
+        belongs_to = "super::record::Entity",
+        from = "Column::RecordId"
+        to = "super::record::Column::Id",
+        on_update = "Cascade",
+        on_delete = "Cascade"
+    )]
+    Record,
 }
 
 impl Related<super::census::Entity> for Entity {
