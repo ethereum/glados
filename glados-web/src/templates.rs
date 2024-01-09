@@ -27,8 +27,8 @@ pub struct PaginatedCensusListTemplate {
 }
 
 #[derive(Template)]
-#[template(path = "census_explorer_page.html")]
-pub struct CensusExplorerPageTemplate {
+#[template(path = "single_census_view.html")]
+pub struct SingleCensusViewTemplate {
     pub client_diversity_data: Vec<ClientDiversityResult>,
     pub enr_list: Vec<RawEnr>,
     pub census_id: i32,
@@ -36,6 +36,10 @@ pub struct CensusExplorerPageTemplate {
     pub node_count: i32,
     pub created_at: String,
 }
+
+#[derive(Template)]
+#[template(path = "census_explorer.html")]
+pub struct CensusExplorerTemplate {}
 
 #[derive(Template)]
 #[template(path = "network_dashboard.html")]
