@@ -21,7 +21,7 @@ pub mod templates;
 
 use crate::state::State;
 
-const SOCKET: &str = "0.0.0.0:3001";
+const SOCKET: &str = "0.0.0.0:3002";
 
 const ASSET_PATH_ENV_VAR: &str = "GLADOS_WEB_ASSETS_PATH";
 
@@ -64,7 +64,8 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
     let app = Router::new()
         .route("/", get(routes::root))
         .route("/census/census-list/", get(routes::census_explorer_list))
-        .route("/census/", get(routes::census_explorer))
+        .route("/census/", get(routes::single_census_view))
+        .route("/census/explorer", get(routes::census_explorer))
         .route("/network/", get(routes::network_dashboard))
         .route("/network/node/:node_id_hex/", get(routes::node_detail))
         .route(
@@ -95,7 +96,7 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
         )
         .route("/api/stat-history/", get(routes::get_audit_stats_handler))
         .route(
-            "/api/census-node-timeseries/",
+            "/census/census-node-timeseries-data/",
             get(routes::census_timeseries),
         )
         .nest_service("/static/", serve_dir.clone())

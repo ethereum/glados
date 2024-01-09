@@ -8,8 +8,6 @@
 <script src="/static/js/trace/enr.js"></script>
 <script src="/static/js/radiusdensity.js"></script>
 <script src="/static/js/stats_history.js"></script>
-<script src="/static/js/census-timeseries.js"></script>
-<link href="/static/css/homepage.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -82,7 +80,7 @@
             </div>
         </div>
     </div>
-    <div class="row">
+    <<<<<<< HEAD <div class="row">
         <div class="col-lg-12 col-md-12 col-sm-12 margin-bottom">
             <div id="census-timeseries-graph"> </div>
             <br />
@@ -94,14 +92,16 @@
         </div>
         <br />
         <br />
-    </div>
+</div>
+=======
+
+>>>>>>> 362161f (feat: adds dedicated census explorer page)
 </div>
 
 <script>
     pie_chart_count({{ client_diversity_data| json | safe }})
     radius_node_id_scatter_chart({{ average_radius_chart| json | safe }})
     statsHistoryChart()
-    censusTimeSeriesChart()
 
 </script>
 
