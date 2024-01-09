@@ -32,11 +32,11 @@ use tracing::error;
 use tracing::info;
 
 use crate::templates::{
-    AuditDashboardTemplate, AuditTableTemplate, CensusExplorerPageTemplate,
+    AuditDashboardTemplate, AuditTableTemplate, CensusExplorerTemplate,
     ContentAuditDetailTemplate, ContentDashboardTemplate, ContentIdDetailTemplate,
     ContentIdListTemplate, ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate,
     HtmlTemplate, IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate,
-    PaginatedCensusListTemplate,
+    SingleCensusViewTemplate, PaginatedCensusListTemplate,
 };
 use crate::{state::State, templates::AuditTuple};
 
@@ -828,6 +828,11 @@ pub async fn contentaudit_dashboard() -> Result<HtmlTemplate<AuditDashboardTempl
     Ok(HtmlTemplate(template))
 }
 
+pub async fn census_explorer() -> Result<HtmlTemplate<CensusExplorerTemplate>, StatusCode> {
+    let template = CensusExplorerTemplate {};
+    Ok(HtmlTemplate(template))
+}
+
 /// Returns the success rate for the last hour as a percentage.
 pub async fn hourly_success_rate(
     Extension(state): Extension<Arc<State>>,
@@ -1143,7 +1148,7 @@ pub async fn census_explorer_list(
 
 #[derive(Debug, Clone, FromQueryResult)]
 pub struct NodeStatus {
-    enr: String,
+    enr_id: i32,
     census_time: DateTime<Utc>,
     census_id: i32,
     node_id: Vec<u8>,
@@ -1154,6 +1159,7 @@ pub struct NodeStatus {
 pub struct CensusTimeSeriesData {
     node_ids: Vec<String>,
     censuses: Vec<CensusStatuses>,
+    enrs: HashMap<i32, String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1164,8 +1170,18 @@ pub struct CensusStatuses {
 }
 
 pub async fn census_timeseries(
+    http_args: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<CensusTimeSeriesData>, StatusCode> {
+
+    let days_ago: i32 = match http_args.get("days-ago") {
+        None => 0,
+        Some(days_ago) => match days_ago.parse::<i32>() {
+            Ok(days_ago) => days_ago,
+            Err(_) => 0,
+        },
+    };
+
     let node_statuses: Vec<NodeStatus> =
         NodeStatus::find_by_statement(Statement::from_sql_and_values(
             DbBackend::Postgres,
@@ -1173,13 +1189,17 @@ pub async fn census_timeseries(
                 c.started_at AS census_time, 
                 c.id AS census_id,
                 n.node_id,
-                r.raw as enr,
+                r.id as enr_id,
                 CASE 
                     WHEN r.id IS NOT NULL THEN true 
                     ELSE false 
                 END AS present
             FROM 
-                (SELECT * FROM census WHERE started_at >= NOW() - INTERVAL '1 day') AS c
+                (
+                    SELECT * FROM census 
+                    WHERE started_at >= NOW() - INTERVAL '1 day' * ($1 + 1)
+                    AND started_at < NOW() - INTERVAL '1 day' * $1
+                ) AS c
             LEFT JOIN 
                 census_node AS cn ON c.id = cn.census_id
             LEFT JOIN 
@@ -1188,7 +1208,7 @@ pub async fn census_timeseries(
                 node AS n ON n.id = r.node_id
             ORDER BY 
                 c.started_at, n.node_id;",
-            [],
+            vec![days_ago.into()],
         ))
         .all(&state.database_connection)
         .await
@@ -1240,13 +1260,29 @@ fn transform_data(node_statuses: Vec<NodeStatus>) -> CensusTimeSeriesData {
 
     censuses.sort_by_key(|c| c.time);
 
-    CensusTimeSeriesData { node_ids, censuses }
+    let enr_id_map: HashMap<i32, String> = node_statuses.into_iter().map(|n| n.enr_id).collect();
+
+    NodeStatus::find_by_statement(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "SELECT id, raw
+        FROM Records
+        WHERE id = ANY(ARRAY[id_array]);",
+        
+    ))
+    .all(&state.database_connection)
+    .await
+    .map_err(|e| {
+        error!(err=?e, "Failed to lookup census node timeseries data");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    CensusTimeSeriesData { node_ids, censuses, enr_id_map }
 }
 
-pub async fn census_explorer(
+pub async fn single_census_view(
     census_id: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
-) -> Result<HtmlTemplate<CensusExplorerPageTemplate>, StatusCode> {
+) -> Result<HtmlTemplate<SingleCensusViewTemplate>, StatusCode> {
     let max_census_id = match get_max_census_id(&state).await {
         None => return Err(StatusCode::from_u16(404).unwrap()),
         Some(max_census_id) => max_census_id,
@@ -1271,7 +1307,7 @@ pub async fn census_explorer(
         Some(enr_list) => enr_list,
     };
 
-    let template = CensusExplorerPageTemplate {
+    let template = SingleCensusViewTemplate {
         client_diversity_data,
         node_count: enr_list.len() as i32,
         enr_list,
@@ -1285,3 +1321,4 @@ pub async fn census_explorer(
 
     Ok(HtmlTemplate(template))
 }
+

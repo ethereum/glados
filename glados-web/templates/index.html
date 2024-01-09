@@ -7,9 +7,6 @@
 <script src="/static/js/piechart.js"></script>
 <script src="/static/js/radiusdensity.js"></script>
 <script src="/static/js/stats_history.js"></script>
-<script src="/static/js/census-timeseries.js"></script>
-<link href="/static/css/homepage.css" rel="stylesheet">
-<script src="/static/js/trace/enr.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -82,27 +79,14 @@
             </div>
         </div>
     </div>
-    <div class="row">
-        <div class="col-lg-12 col-md-12 col-sm-12 margin-bottom">
-             <div id="census-timeseries-graph"> </div>
-             <br/>
-             <br/>
-             <br/>
-             <br/>
-             <br/>
-             <br/>
-        </div>
-    <br/>
-    <br/>
-    </div>
+    
 </div>
 
 <script>
     pie_chart_count({{ client_diversity_data| json | safe }})
     radius_node_id_scatter_chart({{ average_radius_chart| json | safe }})
     statsHistoryChart()
-    censusTimeSeriesChart()
-
+    
 </script>
 
 {% endblock %}
