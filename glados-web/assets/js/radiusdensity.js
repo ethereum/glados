@@ -84,10 +84,14 @@ function getClientStringFromDecodedEnr(enr) {
             let fullClientString = String.fromCharCode.apply(null, value);
             if (fullClientString[0] === 'f') {
                 return "fluffy";
+<<<<<<< HEAD
             }
             else if (fullClientString[0] === 'u') {
                 return "ultralight";
             }
+=======
+            } 
+>>>>>>> 1aa080c (Made it so client names appear when hovering over each point on the graph)
             else if (fullClientString[0] === 't') {
                 clientName = "trin ";
                 clientName += fullClientString.substring(2);
@@ -96,7 +100,14 @@ function getClientStringFromDecodedEnr(enr) {
                 return fullClientString;
             }        
         } else {
+<<<<<<< HEAD
             return "unknown";
         }
     }
+=======
+            return "";
+        }
+    }
+
+>>>>>>> 1aa080c (Made it so client names appear when hovering over each point on the graph)
 }
