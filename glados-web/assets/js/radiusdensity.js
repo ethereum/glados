@@ -45,7 +45,17 @@ function radius_node_id_scatter_chart(data) {
         const hoverX = event.pageX + 10;
         const hoverY = event.pageY - 10;
         let latestClientString = getClientStringFromDecodedEnr(d.raw_enr);
-        hover.html(`Client Name: ${latestClientString}<br>Node ID: ${d.node_id_string}<br>Data Radius: ${d.data_radius}%`)
+        let clientName;
+    
+        if (latestClientString === "fluffy") {
+            clientName = "fluffy";
+        } else if (latestClientString.startsWith("trin")) {
+            clientName = "trin " + latestClientString.substring(4);
+        } else {
+            clientName = "unknown";
+        }
+    
+        hover.html(`Client Name: ${clientName}<br>Node ID: ${d.node_id_string}<br>Data Radius: ${d.data_radius}%`)
             .style("left", hoverX + "px")
             .style("top", hoverY + "px")
             .style("background-color", "#ccc")
