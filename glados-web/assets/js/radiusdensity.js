@@ -72,15 +72,24 @@ function radius_node_id_scatter_chart(data) {
     // Add dots
     svg.append('g')
         .selectAll("dot")
-        .data(data) // the .filter part is just to keep a few dots on the chart, not all of them
+        .data(data)
         .enter()
         .append("circle")
         .attr("cx", function (d) { return x(d.node_id); } )
         .attr("cy", function (d) { return y(d.data_radius); } )
         .attr("r", 4)
-        .style("fill", "#69b3a2")
         .style("opacity", 0.9)
         .style("stroke", "white")
+        .attr("fill", function(d) {
+            const clientString = getClientStringFromDecodedEnr(d.raw_enr);
+            if (clientString[0] === "f") {
+                return "#3498DB";
+            } else if (clientString[0] === "t") {
+                return "#9B59B6";
+            } else {
+                return "#808080";
+            }
+        })
         .on("mouseover", hoverAppear)
         .on("mousemove", hoverFeature)
         .on("mouseout", hoverGone);
