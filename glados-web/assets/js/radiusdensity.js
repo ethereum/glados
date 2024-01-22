@@ -77,13 +77,12 @@ function radius_node_id_scatter_chart(data) {
             } else if (clientString[0] === "t") {
                 return "#9B59B6";
             } else {
-                return "#4BB531";
+                return "#808080";
             }
         })
         .on("mouseover", hoverAppear)
         .on("mousemove", hoverFeature)
         .on("mouseout", hoverGone);
-
 }
 
 function getClientStringFromDecodedEnr(enr) {
