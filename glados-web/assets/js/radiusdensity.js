@@ -45,17 +45,7 @@ function radius_node_id_scatter_chart(data) {
         const hoverX = event.pageX + 10;
         const hoverY = event.pageY - 10;
         let latestClientString = getClientStringFromDecodedEnr(d.raw_enr);
-        let clientName;
-    
-        if (latestClientString === "fluffy") {
-            clientName = "fluffy";
-        } else if (latestClientString.startsWith("trin")) {
-            clientName = "trin " + latestClientString.substring(4);
-        } else {
-            clientName = "unknown";
-        }
-    
-        hover.html(`Client Name: ${clientName}<br>Node ID: ${d.node_id_string}<br>Data Radius: ${d.data_radius}%`)
+        hover.html(`Client Name: ${latestClientString}<br>Node ID: ${d.node_id_string}<br>Data Radius: ${d.data_radius}%`)
             .style("left", hoverX + "px")
             .style("top", hoverY + "px")
             .style("background-color", "#ccc")
@@ -94,7 +84,10 @@ function getClientStringFromDecodedEnr(enr) {
             let fullClientString = String.fromCharCode.apply(null, value);
             if (fullClientString[0] === 'f') {
                 return "fluffy";
-            } 
+            }
+            else if (fullClientString[0] === 'u') {
+                return "ultralight";
+            }
             else if (fullClientString[0] === 't') {
                 clientName = "trin ";
                 clientName += fullClientString.substring(2);
@@ -103,8 +96,7 @@ function getClientStringFromDecodedEnr(enr) {
                 return fullClientString;
             }        
         } else {
-            return "";
+            return "unknown";
         }
     }
-
 }
