@@ -68,6 +68,7 @@ pub struct CensusCreatedAt {
 pub struct RadiusChartData {
     pub data_radius: Vec<u8>,
     pub node_id: Vec<u8>,
+    pub raw: String,
 }
 
 #[derive(Serialize, Debug)]
@@ -75,6 +76,7 @@ pub struct CalculatedRadiusChartData {
     pub data_radius: f64,
     pub node_id: u64,
     pub node_id_string: String,
+    pub raw_enr: String,
 }
 
 #[derive(FromQueryResult, Serialize)]
@@ -109,6 +111,10 @@ async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusC
         .expr(Expr::col((
             census_node::Entity,
             census_node::Column::DataRadius,
+        )))
+        .expr(Expr::col((
+            record::Entity,
+            record::Column::Raw,
         )))
         .expr(Expr::col((node::Entity, node::Column::NodeId)))
         .from(census_node::Entity)
@@ -183,6 +189,7 @@ async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusC
             data_radius: formatted_percentage.parse().unwrap(),
             node_id: u64::from_be_bytes(node_id_high_bytes),
             node_id_string,
+            raw_enr: i.raw,
         });
     }
 

@@ -44,8 +44,8 @@ function radius_node_id_scatter_chart(data) {
     function hoverFeature(event, d) {
         const hoverX = event.pageX + 10;
         const hoverY = event.pageY - 10;
-
-        hover.html(`Node ID: ${d.node_id_string}<br>Data Radius: ${d.data_radius}%`)
+        let latestClientString = getClientStringFromDecodedEnr(d.raw_enr);
+        hover.html(`Client Name: ${latestClientString}<br>Node ID: ${d.node_id_string}<br>Data Radius: ${d.data_radius}%`)
             .style("left", hoverX + "px")
             .style("top", hoverY + "px")
             .style("background-color", "#ccc")
@@ -75,4 +75,28 @@ function radius_node_id_scatter_chart(data) {
         .on("mousemove", hoverFeature)
         .on("mouseout", hoverGone);
 
+}
+
+function getClientStringFromDecodedEnr(enr) {
+    for (let [key, value] of ENR.ENR.decodeTxt(enr).enr.entries()) {
+
+        if (key === "c") {
+            let fullClientString = String.fromCharCode.apply(null, value);
+            if (fullClientString[0] === 'f') {
+                return "fluffy";
+            }
+            else if (fullClientString[0] === 'u') {
+                return "ultralight";
+            }
+            else if (fullClientString[0] === 't') {
+                clientName = "trin ";
+                clientName += fullClientString.substring(2);
+                return clientName;
+            } else {
+                return fullClientString;
+            }        
+        } else {
+            return "unknown";
+        }
+    }
 }
