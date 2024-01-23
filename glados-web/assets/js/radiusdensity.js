@@ -71,15 +71,19 @@ function radius_node_id_scatter_chart(data) {
         .style("opacity", 0.9)
         .style("stroke", "white")
         .attr("fill", function(d) {
+            let blue = '#3498DB'
+            let purple = '#9B59B6'
+            let orange = '#E67E22'
+            let grey = '#808080'
             const clientString = getClientStringFromDecodedEnr(d.raw_enr);
                 if (clientString[0] === "f") {
-                    return "#3498DB";
+                    return blue;
                 } else if (clientString[0] === "t") {
-                    return "#9B59B6"; 
+                    return purple; 
                 } else if (clientString[0] === "u") {
-                    return "#E67E22"; 
+                    return orange; 
                 } else {
-                    return "#808080"; 
+                    return grey; 
                 }
         })
         .on("mouseover", hoverAppear)
