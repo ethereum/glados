@@ -2121,6 +2121,7 @@ dependencies = [
  "migration",
  "primitive-types 0.10.1",
  "sea-orm",
+ "serde_json",
  "tokio",
  "tracing",
  "url",
