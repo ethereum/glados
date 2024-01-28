@@ -3,7 +3,7 @@ services:
     image: portalnetwork/trin:latest
     environment:
       RUST_LOG: info
-    command: "--web3-transport http --web3-http-address http://0.0.0.0:8545/ --mb 0 --no-upnp"
+    command: "--web3-transport http --web3-http-address http://0.0.0.0:8545/ --mb 0 --no-upnp --disable-poke"
 
   fluffy:
     image: statusim/nimbus-fluffy:amd64-master-latest
