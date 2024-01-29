@@ -71,6 +71,7 @@ impl MigrationTrait for Migration {
 
 // Content that is known to exist that the Portal Network should be aware of.
 #[derive(Iden)]
+#[allow(clippy::enum_variant_names)]
 enum Content {
     Table,
     Id,               // Database primary key

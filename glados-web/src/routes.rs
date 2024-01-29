@@ -491,7 +491,7 @@ pub async fn node_detail(
         .await
         .unwrap();
 
-    let latest_enr = enr_list.get(0).cloned();
+    let latest_enr = enr_list.first().cloned();
 
     let latest_enr_key_value_list = match &latest_enr {
         Some(enr) => Some(
