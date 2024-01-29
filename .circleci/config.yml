@@ -4,7 +4,7 @@ orbs:
 executors:
   docker-publisher:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.75.0
 jobs:
   docker-build-glados-web-and-publish:
     resource_class: xlarge
@@ -72,7 +72,7 @@ jobs:
         resource_class: large
         executor:
             name: rust/default
-            tag: 1.70.0
+            tag: 1.75.0
         environment:
             RUSTFLAGS: '-D warnings'
             RUST_LOG: 'debug'
