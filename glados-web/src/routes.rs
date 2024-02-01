@@ -32,11 +32,11 @@ use tracing::error;
 use tracing::info;
 
 use crate::templates::{
-    AuditDashboardTemplate, AuditTableTemplate, CensusExplorerTemplate,
-    ContentAuditDetailTemplate, ContentDashboardTemplate, ContentIdDetailTemplate,
-    ContentIdListTemplate, ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate,
-    HtmlTemplate, IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate,
-    SingleCensusViewTemplate, PaginatedCensusListTemplate,
+    AuditDashboardTemplate, AuditTableTemplate, CensusExplorerTemplate, ContentAuditDetailTemplate,
+    ContentDashboardTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
+    ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate, HtmlTemplate,
+    IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate, PaginatedCensusListTemplate,
+    SingleCensusViewTemplate,
 };
 use crate::{state::State, templates::AuditTuple};
 
@@ -1155,6 +1155,12 @@ pub struct NodeStatus {
     present: bool,
 }
 
+#[derive(Debug, Clone, FromQueryResult)]
+pub struct RecordInfo {
+    id: i32,
+    raw: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct CensusTimeSeriesData {
     node_ids: Vec<String>,
@@ -1166,14 +1172,13 @@ pub struct CensusTimeSeriesData {
 pub struct CensusStatuses {
     census_id: i32,
     time: DateTime<Utc>,
-    enr_statuses: Vec<Option<String>>,
+    enr_statuses: Vec<Option<i32>>,
 }
 
 pub async fn census_timeseries(
     http_args: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<CensusTimeSeriesData>, StatusCode> {
-
     let days_ago: i32 = match http_args.get("days-ago") {
         None => 0,
         Some(days_ago) => match days_ago.parse::<i32>() {
@@ -1182,6 +1187,7 @@ pub async fn census_timeseries(
         },
     };
 
+    // Load all censuses in the given 24 hour window with each node's presence status & ENR
     let node_statuses: Vec<NodeStatus> =
         NodeStatus::find_by_statement(Statement::from_sql_and_values(
             DbBackend::Postgres,
@@ -1196,7 +1202,7 @@ pub async fn census_timeseries(
                 END AS present
             FROM 
                 (
-                    SELECT * FROM census 
+                    SELECT * FROM census
                     WHERE started_at >= NOW() - INTERVAL '1 day' * ($1 + 1)
                     AND started_at < NOW() - INTERVAL '1 day' * $1
                 ) AS c
@@ -1217,22 +1223,58 @@ pub async fn census_timeseries(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let census_node_timeseries: CensusTimeSeriesData = transform_data(node_statuses);
+    // Load all ENRs found in the census
+    let record_ids = node_statuses
+        .iter()
+        .map(|n| n.enr_id)
+        .collect::<HashSet<i32>>() // Collect into a HashSet to remove duplicates
+        .into_iter()
+        .collect::<Vec<i32>>();
+    let record_ids_str = format!(
+        "{{{}}}",
+        record_ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    let records: Vec<RecordInfo> = RecordInfo::find_by_statement(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "SELECT id, raw
+            FROM record
+            WHERE id = ANY($1::int[]);",
+        vec![record_ids_str.into()],
+    ))
+    .all(&state.database_connection)
+    .await
+    .map_err(|e| {
+        error!(err=?e, "Failed to lookup census node timeseries data");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let enr_id_map: HashMap<i32, String> = records.into_iter().map(|r| (r.id, r.raw)).collect();
 
-    Ok(Json(census_node_timeseries))
+    let (node_ids, censuses) = decouple_nodes_and_censuses(node_statuses);
+
+    Ok(Json(CensusTimeSeriesData {
+        node_ids,
+        censuses,
+        enrs: enr_id_map,
+    }))
 }
 
 /// Decouples census data from node data, now including ENR strings.
-fn transform_data(node_statuses: Vec<NodeStatus>) -> CensusTimeSeriesData {
+fn decouple_nodes_and_censuses(
+    node_statuses: Vec<NodeStatus>,
+) -> (Vec<String>, Vec<CensusStatuses>) {
     let mut node_set: HashSet<String> = HashSet::new();
-    let mut census_map: HashMap<i32, (DateTime<Utc>, HashMap<String, Option<String>>)> =
+    let mut census_map: HashMap<i32, (DateTime<Utc>, HashMap<String, Option<i32>>)> =
         HashMap::new();
 
     for status in node_statuses {
         let hex_id = hex_encode(status.node_id);
         node_set.insert(hex_id.clone());
         let enr_opt = if status.present {
-            Some(status.enr)
+            Some(status.enr_id)
         } else {
             None
         };
@@ -1260,23 +1302,7 @@ fn transform_data(node_statuses: Vec<NodeStatus>) -> CensusTimeSeriesData {
 
     censuses.sort_by_key(|c| c.time);
 
-    let enr_id_map: HashMap<i32, String> = node_statuses.into_iter().map(|n| n.enr_id).collect();
-
-    NodeStatus::find_by_statement(Statement::from_sql_and_values(
-        DbBackend::Postgres,
-        "SELECT id, raw
-        FROM Records
-        WHERE id = ANY(ARRAY[id_array]);",
-        
-    ))
-    .all(&state.database_connection)
-    .await
-    .map_err(|e| {
-        error!(err=?e, "Failed to lookup census node timeseries data");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
-    CensusTimeSeriesData { node_ids, censuses, enr_id_map }
+    (node_ids, censuses)
 }
 
 pub async fn single_census_view(
@@ -1321,4 +1347,3 @@ pub async fn single_census_view(
 
     Ok(HtmlTemplate(template))
 }
-

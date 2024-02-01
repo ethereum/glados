@@ -1,31 +1,38 @@
+let daysAgo = 0;
+let decodedEnrs = {};
+
 function createSquareChart(height, width, data) {
 
-    // Incoming data takes the form:
-   /*{
-        "node_ids": [
-          "0x9891fe3fdfcec2707f877306fc6e5596b1405fedf70ad2911496c2ac40dfeda5",
-          "0x08653f55f8120591717aae0426c10c25f0e6a7db078c2e1516b4f3059cefff35",
-          "0xbefb246b22757267608a436d265018374592291f284c536f73c933b29a91e10a"
-        ],
-        "censuses": [
-          {
-            "time": "2023-12-13T02:03:38.389580Z",
-            "enr_statuses": [
-              "enr:-Jy4QOOcmr_MEnF8HacDDUxXjCkaMDsvij3-lNBg...mlwhM69ZOyJc2VjcDI1NmsxoQNhyC_neIY2fOKxBi8UGBvnZiBcWbChOHq73nNxeu0ELYN1ZHCCIzE",
-              null,
-              null,
-            ]
-          },
-          ...
-        ]
-      }*/
+    // Incoming data takes the following form.
+    // node_ids and enr_statuses are arrays of the same length and order.
+    /*{
+         "node_ids": [
+           "0x9891fe3fdfcec2707f877306fc6e5596b1405fedf70ad2911496c2ac40dfeda5",
+           "0x08653f55f8120591717aae0426c10c25f0e6a7db078c2e1516b4f3059cefff35",
+           "0xbefb246b22757267608a436d265018374592291f284c536f73c933b29a91e10a"
+         ],
+         "censuses": [
+           {
+             "time": "2023-12-13T02:03:38.389580Z",
+             "enr_statuses": [
+               345,
+               null,
+               null,
+             ]
+           },
+           ...
+         ],
+         "enrs" {
+            345: "enr:-Jy4QOOcmr_MEnFj3-lNBg...ZiBcWbChOHq73nNxeu0ELYN1ZHCCIzE"
+        }
+       }*/
 
     // Declare the chart dimensions and margins.
-    const marginTop = 80;
-    const marginLeft = 40;
+    const marginTop = 110;
+    const marginLeft = 30;
 
-    // Create a combined array of node IDs and their statuses.
-    const nodesAndEnrStatuses = zipNodesAndCensusData(data.node_ids, data.censuses);
+    // Create a combined array of node IDs and their ENRs during each census.
+    let nodesAndEnrStatuses = zipNodesAndCensusData(data.node_ids, data.censuses, data.enrs);
 
     // Sort the combined array based on latestClientString and secondarily nodeId
     nodesAndEnrStatuses.sort((a, b) => {
@@ -40,6 +47,8 @@ function createSquareChart(height, width, data) {
         return a.nodeId.localeCompare(b.nodeId);
     });
 
+    console.log(`Number of nodes: ${nodesAndEnrStatuses.length}`);
+
     const x = d3.scaleTime()
         .domain(d3.extent(data.censuses, d => new Date(d.time)))
         .range([0, width]);
@@ -48,13 +57,13 @@ function createSquareChart(height, width, data) {
     const y = d3.scaleBand()
         .domain(nodes)
         .range([0, height])
-        .padding(0.05);  
+        .padding(0.05);
 
     // Parameters for handling scaling of rows.
     const originalHeight = y.bandwidth();
     const expandedScaleFactor = 12.0;
-    const expandedCellHeight = (originalHeight * expandedScaleFactor)
-        
+    const expandedCellHeight = (originalHeight * expandedScaleFactor);
+
     // Create the SVG container.
     const svg = d3.create("svg")
         .attr("width", width)
@@ -65,23 +74,43 @@ function createSquareChart(height, width, data) {
 
     // Append the title
     svg.append("text")
-       .attr("x", width / 2)
-       .attr("y", 10)
-       .attr("text-anchor", "middle")
-       .style("font-size", "24px")
-       .text("24 Hour Census Results");
-
-    // Append the subtitle
-    svg.append("text")
         .attr("x", width / 2)
-        .attr("y", 40)
+        .attr("y", 30)
         .attr("text-anchor", "middle")
-        .style("font-size", "16px")
-        .text(`24 hour period beginning ${data.censuses[0].time}`);
-    
+        .style("font-size", "24px")
+        .text(`24 hour period beginning at ${data.censuses[0].time}`);
+
+    // Append the previous button
+    svg.append("a")
+        .attr("xlink:href", "#")
+        .on("click", function (event) {
+            event.preventDefault();
+            censusTimeSeriesChart(daysAgo + 1);
+            daysAgo++;
+        }).append("text")
+        .attr("x", (width / 2) - 130)
+        .attr("y", 70)
+        .text("< Previous");
+
+    // Append the next button
+    svg.append("a")
+        .attr("xlink:href", "#")
+        .on("click", function (event) {
+            event.preventDefault();
+            if (daysAgo == 0) {
+                censusTimeSeriesChart(0);
+                return;
+            }
+            censusTimeSeriesChart(daysAgo - 1);
+            daysAgo--;
+        }).append("text")
+        .attr("x", (width / 2) + 70)
+        .attr("y", 70)
+        .text("Next >");
+
     // Append X axis to the bottom and top
     svg.append("g")
-        .attr("transform", `translate(0,${marginTop + height})`)
+        .attr("transform", `translate(0,${height + expandedCellHeight + marginTop - originalHeight})`)
         .attr("class", "x-axis")
         .call(d3.axisBottom(x))
         .selectAll("text")
@@ -103,18 +132,21 @@ function createSquareChart(height, width, data) {
 
     rowGroups.attr("transform", `translate(0, ${marginTop})`);
 
+    data.censuses.forEach(census => {
+        census.parsedTime = new Date(census.time);
+    });
+
     // Append squares to each row group.
-    rowGroups.each(function(node, i) {
+    rowGroups.each(function (node, i) {
         node.statuses.forEach((censusResult, j) => {
-            const status = censusResult;
 
             const row = d3.select(this);
             const rect = row.append("rect")
-              .attr("x", x(new Date(data.censuses[j].time)))
-              .attr("y", y(node.nodeId))
-              .attr("width", 17)
-              .attr("height", y.bandwidth())
-              .attr("fill", status ? "green" : "gray");
+                .attr("x", x(data.censuses[j].parsedTime))
+                .attr("y", y(node.nodeId))
+                .attr("width", 17)
+                .attr("height", y.bandwidth())
+                .attr("fill", censusResult ? "green" : "gray");
 
             let title = "";
             if (censusResult) {
@@ -125,19 +157,18 @@ function createSquareChart(height, width, data) {
 
             rect.append("title").text(title);
 
-            rect.on("click", function(event, d) {
+            rect.on("click", function (event, d) {
                 window.open(`/census/?census-id=${data.censuses[j].census_id}`, '_blank');
             });
-            
-            rect.on("mouseover", function(event) {
-                row.raise();
+
+            rect.on("mouseenter", function (event) {
                 rect.raise()
-                     .style("stroke", "white")
-                     .style("stroke-width", 4);
-            }).on("mouseout", function() {
+                    .style("stroke", "white")
+                    .style("stroke-width", 4);
+            }).on("mouseout", function () {
                 d3.select(this)
-                  .style("stroke", null) 
-                .style("stroke-width", null); 
+                    .style("stroke", null)
+                    .style("stroke-width", null);
             });
         });
     });
@@ -158,45 +189,37 @@ function createSquareChart(height, width, data) {
         let hoveredIndex = nodes.indexOf(node.nodeId);
         let downwardShift = 0;
 
-        // Push x axis down to fit expanded rows
-        svg.select("g.x-axis")
-            .attr("transform", `translate(0,${height + expandedCellHeight + marginTop - originalHeight})`);
-        svg.attr("height", height + expandedCellHeight + marginTop);
-
-         // Reset all rows to their original positions and heights, if necessary
-         rowGroups.attr("transform", null)
-            .selectAll("rect")
-            .attr("height", originalHeight);
-
-         // Reset font size and position of text, if necessary
-         rowGroups.selectAll("text")
-             .style("font-size", null) // Reset font size
-             .attr("y", d => y(d.nodeId) + originalHeight / 2);
-
         // Remove existing client string labels if any.
         svg.selectAll(".client-string-label").remove();
 
-        rowGroups.each(function(_, index) {
+        rowGroups.attr("transform", null)
+            .selectAll("rect")
+            .attr("height", originalHeight);
+        rowGroups.selectAll("text")
+            .style("font-size", null) // Reset font size
+            .attr("y", d => y(d.nodeId) + originalHeight / 2);
+
+        rowGroups.each(function (_, index) {
             const group = d3.select(this);
             let scaleFactor, heightIncrease;
-    
+
             if (index === hoveredIndex) {
                 scaleFactor = expandedScaleFactor;
                 // Adjust the height of the row
                 group.selectAll("rect")
                     .attr("height", expandedCellHeight);
+                group.selectAll("text").style("font-size", "1.7em");
             } else {
                 scaleFactor = 1;
             }
-    
+
             heightIncrease = (originalHeight * scaleFactor) - originalHeight;
             downwardShift += heightIncrease;
-    
+
             // Adjust the font size and position of the text
             group.selectAll("text")
-                .style("font-size", `${1 + (0.7 * ((scaleFactor - 1) / (expandedScaleFactor - 1)))}em`)
                 .attr("y", y(nodesAndEnrStatuses[index].nodeId) + (originalHeight * scaleFactor) / 2);
-    
+
             // Shift rows below the hovered row downwards
             group.attr("transform", `translate(0, ${marginTop + (downwardShift - heightIncrease)})`);
 
@@ -217,56 +240,95 @@ function createSquareChart(height, width, data) {
     }
 
     // Apply hover effect to the row groups
-    rowGroups.on("mouseover", function(_, node) {
+    rowGroups.on("mouseenter", function (_, node) {
         highlightNode(node);
+    });
+    rowGroups.on("mouseleave", function (event, _) {
+        if (event.toElement.__data__) {
+            const row = d3.select(this);
+            row.attr("transform", null)
+                .selectAll("rect")
+                .attr("height", originalHeight);
+            row.selectAll("text")
+                .style("font-size", null) // Reset font size
+                .attr("y", d => y(d.nodeId) + originalHeight / 2);
+        }
     });
 
     return svg.node();
 }
 
+
 // Combines decoupled node and census response from API
-function zipNodesAndCensusData(nodes, censuses) {
+function zipNodesAndCensusData(nodes, censuses, records) {
     return nodes.map((nodeId, index) => {
 
-        // Use the latest ENR for display & sorting.
-        let enrString = censuses[censuses.length - 1].enr_statuses[index];
-        let clientName = null;
-        if (enrString) {
-            let {enr: decodedEnr, seq, signature} = ENR.ENR.decodeTxt(enrString);
-            
-            for (let [key, value] of decodedEnr.entries()) {
-                if (key === "c") {
-                    let fullClientString = String.fromCharCode.apply(null, value);
-                    if (fullClientString[0] === 'f') {
-                        clientName = "fluffy ";
-                    } 
-                    else if (fullClientString[0] === 't') {
-                        clientName = "trin ";
-                        clientName += fullClientString.substring(2);
-                    } else {
-                        clientName = fullClientString;
-                    }
+        // Map enr_ids to their corresponding recordString
+        const statuses = censuses.map(census => {
+            const enrId = census.enr_statuses[index];
+            return records[enrId] || null;
+        });
 
-                }
+        // Use the latest ENR for display & sorting. Iterate backwards if the node's isn't seen in the latest.
+        let enrString = null;
+        for (let i = statuses.length - 1; i > 0; i--) {
+            enrString = statuses[i];
+            if (enrString) {
+                break;
             }
         }
+
+        // Get the client name for sorting and display purposes.
+        let clientName = null;
+        if (enrString) {
+            let decodedEnr = decodeEnrCached(enrString);
+            let fullClientString = decodedEnr.client;
+            if (fullClientString !== null) {
+                if (fullClientString[0] === 'f') {
+                    clientName = "fluffy ";
+                } else if (fullClientString[0] === 't') {
+                    clientName = "trin ";
+                    clientName += fullClientString.substring(2);
+                } else if (fullClientString[0] === 'u') {
+                    clientName = "ultralight";
+                } else {
+                    clientName = fullClientString;
+                }
+            }
+
+        }
+
         return {
             nodeId: nodeId,
             latestClientString: clientName,
-            statuses: censuses.map(census => census.enr_statuses[index])
+            statuses: statuses
         };
     });
 }
 
+// The same node will have the same ENR for multiple censuses.
+// Cache the decoded ENR to avoid decoding the same ENR multiple times.
+function decodeEnrCached(enr) {
+    if (!decodedEnrs[enr]) {
+        let { enr: decodedEnr, seq, _ } = ENR.ENR.decodeTxt(enr);
+        let enrData = {
+            ip: decodedEnr["ip"],
+            port: decodedEnr["udp"],
+            seq: seq,
+            client: getClientStringFromDecodedEnr(decodedEnr),
+            shortened: enr.substring(0, 15) + '...' + enr.substring(enr.length - 10)
+        }
+        decodedEnrs[enr] = enrData;
+    }
+    return decodedEnrs[enr];
+}
+
+
 // Helper function for creating hover-over text.
 function createHoverOverInfoFromENR(enr, time) {
 
-    let {enr: decodedEnr, seq, signature} = ENR.ENR.decodeTxt(enr);
-    let ip = decodedEnr["ip"];
-    let port = decodedEnr["udp"];
-    let shortenedEnr = enr.substring(0, 15) + '...' + enr.substring(enr.length - 10);
-    let clientString = getClientStringFromDecodedEnr(decodedEnr);
-    title = `Node found during census beginning at ${time}.\nENR: ${shortenedEnr}\nIP: ${ip}:${port}\nSeq: ${seq}\nClient String: ${clientString}`;
+    let decodedEnr = decodeEnrCached(enr);
+    let title = `Node found during census beginning at ${time}.\nENR: ${decodedEnr.shortened}\nIP: ${decodedEnr.ip}:${decodedEnr.port}\nSeq: ${decodedEnr.seq}\nClient String: ${decodedEnr.client}`;
 
     return title;
 
@@ -278,19 +340,20 @@ function getClientStringFromDecodedEnr(decodedEnr) {
         if (key === "c") {
             return String.fromCharCode.apply(null, value);
         } else {
-            return "";
+            return null;
         }
     }
 
 }
 
 // Fetch the census node records from the API.
-async function getCensusTimeSeriesData(daysAgo) {
+async function getCensusTimeSeriesData(numDaysAgo) {
 
-    const baseUrl = `census-node-timeseries-data/?days-ago=daysAgo`;
-
+    const baseUrl = `census-node-timeseries-data/?days-ago=${numDaysAgo}`;
+    daysAgo = numDaysAgo;
     return fetch(`${baseUrl}`)
         .then(response => {
+            // hideLoading();
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
@@ -302,12 +365,25 @@ async function getCensusTimeSeriesData(daysAgo) {
 }
 
 // Create the census node timeseries chart using data from the API and add it to the DOM.
-async function censusTimeSeriesChart() {
-        const data = await getCensusTimeSeriesData();
+async function censusTimeSeriesChart(daysAgo) {
+    document.querySelectorAll('svg').forEach(function (svgElement) {
+        svgElement.remove();
+    });
 
-        if (data) {
-            document.getElementById('census-timeseries-graph').appendChild(createSquareChart(1700, 1700, data));
-        } else {
-            console.log('No data available to plot the census chart');
-        }
+    // showLoading();
+    const data = await getCensusTimeSeriesData(daysAgo);
+    console.log(data);
+    if (data) {
+        document.getElementById('census-timeseries-graph').appendChild(createSquareChart(1700, 1700, data));
+    } else {
+        console.log('No data available to plot the census chart');
+    }
 }
+
+// function showLoading() {
+//     document.getElementById('loading').style.display = 'block';
+// }
+
+// function hideLoading() {
+//     document.getElementById('loading').style.display = 'none';
+// }
