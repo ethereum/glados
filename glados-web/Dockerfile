@@ -18,10 +18,9 @@ COPY . .
 
 RUN cargo build -p glados-web --release
 
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 RUN apt-get update
-RUN apt-get install libssl-dev -y
 
 # copy build artifacts from build stage
 COPY --from=builder ./glados/glados-web/assets/ /usr/bin/assets/
