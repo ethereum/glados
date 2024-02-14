@@ -38,10 +38,17 @@
                 <button id="failure-button" filter="Failure" class="btn btn-outline-secondary"
                     type="button">Failure</button>
             </div>
+
+            <div id="segment-buttons" class="btn-group mx-1 " role="group">
+                <button id="all-segment-button" filter="All" class="btn btn-outline-secondary"
+                    type="button">All</button>
+                <button id="premerge-segment-button" filter="PreMerge" class="btn btn-outline-secondary"
+                    type="button">4444s</button>
+            </div>
         </div>
     </div>
 </div>
-<br/>
+<br />
 <div id="audit-table"></div>
 <style>
     .btn-outline-secondary.active {
@@ -55,6 +62,7 @@
         const contentGroup = document.querySelector('#content-buttons');
         const strategyGroup = document.querySelector('#strategy-buttons');
         const successGroup = document.querySelector('#success-buttons');
+        const segmentGroup = document.querySelector('#segment-buttons');
 
         const activateButton = (btn, group) => {
             // Deactivate all buttons in the group
@@ -74,13 +82,15 @@
             sessionStorage.setItem('content-filter', `#${contentGroup.querySelector('.active').id}`);
             sessionStorage.setItem('strategy-filter', `#${strategyGroup.querySelector('.active').id}`);
             sessionStorage.setItem('success-filter', `#${successGroup.querySelector('.active').id}`);
+            sessionStorage.setItem('segment-filter', `#${segmentGroup.querySelector('.active').id}`);
 
             // Get the active button's filter string in each group
             const selectedContent = contentGroup.querySelector('.active').getAttribute('filter');
             const selectedStrategy = strategyGroup.querySelector('.active').getAttribute('filter');
             const selectedSuccess = successGroup.querySelector('.active').getAttribute('filter');
+            const selectedSegment = segmentGroup.querySelector('.active').getAttribute('filter');
 
-            updateDashboard(selectedStrategy, selectedContent, selectedSuccess);
+            updateDashboard(selectedStrategy, selectedContent, selectedSuccess, selectedSegment);
 
         };
 
@@ -97,26 +107,30 @@
         contentGroup.addEventListener('click', (event) => handleButtonClick(event, contentGroup));
         strategyGroup.addEventListener('click', (event) => handleButtonClick(event, strategyGroup));
         successGroup.addEventListener('click', (event) => handleButtonClick(event, successGroup));
+        segmentGroup.addEventListener('click', (event) => handleButtonClick(event, segmentGroup));
 
         setInitialButton('content-filter', '#all-content-button', contentGroup);
         setInitialButton('strategy-filter', '#all-strategy-button', strategyGroup);
         setInitialButton('success-filter', '#all-success-button', successGroup);
+        setInitialButton('segment-filter', '#all-segment-button', segmentGroup);
 
         const selectedContent = contentGroup.querySelector('.active').getAttribute('filter');
         const selectedStrategy = strategyGroup.querySelector('.active').getAttribute('filter');
         const selectedSuccess = successGroup.querySelector('.active').getAttribute('filter');
+        const selectedSegment = segmentGroup.querySelector('.active').getAttribute('filter');
 
-        updateDashboard(selectedStrategy, selectedContent, selectedSuccess);
+        updateDashboard(selectedStrategy, selectedContent, selectedSuccess, selectedSegment);
 
     });
 
-    function updateDashboard(strategy, content_type, success) {
+    function updateDashboard(strategy, content_type, success, segment) {
 
         const baseUrl = "filter/";
         const params = {
             strategy: strategy,
             content_type: content_type,
             success: success,
+            chain_segment: segment,
         };
 
         const queryString = new URLSearchParams(params).toString();

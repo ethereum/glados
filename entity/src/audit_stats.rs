@@ -16,6 +16,7 @@ pub struct Model {
     pub success_rate_latest: f32,
     pub success_rate_random: f32,
     pub success_rate_oldest: f32,
+    pub success_rate_premerge: f32,
     pub success_rate_all_headers: f32,
     pub success_rate_all_bodies: f32,
     pub success_rate_all_receipts: f32,
@@ -25,6 +26,9 @@ pub struct Model {
     pub success_rate_random_headers: f32,
     pub success_rate_random_bodies: f32,
     pub success_rate_random_receipts: f32,
+    pub success_rate_premerge_headers: f32,
+    pub success_rate_premerge_bodies: f32,
+    pub success_rate_premerge_receipts: f32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -40,6 +44,7 @@ pub async fn create(
     success_rate_latest: f32,
     success_rate_random: f32,
     success_rate_oldest: f32,
+    success_rate_premerge: f32,
     success_rate_all_headers: f32,
     success_rate_all_bodies: f32,
     success_rate_all_receipts: f32,
@@ -49,6 +54,9 @@ pub async fn create(
     success_rate_random_headers: f32,
     success_rate_random_bodies: f32,
     success_rate_random_receipts: f32,
+    success_rate_premerge_headers: f32,
+    success_rate_premerge_bodies: f32,
+    success_rate_premerge_receipts: f32,
     conn: &DatabaseConnection,
 ) -> Result<Model> {
     let audit_stats = ActiveModel {
@@ -59,6 +67,7 @@ pub async fn create(
         success_rate_latest: Set(success_rate_latest),
         success_rate_random: Set(success_rate_random),
         success_rate_oldest: Set(success_rate_oldest),
+        success_rate_premerge: Set(success_rate_premerge),
         success_rate_all_headers: Set(success_rate_all_headers),
         success_rate_all_bodies: Set(success_rate_all_bodies),
         success_rate_all_receipts: Set(success_rate_all_receipts),
@@ -68,6 +77,9 @@ pub async fn create(
         success_rate_random_headers: Set(success_rate_random_headers),
         success_rate_random_bodies: Set(success_rate_random_bodies),
         success_rate_random_receipts: Set(success_rate_random_receipts),
+        success_rate_premerge_headers: Set(success_rate_premerge_headers),
+        success_rate_premerge_bodies: Set(success_rate_premerge_bodies),
+        success_rate_premerge_receipts: Set(success_rate_premerge_receipts),
     };
     Ok(audit_stats.insert(conn).await?)
 }
