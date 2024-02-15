@@ -5,7 +5,9 @@ use chrono::{DateTime, Duration, Utc};
 use entity::{
     content::{self, SubProtocol},
     content_audit::{self, AuditResult, SelectionStrategy},
+    execution_metadata,
 };
+use sea_orm::sea_query::Alias;
 use sea_orm::{
     sea_query::{Expr, IntoCondition},
     ColumnTrait, DatabaseConnection, DbErr, EntityTrait, JoinType, PaginatorTrait, QueryFilter,
@@ -43,7 +45,7 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
         }
     };
     // Content type filters
-    match filters.content_type {
+    let audits = match filters.content_type {
         ContentTypeFilter::All => audits,
         ContentTypeFilter::Headers => audits.join(
             JoinType::InnerJoin,
@@ -84,6 +86,27 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
                         .into_condition()
                 }),
         ),
+    };
+
+    match filters.chain_segment {
+        ChainSegmentFilter::PreMerge => {
+            // Alias content table for this join because the content table was already joined above.
+            let content_alias = Alias::new("content_table");
+            let aliased_content_metadata_relation = {
+                let mut rel = content::Relation::ExecutionMetadata.def();
+                rel.from_tbl = rel.from_tbl.alias(content_alias.clone());
+                rel
+            };
+            audits
+                .join_as(
+                    JoinType::InnerJoin,
+                    content_audit::Relation::Content.def(),
+                    content_alias,
+                )
+                .join(JoinType::InnerJoin, aliased_content_metadata_relation)
+                .filter(execution_metadata::Column::BlockNumber.lt(15_537_392))
+        }
+        ChainSegmentFilter::All => audits,
     }
 }
 
@@ -192,6 +215,7 @@ pub struct AuditFilters {
     pub strategy: StrategyFilter,
     pub content_type: ContentTypeFilter,
     pub success: SuccessFilter,
+    pub chain_segment: ChainSegmentFilter,
 }
 
 #[derive(Deserialize)]
@@ -215,4 +239,10 @@ pub enum ContentTypeFilter {
     Headers,
     Bodies,
     Receipts,
+}
+
+#[derive(Deserialize)]
+pub enum ChainSegmentFilter {
+    All,
+    PreMerge,
 }
