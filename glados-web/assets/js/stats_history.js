@@ -98,9 +98,10 @@ function createMultiLineChart(height, width, dataSets) {
     }
 
     // Select all '.legend' group elements and click on all but the first three
+    let selectedIndexes = [0, 4, 14, 15, 16]
     svg.selectAll(".legend")
-        .each(function(d, i) {
-            if (i >= 3) { // Skip the first three
+        .each(function (d, i) {
+            if (!selectedIndexes.includes(i)) {
                 dispatchClick(this);
             }
         });
@@ -113,7 +114,11 @@ function createMultiLineChart(height, width, dataSets) {
         .attr("fill", (d, i) => colors[i % colors.length]);
 
     // Add text to the legend.
-    const labels = ["All", "Latest", "Random", "Oldest", "All Headers", "All Bodies", "All Receipts", "Latest Headers", "Latest Bodies", "Latest Receipts", "Random Headers", "Random Bodies", "Random Receipts"];
+    const labels = ["All", "Latest", "Random", "Oldest", "4444s",
+        "All Headers", "All Bodies", "All Receipts",
+        "Latest Headers", "Latest Bodies", "Latest Receipts",
+        "Random Headers", "Random Bodies", "Random Receipts",
+        "4444s Headers", "4444s Bodies", "4444s Receipts"];
     legend.append("text")
         .attr("x", -24)
         .attr("y", 9)
@@ -131,6 +136,7 @@ function convertDataForChart(data) {
         'success_rate_latest',
         'success_rate_random',
         'success_rate_oldest',
+        'success_rate_four_fours',
         'success_rate_all_headers',
         'success_rate_all_bodies',
         'success_rate_all_receipts',
@@ -140,6 +146,9 @@ function convertDataForChart(data) {
         'success_rate_random_headers',
         'success_rate_random_bodies',
         'success_rate_random_receipts',
+        'success_rate_four_fours_headers',
+        'success_rate_four_fours_bodies',
+        'success_rate_four_fours_receipts'
     ];
 
     return successRateKeys.map(key =>
