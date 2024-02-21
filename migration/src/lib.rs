@@ -9,6 +9,7 @@ mod m20230511_104830_create_content_audit;
 mod m20230511_104838_create_execution_metadata;
 mod m20230511_104937_create_key_value;
 mod m20231107_004843_create_audit_stats;
+mod m20240213_190221_add_fourfours_stats;
 
 pub struct Migrator;
 
@@ -25,6 +26,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20230511_104937_create_key_value::Migration),
             Box::new(m20230508_111707_create_census_tables::Migration),
             Box::new(m20231107_004843_create_audit_stats::Migration),
+            Box::new(m20240213_190221_add_fourfours_stats::Migration),
         ]
     }
 }

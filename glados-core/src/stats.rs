@@ -31,6 +31,9 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
         StrategyFilter::Oldest => audits.filter(
             content_audit::Column::StrategyUsed.eq(SelectionStrategy::SelectOldestUnaudited),
         ),
+        StrategyFilter::FourFours => {
+            audits.filter(content_audit::Column::StrategyUsed.eq(SelectionStrategy::FourFours))
+        }
     };
     // Success filters
     let audits = match filters.success {
@@ -200,6 +203,7 @@ pub enum StrategyFilter {
     Random,
     Latest,
     Oldest,
+    FourFours,
 }
 
 #[derive(Deserialize)]
