@@ -37,6 +37,8 @@ pub(crate) mod validation;
 pub struct AuditConfig {
     /// For Glados-related data.
     pub database_url: String,
+    /// For getting on-the-fly block information.
+    pub provider_url: String,
     /// Specific strategies to run.
     pub strategies: Vec<SelectionStrategy>,
     /// Weight for each strategy.
@@ -65,6 +67,7 @@ impl AuditConfig {
                 "Selected concurrency set."
             )
         }
+
         let strategies = match args.strategy {
             Some(s) => s,
             None => {
@@ -73,6 +76,7 @@ impl AuditConfig {
                     SelectionStrategy::Random,
                     SelectionStrategy::Failed,
                     SelectionStrategy::SelectOldestUnaudited,
+                    SelectionStrategy::FourFours,
                 ]
             }
         };
@@ -83,11 +87,16 @@ impl AuditConfig {
                 SelectionStrategy::Random => args.random_strategy_weight,
                 SelectionStrategy::Failed => args.failed_strategy_weight,
                 SelectionStrategy::SelectOldestUnaudited => args.oldest_strategy_weight,
+                SelectionStrategy::FourFours => args.four_fours_strategy_weight,
                 SelectionStrategy::SpecificContentKey => 0,
             };
             weights.insert(strat.clone(), weight);
         }
-
+        if args.provider_url.is_empty() && strategies.contains(&SelectionStrategy::FourFours) {
+            return Err(anyhow::anyhow!(
+                "No provider URL provided, required when `four_fours` strategy is enabled."
+            ));
+        }
         let mut portal_clients: Vec<PortalClient> = vec![];
         for client_url in args.portal_client {
             let client = PortalClient::from(client_url).await?;
@@ -96,6 +105,7 @@ impl AuditConfig {
         }
         Ok(AuditConfig {
             database_url: args.database_url,
+            provider_url: args.provider_url,
             strategies,
             weights,
             concurrency: args.concurrency,
@@ -160,6 +170,7 @@ pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
             strategy.clone(),
             tx,
             conn.clone(),
+            config.clone(),
         ));
     }
     // Collation of generated tasks, taken proportional to weights.

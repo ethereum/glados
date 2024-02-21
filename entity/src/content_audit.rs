@@ -37,6 +37,8 @@ pub enum SelectionStrategy {
     SelectOldestUnaudited = 3,
     /// Perform a single audit for a previously audited content key.
     SpecificContentKey = 4,
+    /// Perform audits of random fourfours data.
+    FourFours = 5,
 }
 
 impl AuditResult {
@@ -157,6 +159,7 @@ impl SelectionStrategy {
             SelectionStrategy::Latest => "Latest".to_string(),
             SelectionStrategy::Random => "Random".to_string(),
             SelectionStrategy::Failed => "Failed".to_string(),
+            SelectionStrategy::FourFours => "FourFours".to_string(),
             SelectionStrategy::SelectOldestUnaudited => "Select Oldest Unaudited".to_string(),
             SelectionStrategy::SpecificContentKey => "Specific Content Key".to_string(),
         }

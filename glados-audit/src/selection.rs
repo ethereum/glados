@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use chrono::{DateTime, TimeZone, Utc};
 use ethportal_api::HistoryContentKey;
+use glados_core::db::store_block_keys;
 use rand::{thread_rng, Rng};
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
@@ -17,17 +18,26 @@ use entity::{
     content::{self, Model},
     content_audit::{self, SelectionStrategy},
 };
+use web3::types::{BlockId, BlockNumber};
 
-use crate::AuditTask;
+use crate::{AuditConfig, AuditTask};
+
+pub const MERGE_BLOCK_HEIGHT: i32 = 15537393;
 
 pub async fn start_audit_selection_task(
     strategy: SelectionStrategy,
     tx: mpsc::Sender<AuditTask>,
     conn: DatabaseConnection,
+    config: AuditConfig,
 ) {
     match strategy {
         SelectionStrategy::Latest => select_latest_content_for_audit(tx, conn).await,
         SelectionStrategy::Random => select_random_content_for_audit(tx, conn).await,
+        SelectionStrategy::FourFours => {
+            // Fourfours strategy downloads its own keys rather than waiting on glados-monitor to put them in the DB.
+            let w3 = web3::Web3::new(web3::transports::Http::new(&config.provider_url).unwrap());
+            select_fourfours_content_for_audit(tx, conn, w3).await
+        }
         SelectionStrategy::Failed => warn!("Need to implement SelectionStrategy::Failed"),
         SelectionStrategy::SelectOldestUnaudited => {
             select_oldest_unaudited_content_for_audit(tx, conn).await
@@ -92,6 +102,46 @@ async fn select_latest_content_for_audit(
             content_key_db_entries,
         )
         .await;
+    }
+}
+
+/// Finds and sends audit tasks for [SelectionStrategy::FourFours].
+///
+/// 1. Get a random block number between 1 and MERGE_BLOCK_HEIGHT.
+/// 2. Get the block hash for that block.
+/// 3. Send content keys for header, body, receipts.
+///
+async fn select_fourfours_content_for_audit(
+    tx: mpsc::Sender<AuditTask>,
+    conn: DatabaseConnection,
+    w3: web3::Web3<web3::transports::Http>,
+) -> ! {
+    let mut interval = interval(Duration::from_secs(5));
+
+    loop {
+        interval.tick().await;
+        let block_number = thread_rng().gen_range(1..MERGE_BLOCK_HEIGHT);
+        debug!(
+            strategy = "4444s",
+            "Getting hash for block number {block_number}."
+        );
+        let block_hash = w3
+            .eth()
+            .block(BlockId::Number(BlockNumber::Number(block_number.into())))
+            .await
+            .unwrap()
+            .unwrap()
+            .hash
+            .unwrap();
+
+        let items_to_audit =
+            store_block_keys(block_number, block_hash.as_fixed_bytes(), &conn).await;
+        debug!(
+            strategy = "4444s",
+            item_count = items_to_audit.len(),
+            "Adding content keys to the audit queue."
+        );
+        add_to_queue(tx.clone(), SelectionStrategy::FourFours, items_to_audit).await;
     }
 }
 

@@ -1,13 +1,11 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use anyhow::{anyhow, Error, Result};
-use ethportal_api::utils::bytes::{hex_decode, hex_encode};
-use ethportal_api::{
-    BlockBodyKey, BlockHeaderKey, BlockReceiptsKey, EpochAccumulatorKey, HistoryContentKey,
-    OverlayContentKey,
-};
+use anyhow::{anyhow, Result};
+use ethportal_api::utils::bytes::hex_decode;
+use ethportal_api::{EpochAccumulatorKey, HistoryContentKey};
 use futures::future::join_all;
+use glados_core::db::store_block_keys;
 use reqwest::header;
 use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection};
 use std::env;
@@ -22,7 +20,7 @@ use web3::Web3;
 
 use url::Url;
 
-use entity::{content, execution_metadata};
+use entity::content;
 
 pub mod cli;
 
@@ -137,76 +135,6 @@ async fn fetch_block_hash(
     );
 
     Ok(block_hash)
-}
-
-/// Stores the content keys and block metadata for the given block.
-///
-/// The metadata included is the block number and hash under the execution
-/// header, body and receipts tables.
-///
-/// Errors are logged.
-async fn store_block_keys(block_number: i32, block_hash: &[u8; 32], conn: &DatabaseConnection) {
-    let header = HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey {
-        block_hash: *block_hash,
-    });
-    let body = HistoryContentKey::BlockBody(BlockBodyKey {
-        block_hash: *block_hash,
-    });
-    let receipts = HistoryContentKey::BlockReceipts(BlockReceiptsKey {
-        block_hash: *block_hash,
-    });
-
-    store_content_key(&header, "block_header", block_number, conn).await;
-    store_content_key(&body, "block_body", block_number, conn).await;
-    store_content_key(&receipts, "block_receipts", block_number, conn).await;
-}
-
-/// Accepts a ContentKey from the History and attempts to store it.
-///
-/// Errors are logged.
-async fn store_content_key<T: OverlayContentKey>(
-    key: &T,
-    name: &str,
-    block_number: i32,
-    conn: &DatabaseConnection,
-) {
-    // Store key
-    match content::get_or_create(key, conn).await {
-        Ok(content_model) => {
-            log_record_outcome(key, name, DbOutcome::Success);
-            // Store metadata
-            let metadata_str = format!("{name}_metadata");
-            match execution_metadata::get_or_create(content_model.id, block_number, conn).await {
-                Ok(_) => log_record_outcome(key, metadata_str.as_str(), DbOutcome::Success),
-                Err(e) => log_record_outcome(key, metadata_str.as_str(), DbOutcome::Fail(e)),
-            };
-        }
-        Err(e) => log_record_outcome(key, name, DbOutcome::Fail(e)),
-    }
-}
-
-/// Logs a database record error for the given key.
-///
-/// Helper function for common error pattern to be logged.
-fn log_record_outcome<T: OverlayContentKey>(key: &T, name: &str, outcome: DbOutcome) {
-    match outcome {
-        DbOutcome::Success => debug!(
-            content.key = hex_encode(key.to_bytes()),
-            content.kind = name,
-            "Imported new record",
-        ),
-        DbOutcome::Fail(e) => error!(
-            content.key=hex_encode(key.to_bytes()),
-            content.kind=name,
-            err=?e,
-            "Failed to create database record",
-        ),
-    }
-}
-
-enum DbOutcome {
-    Success,
-    Fail(Error),
 }
 
 pub async fn import_pre_merge_accumulators(
