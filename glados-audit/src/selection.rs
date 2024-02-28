@@ -5,8 +5,8 @@ use ethportal_api::HistoryContentKey;
 use glados_core::db::store_block_keys;
 use rand::{thread_rng, Rng};
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect,
+    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, RelationTrait,
 };
 use tokio::{
     sync::mpsc,
@@ -17,6 +17,7 @@ use tracing::{debug, error, warn};
 use entity::{
     content::{self, Model},
     content_audit::{self, SelectionStrategy},
+    execution_metadata,
 };
 use web3::types::{BlockId, BlockNumber};
 
@@ -80,6 +81,11 @@ async fn select_latest_content_for_audit(
             .filter(
                 content::Column::FirstAvailableAt.lt(Utc::now() - chrono::Duration::seconds(10)),
             )
+            .join(
+                JoinType::InnerJoin,
+                entity::content::Relation::ExecutionMetadata.def(),
+            )
+            .filter(execution_metadata::Column::BlockNumber.gt(MERGE_BLOCK_HEIGHT))
             .order_by_desc(content::Column::FirstAvailableAt)
             .limit(keys_required as u64)
             .all(&conn)
@@ -384,6 +390,10 @@ mod tests {
                 true => Utc::now() - chrono::Duration::days(1),
                 false => Utc::now() - chrono::Duration::minutes(10),
             };
+            let block_number = match (2..=15).contains(&num) {
+                true => MERGE_BLOCK_HEIGHT - num as i32,
+                false => MERGE_BLOCK_HEIGHT + num as i32,
+            };
             let content_key_active_model = content::ActiveModel {
                 id: NotSet,
                 content_id: Set(content_key.content_id().to_vec()),
@@ -392,6 +402,13 @@ mod tests {
                 protocol_id: Set(SubProtocol::History),
             };
             let content_key_model = content_key_active_model.insert(&conn).await?;
+
+            let execution_metadata = execution_metadata::ActiveModel {
+                id: NotSet,
+                content: Set(content_key_model.id),
+                block_number: Set(block_number),
+            };
+            let _ = execution_metadata.insert(&conn).await?;
 
             let client_info_active_model = client_info::ActiveModel {
                 id: NotSet,
@@ -439,13 +456,13 @@ mod tests {
     async fn test_latest_strategy() {
         // Orchestration
         let conn = get_populated_test_audit_db().await.unwrap();
-        const CHANNEL_SIZE: usize = 10;
+        const CHANNEL_SIZE: usize = 20;
         let (tx, mut rx) = channel::<AuditTask>(CHANNEL_SIZE);
         // Start strategy
         tokio::spawn(select_latest_content_for_audit(tx.clone(), conn.clone()));
         let mut checked_ids: HashSet<i32> = HashSet::new();
-        // There are 10 correct values: [36, 37, ... 45]
-        let expected_key_ids: Vec<i32> = (36..=45).collect();
+        // There are 15 correct values: [31, 32, ... 45], after which the queue should be empty
+        let expected_key_ids: Vec<i32> = (31..=45).collect();
         // Await strategy results
         while let Some(task) = rx.recv().await {
             let key_model = content::Entity::find()
@@ -457,12 +474,19 @@ mod tests {
             // Check that strategy only yields expected keys.
             assert!(expected_key_ids.contains(&key_model.id));
             checked_ids.insert(key_model.id);
-            if checked_ids.len() == CHANNEL_SIZE {
+            if checked_ids.len() == expected_key_ids.len() {
                 break;
             }
         }
+
+        // Make sure that there are no further keys (latest should filter out the premerge keys).
+        assert!(matches!(
+            rx.try_recv(),
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+        ));
+
         // Make sure no key was audited twice by pushing to a hashmap and checking it's length.
-        assert_eq!(checked_ids.len(), CHANNEL_SIZE);
+        assert_eq!(checked_ids.len(), expected_key_ids.len());
     }
 
     /// Tests that the `SelectionStrategy::SelectOldestUnaudited` selects the correct values
