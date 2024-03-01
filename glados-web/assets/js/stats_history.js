@@ -127,6 +127,59 @@ function createMultiLineChart(height, width, dataSets) {
         .text((d, i) => labels[i])
         .attr("class", "legend-text");
 
+    // Append a vertical line to the chart, initially hidden
+    const verticalLine = svg.append('line')
+        .style('stroke', 'grey')
+        .style('stroke-width', '1px')
+        .style('stroke-dasharray', '3,3')
+        .style('display', 'none'); // Initially hidden
+
+    // Create an overlay for the mouseover event
+    svg.append("rect")
+        .attr("class", "overlay")
+        .attr("x", marginLeft)
+        .attr("y", marginTop)
+        .attr("width", width - marginLeft - marginRight)
+        .attr("height", height - marginTop - marginBottom)
+        .style("fill", "none")
+        .style("pointer-events", "all")
+        .on("mouseover", () => tooltip.style("display", null))
+        .on("mouseout", () => {
+            verticalLine.style('display', 'none');
+            tooltip.style("display", "none");
+        })
+        .on("mousemove", mousemove);
+
+    // Function to handle mouse movements
+    function mousemove(event) {
+        const x0 = x.invert(d3.pointer(event)[0]),
+            formatDate = d3.timeFormat("%H:%M:%S");
+        const xPos = d3.pointer(event)[0];
+        tooltip
+            .attr("transform", `translate(${d3.pointer(event)[0]},0)`)
+            .call(g => g.select("text").text(`${formatDate(x0)}`));
+
+        // Update the vertical line position
+        verticalLine
+            .attr('x1', xPos)
+            .attr('x2', xPos)
+            .attr('y1', marginTop)
+            .attr('y2', height - marginBottom)
+            .style('display', null);
+    }
+
+    // Create a tooltip for displaying the time
+    const tooltip = svg.append("g")
+        .style("display", "none");
+
+    tooltip.append("text")
+        .attr("class", "tooltip-date")
+        .attr("y", marginTop / 2)
+        .attr("x", marginLeft)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "12px")
+        .style("background", "white");
+
     return svg.node();
 }
 
