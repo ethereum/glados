@@ -60,6 +60,7 @@ pub struct IpcClientManager {
     client: Client,
 }
 
+const CONTENT_NOT_FOUND_ERROR_CODE: i32 = -39001;
 #[derive(Error, Debug)]
 pub enum JsonRpcError {
     #[error("received formatted response with no error, but contains a None result")]
@@ -68,8 +69,8 @@ pub enum JsonRpcError {
     #[error("received empty response (EOF only)")]
     Empty,
 
-    #[error("HTTP client error")]
-    HttpClient(#[from] jsonrpsee::core::error::Error),
+    #[error("HTTP client error: {0}")]
+    HttpClient(String),
 
     #[cfg(unix)]
     #[error("IPC client error")]
@@ -124,6 +125,31 @@ pub enum JsonRpcError {
         source: std::io::Error,
         path: PathBuf,
     },
+
+    #[error("Query completed without finding content")]
+    ContentNotFound { trace: Option<String> },
+}
+
+impl From<jsonrpsee::core::error::Error> for JsonRpcError {
+    fn from(e: jsonrpsee::core::error::Error) -> Self {
+        if let jsonrpsee::core::error::Error::Call(ref error) = e {
+            if error.code() == CONTENT_NOT_FOUND_ERROR_CODE {
+                return JsonRpcError::ContentNotFound {
+                    trace: error.data().map(|data| data.to_string()),
+                };
+            }
+        }
+
+        // Fallback to the generic HttpClient error variant if no match
+        JsonRpcError::HttpClient(e.to_string())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PortalRpcError {
+    pub code: Value,
+    pub message: Value,
+    pub data: Option<Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -178,51 +204,6 @@ pub struct Content {
     pub raw: Vec<u8>,
 }
 
-/// Differentiates content absent responses from other responses.
-/// Portal network specs define content absent by an "0x" response, which otherwise
-/// is not readily convertible to the Response type.
-#[derive(Clone, Debug)]
-pub enum PortalResponse {
-    ContentAbsent,
-    Regular(Value),
-}
-
-impl PortalResponse {
-    /// Creates a Portal response from an IPC/HTTP response result.
-    fn from_value(val: Value) -> Self {
-        match val.eq(&json!("0x")) {
-            true => PortalResponse::ContentAbsent,
-            false => PortalResponse::Regular(val),
-        }
-    }
-
-    /// Converts a content response JSON value to a string.
-    ///
-    /// A valid content response may be None, unlike non-content responses.
-    /// This occurs through the special "0x" response defined in the Portal specs.
-    fn content_response_to_string(&self) -> Result<Option<String>, JsonRpcError> {
-        match self {
-            PortalResponse::ContentAbsent => Ok(None),
-            PortalResponse::Regular(response) => {
-                let query_result = serde_json::from_value::<QueryResult>(response.clone())
-                    .map_err(JsonRpcError::Malformed)?;
-
-                Ok(Some(query_result.content))
-            }
-        }
-    }
-    /// Converts a non-content (e.g., node info) response JSON value to a string.
-    ///
-    /// A valid non-content response may be None, unlike content responses,
-    /// which must use the special "0x" response defined in the Portal specs.
-    fn non_content_response_to_string(&self) -> Result<String, JsonRpcError> {
-        match self {
-            PortalResponse::ContentAbsent => Err(JsonRpcError::SpecialMessageUnexpected),
-            PortalResponse::Regular(r) => Ok(r.to_string()),
-        }
-    }
-}
-
 impl PortalClient {
     pub async fn from(portal_client_url: String) -> Result<Self, JsonRpcError> {
         let api = PortalApi {
@@ -257,7 +238,7 @@ impl PortalApi {
         &self,
         method: &str,
         params: Option<Vec<Box<RawValue>>>,
-    ) -> Result<PortalResponse, JsonRpcError> {
+    ) -> Result<String, JsonRpcError> {
         let transport = PortalApi::parse_client_url(self.client_url.clone()).await?;
         // jsonrpsee requires the conversion of `Option<Vec<Box<RawValue>>>` to `ArrayParams`
         let array_params: ArrayParams = match params {
@@ -273,11 +254,11 @@ impl PortalApi {
         match transport {
             Transport::HTTP(http) => {
                 let val: Value = http.client.request(method, array_params).await?;
-                Ok(PortalResponse::from_value(val))
+                Ok(val.to_string())
             }
             Transport::IPC(ipc) => {
                 let val: Value = ipc.client.request(method, array_params).await?;
-                Ok(PortalResponse::from_value(val))
+                Ok(val.to_string())
             }
         }
     }
@@ -285,18 +266,13 @@ impl PortalApi {
     pub async fn get_client_version(&self) -> Result<String, JsonRpcError> {
         let method = "web3_clientVersion";
         let params = None;
-        self.make_request(method, params)
-            .await?
-            .non_content_response_to_string()
+        self.make_request(method, params).await
     }
 
     pub async fn get_node_info(&self) -> Result<NodeInfo, JsonRpcError> {
         let method = "discv5_nodeInfo";
         let params = None;
-        let response = self
-            .make_request(method, params)
-            .await?
-            .non_content_response_to_string()?;
+        let response = self.make_request(method, params).await?;
         serde_json::from_str(&response).map_err(|e| JsonRpcError::InvalidJson {
             source: e,
             input: response.to_string(),
@@ -306,10 +282,7 @@ impl PortalApi {
     pub async fn get_routing_table_info(self) -> Result<RoutingTableInfo, JsonRpcError> {
         let method = "discv5_routingTableInfo";
         let params = None;
-        let response = self
-            .make_request(method, params)
-            .await?
-            .non_content_response_to_string()?;
+        let response = self.make_request(method, params).await?;
         let result_raw: RoutingTableInfoRaw =
             serde_json::from_str(&response).map_err(|e| JsonRpcError::InvalidJson {
                 source: e,
@@ -341,16 +314,18 @@ impl PortalApi {
             source: e,
             input: key.to_string(),
         })?;
-        match self
-            .make_request(method, Some(vec![param]))
-            .await?
-            .content_response_to_string()?
-        {
-            Some(response) => {
-                let content_raw = hex_decode(&response)?;
+        match self.make_request(method, Some(vec![param])).await {
+            Ok(response) => {
+                let query_result = serde_json::from_value::<QueryResult>(json!(response))
+                    .map_err(JsonRpcError::Malformed)?;
+
+                let content_raw = hex_decode(&query_result.content)?;
                 Ok(Some(Content { raw: content_raw }))
             }
-            None => Ok(None),
+            Err(err) => match err {
+                JsonRpcError::ContentNotFound { trace: _ } => Ok(None),
+                _ => Err(err),
+            },
         }
     }
 
@@ -359,18 +334,24 @@ impl PortalApi {
         content_key: &T,
     ) -> Result<(Option<Content>, String), JsonRpcError> {
         let params = Some(vec![to_raw_value(&hex_encode(content_key.to_bytes()))?]);
-        let resp = self
+        match self
             .make_request("portal_historyTraceRecursiveFindContent", params)
-            .await?
-            .non_content_response_to_string()?;
-
-        let query_result: TracedQueryResult = serde_json::from_str(&resp)?;
-        let trace = query_result.trace.to_string();
-        if query_result.content.len() > 2 {
-            let content_raw = hex_decode(&query_result.content)?;
-            Ok((Some(Content { raw: content_raw }), trace))
-        } else {
-            Ok((None, trace))
+            .await
+        {
+            Ok(result) => {
+                let query_result: TracedQueryResult = serde_json::from_str(&result)?;
+                let trace = query_result.trace.to_string();
+                Ok((
+                    Some(Content {
+                        raw: hex_decode(&query_result.content)?,
+                    }),
+                    trace,
+                ))
+            }
+            Err(err) => match err {
+                JsonRpcError::ContentNotFound { trace } => Ok((None, trace.unwrap_or_default())),
+                _ => Err(err),
+            },
         }
     }
 
