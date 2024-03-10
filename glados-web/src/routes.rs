@@ -1188,10 +1188,7 @@ pub async fn census_timeseries(
 ) -> Result<Json<CensusTimeSeriesData>, StatusCode> {
     let days_ago: i32 = match http_args.get("days-ago") {
         None => 0,
-        Some(days_ago) => match days_ago.parse::<i32>() {
-            Ok(days_ago) => days_ago,
-            Err(_) => 0,
-        },
+        Some(days_ago) => days_ago.parse::<i32>().unwrap_or(0),
     };
 
     // Load all censuses in the given 24 hour window with each node's presence status & ENR
@@ -1270,12 +1267,14 @@ pub async fn census_timeseries(
 }
 
 /// Decouples census data from node data, now including ENR strings.
+type NodeIdString = String;
 fn decouple_nodes_and_censuses(
     node_statuses: Vec<NodeStatus>,
-) -> (Vec<String>, Vec<CensusStatuses>) {
+) -> (Vec<NodeIdString>, Vec<CensusStatuses>) {
     let mut node_set: HashSet<String> = HashSet::new();
-    let mut census_map: HashMap<i32, (DateTime<Utc>, HashMap<String, Option<i32>>)> =
-        HashMap::new();
+
+    type NodeEnrIdStatuses = HashMap<String, Option<i32>>;
+    let mut census_map: HashMap<i32, (DateTime<Utc>, NodeEnrIdStatuses)> = HashMap::new();
 
     for status in node_statuses {
         let hex_id = hex_encode(status.node_id);

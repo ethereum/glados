@@ -1,7 +1,8 @@
 let daysAgo = 0;
 let decodedEnrs = {};
+let highlightedRowGroup = null;
 
-function createSquareChart(height, width, data) {
+function createSquareChart(width, data) {
 
     // Incoming data takes the following form.
     // node_ids and enr_statuses are arrays of the same length and order.
@@ -27,10 +28,6 @@ function createSquareChart(height, width, data) {
         }
        }*/
 
-    // Declare the chart dimensions and margins.
-    const marginTop = 110;
-    const marginLeft = 30;
-
     // Create a combined array of node IDs and their ENRs during each census.
     let nodesAndEnrStatuses = zipNodesAndCensusData(data.node_ids, data.censuses, data.enrs);
 
@@ -54,6 +51,9 @@ function createSquareChart(height, width, data) {
         .range([0, width]);
 
     const nodes = nodesAndEnrStatuses.map(d => d.nodeId);
+
+    const cellHeight = 11;
+    const height = cellHeight * nodes.length;
     const y = d3.scaleBand()
         .domain(nodes)
         .range([0, height])
@@ -65,12 +65,14 @@ function createSquareChart(height, width, data) {
     const expandedCellHeight = (originalHeight * expandedScaleFactor);
 
     // Create the SVG container.
+    const marginTop = 110;
+    const marginLeft = 30;
     const svg = d3.create("svg")
         .attr("width", width)
         .attr("height", height + expandedCellHeight + marginTop)
-        .attr("viewBox", [0, 0, width, height + expandedCellHeight + marginTop])
+        .attr("viewBox", [-(width * 0.07), 0, width, height + expandedCellHeight + marginTop])
         .attr("overflow", "visible")
-        .attr("style", "max-width: 100%; height: auto; height: intrinsic;");
+        .attr("style", "max-width: 90%; height: 100%; height: intrinsic;");
 
     // Append the title
     svg.append("text")
@@ -85,8 +87,10 @@ function createSquareChart(height, width, data) {
         .attr("xlink:href", "#")
         .on("click", function (event) {
             event.preventDefault();
+            console.log(`days ago: ${daysAgo}`);
             censusTimeSeriesChart(daysAgo + 1);
             daysAgo++;
+            console.log(`days ago now: ${daysAgo}`);
         }).append("text")
         .attr("x", (width / 2) - 130)
         .attr("y", 70)
@@ -101,8 +105,10 @@ function createSquareChart(height, width, data) {
                 censusTimeSeriesChart(0);
                 return;
             }
+            console.log(`days ago: ${daysAgo}`);
             censusTimeSeriesChart(daysAgo - 1);
             daysAgo--;
+            console.log(`days ago now: ${daysAgo}`);
         }).append("text")
         .attr("x", (width / 2) + 70)
         .attr("y", 70)
@@ -144,8 +150,9 @@ function createSquareChart(height, width, data) {
             const rect = row.append("rect")
                 .attr("x", x(data.censuses[j].parsedTime))
                 .attr("y", y(node.nodeId))
-                .attr("width", 17)
-                .attr("height", y.bandwidth())
+                .attr("width", `${(width * 0.96) / data.censuses.length}px`)
+                .attr("height", y.bandwidth() + "px")
+                .attr("stroke-width", 1)
                 .attr("fill", censusResult ? "green" : "gray");
 
             let title = "";
@@ -157,11 +164,11 @@ function createSquareChart(height, width, data) {
 
             rect.append("title").text(title);
 
-            rect.on("click", function (event, d) {
+            rect.on("click", function (_, _) {
                 window.open(`/census/?census-id=${data.censuses[j].census_id}`, '_blank');
             });
 
-            rect.on("mouseenter", function (event) {
+            rect.on("mouseenter", function (_) {
                 rect.raise()
                     .style("stroke", "white")
                     .style("stroke-width", 4);
@@ -186,18 +193,22 @@ function createSquareChart(height, width, data) {
 
     // Internal function to handle hover-over magnification effect.
     function highlightNode(node) {
+
         let hoveredIndex = nodes.indexOf(node.nodeId);
+
         let downwardShift = 0;
 
         // Remove existing client string labels if any.
         svg.selectAll(".client-string-label").remove();
-
-        rowGroups.attr("transform", null)
-            .selectAll("rect")
-            .attr("height", originalHeight);
-        rowGroups.selectAll("text")
-            .style("font-size", null) // Reset font size
-            .attr("y", d => y(d.nodeId) + originalHeight / 2);
+        // Unhighlight the highlighted row.
+        if (highlightedRowGroup) {
+            highlightedRowGroup.attr("transform", null)
+                .selectAll("rect")
+                .attr("height", originalHeight);
+            highlightedRowGroup.selectAll("text")
+                .style("font-size", null) // Reset font size
+                .attr("y", d => y(d.nodeId) + originalHeight / 2);
+        }
 
         rowGroups.each(function (_, index) {
             const group = d3.select(this);
@@ -231,12 +242,14 @@ function createSquareChart(height, width, data) {
                 group.append("text")
                     .attr("class", "client-string-label")
                     .attr("x", -200)
-                    .attr("y", yPos + 30) // Adjust this to position the label correctly
+                    .attr("y", yPos + 30)
                     .attr("text-anchor", "start")
                     .text(nodesAndEnrStatuses[index].latestClientString);
             }
 
         });
+
+        highlightedRowGroup = rowGroups.filter(d => d.nodeId === node.nodeId);
     }
 
     // Apply hover effect to the row groups
@@ -244,7 +257,7 @@ function createSquareChart(height, width, data) {
         highlightNode(node);
     });
     rowGroups.on("mouseleave", function (event, _) {
-        if (event.toElement.__data__) {
+        if (event.toElement?.__data__) {
             const row = d3.select(this);
             row.attr("transform", null)
                 .selectAll("rect")
@@ -350,10 +363,8 @@ function getClientStringFromDecodedEnr(decodedEnr) {
 async function getCensusTimeSeriesData(numDaysAgo) {
 
     const baseUrl = `census-node-timeseries-data/?days-ago=${numDaysAgo}`;
-    daysAgo = numDaysAgo;
     return fetch(`${baseUrl}`)
         .then(response => {
-            // hideLoading();
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
@@ -370,20 +381,15 @@ async function censusTimeSeriesChart(daysAgo) {
         svgElement.remove();
     });
 
-    // showLoading();
     const data = await getCensusTimeSeriesData(daysAgo);
+    console.log('Census data from glados API:');
     console.log(data);
     if (data) {
-        document.getElementById('census-timeseries-graph').appendChild(createSquareChart(1700, 1700, data));
+        document.getElementById('census-timeseries-graph').appendChild(createSquareChart(1700, data));
+        if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1) {
+            alert('This page does not display well on Firefox, Chrome or Safari are recommended.');
+        }
     } else {
         console.log('No data available to plot the census chart');
     }
 }
-
-// function showLoading() {
-//     document.getElementById('loading').style.display = 'block';
-// }
-
-// function hideLoading() {
-//     document.getElementById('loading').style.display = 'none';
-// }
