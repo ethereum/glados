@@ -21,7 +21,7 @@ pub mod templates;
 
 use crate::state::State;
 
-const SOCKET: &str = "0.0.0.0:3002";
+const SOCKET: &str = "0.0.0.0:3001";
 
 const ASSET_PATH_ENV_VAR: &str = "GLADOS_WEB_ASSETS_PATH";
 
