@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
             task::spawn(follow_head_command(conn, provider_url.to_string()))
         }
         Some(Commands::FollowHeadPandaops { provider_url }) => {
-            info!("Running follow head");
+            info!("Running follow head beacon");
             task::spawn(follow_head_command_pandaops(conn, provider_url.to_string()))
         }
         Some(Commands::ImportPreMergeAccumulators { path }) => {

@@ -189,6 +189,7 @@ pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
         .expect("failed to pause until ctrl-c");
 
     info!("got CTRL+C. shutting down...");
+    std::process::exit(0);
 }
 
 /// Listens to tasks coming on different strategy channels and selects

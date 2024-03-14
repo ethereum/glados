@@ -323,12 +323,14 @@ impl PortalApi {
         let params = Some(vec![to_raw_value(&hex_encode(
             content.content_key.clone(),
         ))?]);
+
         let method = match content.protocol_id {
             content::SubProtocol::History => "portal_historyTraceRecursiveFindContent",
             content::SubProtocol::State => "portal_stateTraceRecursiveFindContent",
             content::SubProtocol::Beacon => "portal_beaconTraceRecursiveFindContent",
         };
         info!("Making request to method: {}", method);
+        info!("Protocol: {:?}", content.protocol_id);
         match self.make_request(method, params).await {
             Ok(result) => {
                 let query_result: TracedQueryResult = serde_json::from_str(&result)?;
