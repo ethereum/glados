@@ -10,7 +10,6 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 
 [dependencies]
 anyhow = "1.0.68"
-discv5 = "0.1.0"
 ethereum-types = "0.14.0"
 chrono = "0.4.22"
 jsonrpc = "0.13.0"
@@ -22,7 +21,7 @@ sha2 = "0.10.6"
 thiserror = "1.0.37"
 env_logger = "0.9.3"
 tracing = "0.1.37"
-ethportal-api = "0.2.2"
+ethportal-api = { git = "https://github.com/ethereum/trin" }
 url = "2.3.1"
 jsonrpsee = { version = "0.20.0", features = ["async-client", "client"] }
 rustc-hex = "2.1.0"

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 
 use entity::{
     content::{self, SubProtocol},
@@ -174,9 +174,9 @@ impl Display for Period {
 impl Period {
     fn cutoff_time(&self) -> DateTime<Utc> {
         let duration = match self {
-            Period::Hour => Duration::hours(1),
-            Period::Day => Duration::days(1),
-            Period::Week => Duration::weeks(1),
+            Period::Hour => chrono::TimeDelta::try_hours(1).unwrap(),
+            Period::Day => chrono::TimeDelta::try_days(1).unwrap(),
+            Period::Week => chrono::TimeDelta::try_weeks(1).unwrap(),
         };
         Utc::now() - duration
     }

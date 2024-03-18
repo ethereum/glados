@@ -42,7 +42,7 @@ impl Related<super::node::Entity> for Entity {
 impl ActiveModelBehavior for ActiveModel {}
 
 pub async fn get_or_create(enr: &Enr, conn: &DatabaseConnection) -> Result<Model> {
-    let node_id = super::node::get_or_create(enr.node_id().into(), conn).await?;
+    let node_id = super::node::get_or_create(enr.node_id(), conn).await?;
 
     // First try to lookup an existing entry.
     if let Some(enr_model) = Entity::find()

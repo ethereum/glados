@@ -345,7 +345,7 @@ async fn perform_single_audit(
         }
     };
 
-    let node_id = match node::get_or_create(client.enr.node_id().into(), &conn).await {
+    let node_id = match node::get_or_create(client.enr.node_id(), &conn).await {
         Ok(enr) => enr.id,
         Err(err) => {
             error!(

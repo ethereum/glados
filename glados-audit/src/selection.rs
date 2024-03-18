@@ -78,9 +78,8 @@ async fn select_latest_content_for_audit(
         let content_key_db_entries = match content::Entity::find()
             .left_join(entity::content_audit::Entity)
             .filter(content_audit::Column::CreatedAt.is_null())
-            .filter(
-                content::Column::FirstAvailableAt.lt(Utc::now() - chrono::Duration::seconds(10)),
-            )
+            .filter(content::Column::FirstAvailableAt.lt(Utc::now()
+                - chrono::TimeDelta::try_seconds(10).expect("Couldn't calculate 10 seconds")))
             .join(
                 JoinType::InnerJoin,
                 entity::content::Relation::ExecutionMetadata.def(),
@@ -288,9 +287,8 @@ async fn select_oldest_unaudited_content_for_audit(
         let search_result: Vec<(content::Model, Vec<content_audit::Model>)> =
             match content::Entity::find()
                 .filter(content::Column::FirstAvailableAt.gt(timestamp_too_old_threshold))
-                .filter(
-                    content::Column::FirstAvailableAt.lt(Utc::now() - chrono::Duration::days(1)),
-                )
+                .filter(content::Column::FirstAvailableAt.lt(Utc::now()
+                    - chrono::TimeDelta::try_days(1).expect("Failed to calculate time delta")))
                 .order_by_asc(content::Column::FirstAvailableAt)
                 .find_with_related(entity::content_audit::Entity)
                 .filter(content_audit::Column::CreatedAt.is_null())
@@ -332,13 +330,13 @@ mod tests {
     use std::collections::HashSet;
 
     use chrono::Utc;
+    use enr::NodeId;
     use entity::{
         client_info,
         content::{self, SubProtocol},
         content_audit::{self, AuditResult},
         node,
     };
-    use ethportal_api::types::node_id::NodeId;
     use ethportal_api::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
     use migration::{DbErr, Migrator, MigratorTrait};
     use sea_orm::{
@@ -387,8 +385,8 @@ mod tests {
             // Content table test data initialization
             // Check whether row should be new or old data
             let available_at = match (2..=15).contains(&num) {
-                true => Utc::now() - chrono::Duration::days(1),
-                false => Utc::now() - chrono::Duration::minutes(10),
+                true => Utc::now() - chrono::TimeDelta::try_days(1).unwrap(),
+                false => Utc::now() - chrono::TimeDelta::try_minutes(10).unwrap(),
             };
             let block_number = match (2..=15).contains(&num) {
                 true => MERGE_BLOCK_HEIGHT - num as i32,

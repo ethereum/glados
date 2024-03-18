@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
+use ethereum_types::H256;
 use ethportal_api::utils::bytes::hex_decode;
 use ethportal_api::{EpochAccumulatorKey, HistoryContentKey};
 use futures::future::join_all;
@@ -15,7 +16,7 @@ use tokio::task::JoinHandle;
 use tokio::{fs::read_dir, sync::mpsc, time::sleep};
 use tracing::{debug, error, info, warn};
 use web3::transports::Http;
-use web3::types::{BlockId, H256};
+use web3::types::BlockId;
 use web3::Web3;
 
 use url::Url;
@@ -128,13 +129,15 @@ async fn fetch_block_hash(
         .hash
         .ok_or_else(|| anyhow!("Fetched block has no hash (skipping)"))?;
 
+    let block_hash_bytes = block_hash.as_bytes();
+
     info!(
         block.hash=?block_hash,
         block.number=?block_number,
         "received block",
     );
 
-    Ok(block_hash)
+    Ok(H256::from_slice(block_hash_bytes))
 }
 
 pub async fn import_pre_merge_accumulators(

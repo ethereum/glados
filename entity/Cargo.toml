@@ -12,9 +12,10 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 anyhow = "1.0.68"
 chrono = "0.4.22"
 clap = { version = "4.0.24", features = ["derive"] }
-enr = "0.8.1"
 ethereum-types = "0.14.0"
-ethportal-api = "0.2.2"
+enr = "0.10.0"
+ethportal-api = { git = "https://github.com/ethereum/trin" }
+discv5 = "0.4.1"
 migration = { path = "../migration" }
 sea-orm = { version = "0.11.3", features = ["sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-native-tls"] }
 sea-query = "0.28.4"

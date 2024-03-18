@@ -2,11 +2,12 @@ use anyhow::{bail, Result};
 use chrono::{DateTime, Duration, Utc};
 use clap::Parser;
 use cli::Args;
+use enr::NodeId;
 use ethereum_types::H256;
+use ethereum_types::U256;
+use ethportal_api::Enr;
 use ethportal_api::HistoryNetworkApiClient;
 use ethportal_api::{generate_random_remote_enr, jsonrpsee::http_client::HttpClientBuilder};
-use ethportal_api::{Enr, NodeId};
-use primitive_types::U256;
 use sea_orm::DatabaseConnection;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -171,12 +172,12 @@ impl DHTCensus {
 
     async fn is_known(&self, node_id: NodeId) -> bool {
         let known = self.known.read().await;
-        known.contains(&node_id.0)
+        known.contains(&node_id.raw())
     }
 
     async fn add_known(&self, node_id: NodeId) -> bool {
         let mut known = self.known.write().await;
-        known.insert(node_id.0)
+        known.insert(node_id.raw())
     }
 
     async fn add_alive(&self, enr: Enr, record_id: i32, data_radius: U256) {
@@ -195,12 +196,12 @@ impl DHTCensus {
 
     async fn add_finished(&self, node_id: NodeId) -> bool {
         let mut finished = self.finished.write().await;
-        finished.insert(node_id.0)
+        finished.insert(node_id.raw())
     }
 
     async fn add_errored(&self, node_id: NodeId) -> bool {
         let mut errored = self.errored.write().await;
-        errored.insert(node_id.0)
+        errored.insert(node_id.raw())
     }
 }
 
@@ -255,7 +256,7 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
     };
 
     for enr in initial_enrs {
-        census.add_known(NodeId(enr.node_id().raw())).await;
+        census.add_known(enr.node_id()).await;
         match to_ping_tx.send(enr).await {
             Ok(_) => (),
             Err(err) => {
@@ -417,7 +418,7 @@ async fn do_liveliness_check(
                 Ok(client) => client,
                 Err(err) => {
                     error!(client.http_url=?http_url, err=?err, "Error initializing Portal JSON-RPC HTTP client");
-                    census.add_errored(NodeId(enr.node_id().raw())).await;
+                    census.add_errored(enr.node_id()).await;
                     return;
                 }
             }
@@ -433,7 +434,7 @@ async fn do_liveliness_check(
         }
         Err(err) => {
             error!(enr.node_id=?H256::from(enr.node_id().raw()), err=?err, "Error saving ENR to database");
-            census.add_errored(NodeId(enr.node_id().raw())).await;
+            census.add_errored(enr.node_id()).await;
             return;
         }
     };
@@ -455,7 +456,7 @@ async fn do_liveliness_check(
                 Ok(_) => (),
                 Err(err) => {
                     error!(err=?err, "Error queueing enr for routing table enumeration");
-                    census.add_finished(NodeId(enr.node_id().raw())).await;
+                    census.add_finished(enr.node_id()).await;
                 }
             }
         }
@@ -463,7 +464,7 @@ async fn do_liveliness_check(
             warn!(node_id=?H256::from(enr.node_id().raw()), err=?err, "Liveliness failed");
 
             // Add node to error list.
-            census.add_errored(NodeId(enr.node_id().raw())).await;
+            census.add_errored(enr.node_id()).await;
         }
     }
 }
@@ -505,7 +506,7 @@ async fn do_routing_table_enumeration(
                 Ok(client) => client,
                 Err(err) => {
                     error!(client.http_url=?http_url, err=?err, "Error initializing Portal JSON-RPC HTTP client");
-                    census.add_errored(NodeId(enr.node_id().raw())).await;
+                    census.add_errored(enr.node_id()).await;
                     return;
                 }
             }
@@ -525,10 +526,10 @@ async fn do_routing_table_enumeration(
         };
         debug!(enr.node_id=?H256::from(enr.node_id().raw()), distance=distance, count=enrs_at_distance.len(), "Routing Table Info");
         for found_enr in enrs_at_distance {
-            if census.is_known(NodeId(found_enr.node_id().raw())).await {
+            if census.is_known(enr.node_id()).await {
                 continue;
             } else {
-                census.add_known(NodeId(found_enr.node_id().raw())).await;
+                census.add_known(enr.node_id()).await;
                 to_ping_tx
                     .send(found_enr)
                     .await
@@ -536,5 +537,5 @@ async fn do_routing_table_enumeration(
             }
         }
     }
-    census.add_finished(NodeId(enr.node_id().raw())).await;
+    census.add_finished(enr.node_id()).await;
 }
