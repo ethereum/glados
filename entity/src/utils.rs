@@ -41,7 +41,7 @@ pub fn time_ago(past: DateTime<Utc>, present: DateTime<Utc>) -> String {
 #[cfg(test)]
 mod test {
     use super::time_ago;
-    use chrono::{Duration, Utc};
+    use chrono::{TimeDelta, Utc};
     use rstest::rstest;
 
     #[rstest]
@@ -52,8 +52,10 @@ mod test {
     #[case(356523, "4d3h2m ago")]
     #[case(31798861, "1y3d1h1m ago")]
     fn test_time_ago(#[case] seconds_ago: i64, #[case] expected_result: &str) {
+        let seconds_ago_delta =
+            TimeDelta::try_seconds(seconds_ago).expect("Couldn't calculate seconds delta.");
         assert_eq!(
-            time_ago(Utc::now() - Duration::seconds(seconds_ago), Utc::now()),
+            time_ago(Utc::now() - seconds_ago_delta, Utc::now()),
             expected_result
         );
     }

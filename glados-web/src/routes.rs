@@ -11,6 +11,7 @@ use entity::{
     content_audit::{self, AuditResult},
     execution_metadata, key_value, node, record,
 };
+use ethereum_types::U256;
 use ethportal_api::jsonrpsee::core::__reexports::serde_json;
 use ethportal_api::types::distance::{Distance, Metric, XorMetric};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
@@ -1056,8 +1057,8 @@ pub async fn is_content_in_deadzone(
 
     let mut enrs: Vec<String> = vec![];
     for dead_zone_data in dead_zone_data_vec {
-        let radius = Distance::from(crate::U256::from_big_endian(&dead_zone_data.data_radius));
-        let node_id = Distance::from(crate::U256::from_big_endian(&dead_zone_data.node_id));
+        let radius = Distance::from(U256::from_big_endian(&dead_zone_data.data_radius));
+        let node_id = Distance::from(U256::from_big_endian(&dead_zone_data.node_id));
         if XorMetric::distance(&content_id, &node_id.big_endian()) <= radius {
             enrs.push(dead_zone_data.raw);
         }

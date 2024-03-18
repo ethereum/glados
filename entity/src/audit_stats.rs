@@ -1,7 +1,5 @@
-use chrono::Duration;
-
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use sea_orm::{entity::prelude::*, ActiveValue::NotSet, QueryOrder, Set};
 use serde::Serialize;
 
@@ -86,7 +84,8 @@ pub async fn create(
 
 /// Get the most recent audit stat series of the last 7 days.
 pub async fn get_recent_stats(conn: &DatabaseConnection) -> Result<Vec<Model>, DbErr> {
-    let one_week_ago = Utc::now() - Duration::days(7);
+    let seven_days = TimeDelta::try_days(7).expect("Couldn't calculate 7 day delta.");
+    let one_week_ago = Utc::now() - seven_days;
 
     Entity::find()
         .filter(Column::Timestamp.gt(one_week_ago))

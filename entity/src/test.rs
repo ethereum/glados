@@ -3,9 +3,10 @@ use std::str::FromStr;
 
 #[cfg(test)]
 use chrono::prelude::*;
+use enr::NodeId;
 use ethereum_types::{H256, U256};
 #[cfg(test)]
-use ethportal_api::types::node_id::{generate_random_node_id, NodeId};
+use ethportal_api::types::node_id::generate_random_node_id;
 use ethportal_api::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
 use sea_orm::entity::prelude::*;
 use sea_orm::{
@@ -90,7 +91,7 @@ async fn test_node_crud() -> Result<(), DbErr> {
 async fn crud_record() -> Result<(), DbErr> {
     let _conn = setup_database().await?;
 
-    use enr::{k256, EnrBuilder};
+    use enr::{k256, Enr};
     use rand::thread_rng;
     use std::net::Ipv4Addr;
 
@@ -99,11 +100,10 @@ async fn crud_record() -> Result<(), DbErr> {
     let key = k256::ecdsa::SigningKey::random(&mut rng);
 
     let ip = Ipv4Addr::new(192, 168, 0, 1);
-    let enr = EnrBuilder::new("v4")
-        .ip4(ip)
-        .tcp4(8000)
-        .build(&key)
-        .unwrap();
+    let enr = {
+        let mut builder = Enr::builder();
+        builder.ip4(ip).tcp4(8000).build(&key).unwrap()
+    };
 
     assert_eq!(enr.ip4(), Some("192.168.0.1".parse().unwrap()));
     assert_eq!(enr.id(), Some("v4".into()));
@@ -366,9 +366,9 @@ async fn test_query_closest() {
     let distance_a_c = node_a.node_id_high ^ node_c.node_id_high;
     let distance_b_c = node_b.node_id_high ^ node_c.node_id_high;
 
-    let node_id_a_full = U256::from_big_endian(&node_id_a.0);
-    let node_id_b_full = U256::from_big_endian(&node_id_b.0);
-    let node_id_c_full = U256::from_big_endian(&node_id_c.0);
+    let node_id_a_full = U256::from_big_endian(&node_id_a.raw());
+    let node_id_b_full = U256::from_big_endian(&node_id_b.raw());
+    let node_id_c_full = U256::from_big_endian(&node_id_c.raw());
 
     assert_eq!(node_a.node_id_high as u64, (node_id_a_full >> 193).as_u64());
     assert_eq!(node_b.node_id_high as u64, (node_id_b_full >> 193).as_u64());
