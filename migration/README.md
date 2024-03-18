@@ -13,7 +13,7 @@ Generate all entities. Commands are made from the project root directory.
 ```command
 DATABASE_URL=sqlite:////path/to/my-database.sqlite sea-orm-cli generate entity -o entity/src
 ```
-Generate entity ony for `MyNewTable` as defined in a migration (`./migration/src/*.rs`) file:
+Generate entity only for `MyNewTable` as defined in a migration (`./migration/src/*.rs`) file:
 ```command
 DATABASE_URL=sqlite:////path/to/my-database.sqlite sea-orm-cli generate entity -o entity/src -t my_new_table
 ```

@@ -55,7 +55,7 @@ pub async fn start_audit_selection_task(
 /// 1. Left joining contentkey table to the contentaudit table to find audits per key.
 /// 2. Filter for null audits (Exclude any item with an existing audit).
 /// 3. Sort ascending to have most recently added content keys first.
-/// 4. Filter for content that is older than n seconds to allow the network a chance to propogate the content.
+/// 4. Filter for content that is older than n seconds to allow the network a chance to propagate the content.
 ///
 /// At regular intervals the channel capacity is assessed and new tasks are added to reach capacity.
 async fn select_latest_content_for_audit(
