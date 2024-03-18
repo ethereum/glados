@@ -1,12 +1,9 @@
-#[cfg(unix)]
-use reth_ipc::client::{IpcClientBuilder, IpcError};
 use std::str::FromStr;
 use std::{path::PathBuf, time::Duration};
 
 use ethereum_types::{H256, U256};
 use ethportal_api::OverlayContentKey;
 use jsonrpsee::{
-    async_client::Client,
     core::{client::ClientT, params::ArrayParams},
     http_client::{HttpClient, HttpClientBuilder},
     rpc_params,
@@ -35,7 +32,6 @@ pub enum TransportConfig {
 /// Details for a Connection to a Portal network node over different transports.
 pub enum Transport {
     HTTP(HttpClientManager),
-    IPC(IpcClientManager),
 }
 
 #[derive(Clone, Debug)]
@@ -55,11 +51,6 @@ pub struct HttpClientManager {
     client: HttpClient,
 }
 
-/// IPC-based transport for connecting to a Portal network node.
-pub struct IpcClientManager {
-    client: Client,
-}
-
 const CONTENT_NOT_FOUND_ERROR_CODE: i32 = -39001;
 #[derive(Error, Debug)]
 pub enum JsonRpcError {
@@ -71,10 +62,6 @@ pub enum JsonRpcError {
 
     #[error("HTTP client error: {0}")]
     HttpClient(String),
-
-    #[cfg(unix)]
-    #[error("IPC client error")]
-    IpcClient(#[from] IpcError),
 
     /// Portal network defines "0x" as the response for absent content.
     #[error("expected special 0x 'content absent' message for content request, received HTTP response with None result")]
@@ -256,10 +243,6 @@ impl PortalApi {
                 let val: Value = http.client.request(method, array_params).await?;
                 Ok(val.to_string())
             }
-            Transport::IPC(ipc) => {
-                let val: Value = ipc.client.request(method, array_params).await?;
-                Ok(val.to_string())
-            }
         }
     }
 
@@ -364,13 +347,8 @@ impl PortalApi {
                     .request_timeout(Duration::from_secs(120))
                     .build(client_url)?,
             }))
-        } else if let Some(ipc_path) = client_url.strip_prefix(ipc_prefix) {
-            #[cfg(unix)]
-            return Ok(Transport::IPC(IpcClientManager {
-                client: IpcClientBuilder::default().build(ipc_path).await?,
-            }));
-            #[cfg(windows)]
-            panic!("Reth doesn't support Unix Domain Sockets IPC for windows, use http")
+        } else if client_url.strip_prefix(ipc_prefix).is_some() {
+            panic!("IPC not implemented, use http.");
         } else {
             Err(JsonRpcError::ClientURL { url: client_url })
         }
