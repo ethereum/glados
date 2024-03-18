@@ -98,7 +98,7 @@ function createMultiLineChart(height, width, dataSets) {
     }
 
     // Select all '.legend' group elements and click on all but the first three
-    let selectedIndexes = [0, 4, 14, 15, 16]
+    let selectedIndexes = [1, 4]
     svg.selectAll(".legend")
         .each(function (d, i) {
             if (!selectedIndexes.includes(i)) {
