@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
-use chrono::Utc;
+use chrono::{DateTime, TimeZone, Utc};
 use ethereum_types::H256;
 use ethportal_api::utils::bytes::hex_decode;
 use ethportal_api::{EpochAccumulatorKey, HistoryContentKey};
@@ -100,7 +100,7 @@ async fn retrieve_new_blocks(
         };
         debug!(block.number=?block_number_to_retrieve, "fetching block");
 
-        let block_hash = match fetch_block_hash(block_number_to_retrieve, &w3).await {
+        let (block_hash, block_time) = match fetch_block_info(block_number_to_retrieve, &w3).await {
             Ok(block_hash) => block_hash,
             Err(e) => {
                 error!(block.number=?block_number_to_retrieve, err=?e, "Failed to fetch block");
@@ -110,15 +110,15 @@ async fn retrieve_new_blocks(
 
         let block_num =
             i32::try_from(block_number_to_retrieve).expect("Block num does not fit in i32.");
-        store_block_keys(block_num, block_hash.as_fixed_bytes(), Utc::now(), &conn).await;
+        store_block_keys(block_num, block_hash.as_fixed_bytes(), block_time, &conn).await;
     }
 }
 
-/// Gets the block hash for the given block number.
-async fn fetch_block_hash(
+/// Gets the block hash and timestamp for the given block number.
+async fn fetch_block_info(
     block_number: web3::types::U64,
     w3: &web3::Web3<web3::transports::Http>,
-) -> Result<H256> {
+) -> Result<(H256, DateTime<Utc>)> {
     let block = w3
         .eth()
         .block(BlockId::from(block_number))
@@ -135,10 +135,22 @@ async fn fetch_block_hash(
     info!(
         block.hash=?block_hash,
         block.number=?block_number,
+        block.timestamp=?block.timestamp,
         "received block",
     );
 
-    Ok(H256::from_slice(block_hash_bytes))
+    let timestamp = block.timestamp.as_u64() as i64;
+    let block_timestamp = match Utc.timestamp_opt(timestamp, 0) {
+        chrono::LocalResult::Single(time) => time,
+        _ => {
+            return Err(anyhow!(
+                "Failed to convert block timestamp to Utc: {}",
+                timestamp
+            ))
+        }
+    };
+
+    Ok((H256::from_slice(block_hash_bytes), block_timestamp))
 }
 
 pub async fn import_pre_merge_accumulators(
@@ -227,8 +239,8 @@ pub async fn bulk_download_block_data(
             let permit = semaphore.clone().acquire_owned().await?;
             tokio::spawn(async move {
                 // In case of failure, retry until successful
-                let block_hash = loop {
-                    match fetch_block_hash(block_number.into(), &w3).await {
+                let (block_hash, block_time) = loop {
+                    match fetch_block_info(block_number.into(), &w3).await {
                         Ok(block_hash) => break block_hash,
                         Err(err) => {
                             warn!(
@@ -243,7 +255,7 @@ pub async fn bulk_download_block_data(
 
                 let block_number =
                     i32::try_from(block_number).expect("Block num does not fit in i32.");
-                store_block_keys(block_number, block_hash.as_fixed_bytes(), Utc::now(), &conn)
+                store_block_keys(block_number, block_hash.as_fixed_bytes(), block_time, &conn)
                     .await;
                 drop(permit);
             });
@@ -273,8 +285,8 @@ pub async fn bulk_download_block_data(
                     let block_number = *block_number;
                     tokio::spawn(async move {
                         // In case of failure, retry until successful
-                        let block_hash = loop {
-                            match fetch_block_hash(block_number.into(), &w3).await {
+                        let (block_hash, block_time) = loop {
+                            match fetch_block_info(block_number.into(), &w3).await {
                                 Ok(block_hash) => break block_hash,
                                 Err(err) => {
                                     warn!(
@@ -292,7 +304,7 @@ pub async fn bulk_download_block_data(
                         store_block_keys(
                             block_number,
                             block_hash.as_fixed_bytes(),
-                            Utc::now(),
+                            block_time,
                             &conn,
                         )
                         .await;
