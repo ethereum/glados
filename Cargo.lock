@@ -2333,6 +2333,7 @@ name = "glados-monitor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap 4.5.3",
  "entity",
  "env_logger 0.9.3",

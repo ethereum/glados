@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
+use chrono::Utc;
 use ethereum_types::H256;
 use ethportal_api::utils::bytes::hex_decode;
 use ethportal_api::{EpochAccumulatorKey, HistoryContentKey};
@@ -109,7 +110,7 @@ async fn retrieve_new_blocks(
 
         let block_num =
             i32::try_from(block_number_to_retrieve).expect("Block num does not fit in i32.");
-        store_block_keys(block_num, block_hash.as_fixed_bytes(), &conn).await;
+        store_block_keys(block_num, block_hash.as_fixed_bytes(), Utc::now(), &conn).await;
     }
 }
 
@@ -169,7 +170,7 @@ pub async fn import_pre_merge_accumulators(
                                     });
                                 debug!(content_key = %content_key, "Importing");
                                 let content_key_db =
-                                    content::get_or_create(&content_key, &conn).await?;
+                                    content::get_or_create(&content_key, Utc::now(), &conn).await?;
                                 info!(content_key = %content_key, database_id = content_key_db.id, "Imported");
                             }
                             Err(_) => info!(
@@ -242,7 +243,8 @@ pub async fn bulk_download_block_data(
 
                 let block_number =
                     i32::try_from(block_number).expect("Block num does not fit in i32.");
-                store_block_keys(block_number, block_hash.as_fixed_bytes(), &conn).await;
+                store_block_keys(block_number, block_hash.as_fixed_bytes(), Utc::now(), &conn)
+                    .await;
                 drop(permit);
             });
         }
@@ -287,7 +289,13 @@ pub async fn bulk_download_block_data(
 
                         let block_number =
                             i32::try_from(block_number).expect("Block num does not fit in i32.");
-                        store_block_keys(block_number, block_hash.as_fixed_bytes(), &conn).await;
+                        store_block_keys(
+                            block_number,
+                            block_hash.as_fixed_bytes(),
+                            Utc::now(),
+                            &conn,
+                        )
+                        .await;
                     })
                 })
                 .collect();

@@ -1,4 +1,5 @@
 use anyhow::Error;
+use chrono::{DateTime, Utc};
 use entity::{content, execution_metadata};
 use ethportal_api::{
     utils::bytes::hex_encode, BlockBodyKey, BlockHeaderKey, BlockReceiptsKey, HistoryContentKey,
@@ -16,6 +17,7 @@ use tracing::{debug, error};
 pub async fn store_block_keys(
     block_number: i32,
     block_hash: &[u8; 32],
+    available_at: DateTime<Utc>,
     conn: &DatabaseConnection,
 ) -> Vec<content::Model> {
     let header = HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey {
@@ -28,9 +30,16 @@ pub async fn store_block_keys(
         block_hash: *block_hash,
     });
 
-    let header = store_content_key(&header, "block_header", block_number, conn).await;
-    let body = store_content_key(&body, "block_body", block_number, conn).await;
-    let receipts = store_content_key(&receipts, "block_receipts", block_number, conn).await;
+    let header = store_content_key(&header, "block_header", block_number, available_at, conn).await;
+    let body = store_content_key(&body, "block_body", block_number, available_at, conn).await;
+    let receipts = store_content_key(
+        &receipts,
+        "block_receipts",
+        block_number,
+        available_at,
+        conn,
+    )
+    .await;
 
     let mut returned_values = vec![];
     if let Some(header) = header {
@@ -52,10 +61,11 @@ pub async fn store_content_key<T: OverlayContentKey>(
     key: &T,
     name: &str,
     block_number: i32,
+    available_at: DateTime<Utc>,
     conn: &DatabaseConnection,
 ) -> Option<content::Model> {
     // Store key
-    match content::get_or_create(key, conn).await {
+    match content::get_or_create(key, available_at, conn).await {
         Ok(content_model) => {
             log_record_outcome(key, name, DbOutcome::Success);
             // Store metadata

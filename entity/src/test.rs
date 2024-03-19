@@ -128,7 +128,9 @@ async fn test_content_id_as_hash() -> Result<(), DbErr> {
     let conn = setup_database().await?;
     let key = sample_history_key();
     let content_id_hash = H256::from_slice(&key.content_id());
-    let content_model = content::get_or_create(&key, &conn).await.unwrap();
+    let content_model = content::get_or_create(&key, Utc::now(), &conn)
+        .await
+        .unwrap();
     assert_eq!(content_model.id_as_hash(), content_id_hash);
     Ok(())
 }
@@ -140,7 +142,9 @@ async fn test_content_id_as_hex() -> Result<(), DbErr> {
     let key = sample_history_key();
     let content_id_hash = H256::from_slice(&key.content_id());
     let content_id_hex = hex_encode(content_id_hash);
-    let content_model = content::get_or_create(&key, &conn).await.unwrap();
+    let content_model = content::get_or_create(&key, Utc::now(), &conn)
+        .await
+        .unwrap();
     assert_eq!(content_model.id_as_hex(), content_id_hex);
     Ok(())
 }
@@ -150,7 +154,9 @@ async fn test_content_id_as_hex() -> Result<(), DbErr> {
 async fn test_content_key_as_hex() -> Result<(), DbErr> {
     let conn = setup_database().await?;
     let key = sample_history_key();
-    let content_model = content::get_or_create(&key, &conn).await.unwrap();
+    let content_model = content::get_or_create(&key, Utc::now(), &conn)
+        .await
+        .unwrap();
     assert_eq!(
         content_model.key_as_hex(),
         "0x00000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
@@ -168,13 +174,17 @@ async fn test_content_get_or_create() -> Result<(), DbErr> {
     // Ensure our database is empty
     assert_eq!(content::Entity::find().count(&conn).await?, 0);
 
-    let content_id_a = content::get_or_create(&key, &conn).await.unwrap();
+    let content_id_a = content::get_or_create(&key, Utc::now(), &conn)
+        .await
+        .unwrap();
 
     // Ensure we added a new record to the database.
     assert_eq!(content::Entity::find().count(&conn).await?, 1);
 
     // Retrieve the key
-    let content_id_b = content::get_or_create(&key, &conn).await.unwrap();
+    let content_id_b = content::get_or_create(&key, Utc::now(), &conn)
+        .await
+        .unwrap();
 
     // Key was not saved twice.
     assert_eq!(content::Entity::find().count(&conn).await?, 1);
