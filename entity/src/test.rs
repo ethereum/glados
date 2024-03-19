@@ -128,7 +128,7 @@ async fn test_content_id_as_hash() -> Result<(), DbErr> {
     let conn = setup_database().await?;
     let key = sample_history_key();
     let content_id_hash = H256::from_slice(&key.content_id());
-    let content_model = content::get_or_create(&key, Utc::now(), &conn)
+    let content_model = content::get_or_create(SubProtocol::History, &key, Utc::now(), &conn)
         .await
         .unwrap();
     assert_eq!(content_model.id_as_hash(), content_id_hash);
@@ -142,7 +142,7 @@ async fn test_content_id_as_hex() -> Result<(), DbErr> {
     let key = sample_history_key();
     let content_id_hash = H256::from_slice(&key.content_id());
     let content_id_hex = hex_encode(content_id_hash);
-    let content_model = content::get_or_create(&key, Utc::now(), &conn)
+    let content_model = content::get_or_create(SubProtocol::History, &key, Utc::now(), &conn)
         .await
         .unwrap();
     assert_eq!(content_model.id_as_hex(), content_id_hex);
@@ -154,7 +154,7 @@ async fn test_content_id_as_hex() -> Result<(), DbErr> {
 async fn test_content_key_as_hex() -> Result<(), DbErr> {
     let conn = setup_database().await?;
     let key = sample_history_key();
-    let content_model = content::get_or_create(&key, Utc::now(), &conn)
+    let content_model = content::get_or_create(SubProtocol::History, &key, Utc::now(), &conn)
         .await
         .unwrap();
     assert_eq!(
@@ -174,7 +174,7 @@ async fn test_content_get_or_create() -> Result<(), DbErr> {
     // Ensure our database is empty
     assert_eq!(content::Entity::find().count(&conn).await?, 0);
 
-    let content_id_a = content::get_or_create(&key, Utc::now(), &conn)
+    let content_id_a = content::get_or_create(SubProtocol::History, &key, Utc::now(), &conn)
         .await
         .unwrap();
 
@@ -182,7 +182,7 @@ async fn test_content_get_or_create() -> Result<(), DbErr> {
     assert_eq!(content::Entity::find().count(&conn).await?, 1);
 
     // Retrieve the key
-    let content_id_b = content::get_or_create(&key, Utc::now(), &conn)
+    let content_id_b = content::get_or_create(SubProtocol::History, &key, Utc::now(), &conn)
         .await
         .unwrap();
 

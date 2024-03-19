@@ -21,6 +21,7 @@ sea-orm = "0.11.3"
 ethereum-types = "0.14.0"
 env_logger = "0.9.3"
 futures = "0.3.21"
+serde_json = "1.0.89"
 tracing = "0.1.37"
 ethportal-api = { git = "https://github.com/ethereum/trin" }
 reqwest = { version = "0.11.6", default-features = false, features = ["rustls-tls"] }

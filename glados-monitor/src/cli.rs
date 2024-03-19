@@ -30,6 +30,8 @@ pub enum Commands {
         provider_url: String,
     },
 
+    FollowBeaconPandaops {},
+
     /// does testing things
     ImportPreMergeAccumulators {
         /// lists test values

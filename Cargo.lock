@@ -2344,6 +2344,7 @@ dependencies = [
  "migration",
  "reqwest",
  "sea-orm",
+ "serde_json",
  "tokio",
  "tracing",
  "url",

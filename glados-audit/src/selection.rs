@@ -1,18 +1,17 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, TimeZone, Utc};
-use ethportal_api::HistoryContentKey;
 use glados_core::db::store_block_keys;
 use rand::{thread_rng, Rng};
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, PaginatorTrait, QueryFilter,
+    ColumnTrait, Condition, DatabaseConnection, EntityTrait, JoinType, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, RelationTrait,
 };
 use tokio::{
     sync::mpsc,
     time::{interval, Duration},
 };
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 
 use entity::{
     content::{self, Model},
@@ -81,10 +80,15 @@ async fn select_latest_content_for_audit(
             .filter(content::Column::FirstAvailableAt.lt(Utc::now()
                 - chrono::TimeDelta::try_seconds(10).expect("Couldn't calculate 10 seconds")))
             .join(
-                JoinType::InnerJoin,
+                JoinType::LeftJoin,
                 entity::content::Relation::ExecutionMetadata.def(),
             )
-            .filter(execution_metadata::Column::BlockNumber.gt(MERGE_BLOCK_HEIGHT))
+            .filter(
+                // If execution metadata is associated with the content, it should be post-merge.
+                Condition::any()
+                    .add(execution_metadata::Column::BlockNumber.gt(MERGE_BLOCK_HEIGHT))
+                    .add(execution_metadata::Column::Id.is_null()),
+            )
             .order_by_desc(content::Column::FirstAvailableAt)
             .limit(keys_required as u64)
             .all(&conn)
@@ -182,26 +186,22 @@ async fn add_to_queue(
 ) {
     let capacity = tx.capacity();
     let max_capacity = tx.max_capacity();
-    debug!(
+    info!(
         channel.availability = capacity,
         channel.size = max_capacity,
         "Adding items to audit task channel."
     );
     for content_key_model in items {
-        // Create key from database bytes.
-        let content_key = match HistoryContentKey::try_from(content_key_model.content_key) {
-            Ok(key) => key,
-            Err(err) => {
-                error!(database.id=?content_key_model.id, err=?err, "Could not decode content key from database record");
-                continue;
-            }
-        };
         let task = AuditTask {
             strategy: strategy.clone(),
-            content_key,
+            content: content_key_model.clone(),
         };
+        info!(
+            "Sending key of type {}",
+            content_key_model.protocol_id.as_text()
+        );
         if let Err(e) = tx.send(task).await {
-            debug!(audit.strategy=?strategy, err=?e, "Could not send key for audit, channel might be full or closed.")
+            error!(audit.strategy=?strategy, err=?e, "Could not send key for audit, channel might be full or closed.")
         }
     }
 }
@@ -226,13 +226,17 @@ async fn select_random_content_for_audit(
 
         let num_keys = match content::Entity::find().count(&conn).await {
             // Skip if no keys yet.
-            Ok(0) => continue,
+            Ok(0) => {
+                info!("No keys in the database yet.");
+                continue;
+            }
             Ok(count) => count as u32,
             Err(err) => {
                 error!(audit.strategy="random", err=?err, "Could not make audit query");
                 continue;
             }
         };
+        info!("Number of keys in the database: {num_keys}");
         let keys_required = tx.capacity();
         if keys_required == 0 {
             continue;
@@ -242,17 +246,26 @@ async fn select_random_content_for_audit(
             // Thread safe block for the rng, which is not `Send`.
             let mut rng = thread_rng();
             for _ in 0..keys_required {
-                random_ids.insert(rng.gen_range(0..num_keys));
+                // IDs start at 1
+                random_ids.insert(rng.gen_range(1..num_keys + 1));
             }
         }
+        info!("Randomly selected keys: {random_ids:?}");
         let mut content_key_db_entries: Vec<Model> = vec![];
         for random_id in random_ids {
             match content::Entity::find()
                 .filter(content::Column::Id.eq(random_id))
-                .all(&conn)
+                .one(&conn)
                 .await
             {
-                Ok(found) => content_key_db_entries.extend(found),
+                Ok(Some(found)) => content_key_db_entries.push(found),
+                Ok(None) => {
+                    warn!(
+                        strategy = "random",
+                        random_id, "Could not find content key in the database."
+                    );
+                    continue;
+                }
                 Err(err) => {
                     error!(audit.strategy="random", err=?err, "Could not make audit query");
                     continue;
@@ -260,7 +273,7 @@ async fn select_random_content_for_audit(
             };
         }
         let item_count = content_key_db_entries.len();
-        debug!(
+        info!(
             strategy = "random",
             item_count, "Adding content keys to the audit queue."
         );
@@ -487,7 +500,7 @@ mod tests {
         // Await strategy results
         while let Some(task) = rx.recv().await {
             let key_model = content::Entity::find()
-                .filter(content::Column::ContentKey.eq(task.content_key.to_bytes()))
+                .filter(content::Column::ContentKey.eq(task.content.content_key))
                 .one(&conn)
                 .await
                 .unwrap()
@@ -529,7 +542,7 @@ mod tests {
         // Await strategy results
         while let Some(task) = rx.recv().await {
             let key_model = content::Entity::find()
-                .filter(content::Column::ContentKey.eq(task.content_key.to_bytes()))
+                .filter(content::Column::ContentKey.eq(task.content.content_key))
                 .one(&conn)
                 .await
                 .unwrap()
@@ -561,7 +574,7 @@ mod tests {
         // Await strategy results
         while let Some(task) = rx.recv().await {
             let key_model = content::Entity::find()
-                .filter(content::Column::ContentKey.eq(task.content_key.to_bytes()))
+                .filter(content::Column::ContentKey.eq(task.content.content_key))
                 .one(&conn)
                 .await
                 .unwrap()

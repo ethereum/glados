@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, TimeZone, Utc};
+use entity::content::SubProtocol;
 use ethereum_types::H256;
 use ethportal_api::utils::bytes::hex_decode;
 use ethportal_api::{EpochAccumulatorKey, HistoryContentKey};
@@ -20,10 +21,13 @@ use web3::transports::Http;
 use web3::types::BlockId;
 use web3::Web3;
 
+use crate::beacon::follow_beacon_head;
+use reqwest::Client as HttpClient;
 use url::Url;
 
 use entity::content;
 
+pub mod beacon;
 pub mod cli;
 
 pub async fn run_glados_monitor(conn: DatabaseConnection, w3: web3::Web3<web3::transports::Http>) {
@@ -31,6 +35,17 @@ pub async fn run_glados_monitor(conn: DatabaseConnection, w3: web3::Web3<web3::t
 
     tokio::spawn(follow_chain_head(w3.clone(), tx));
     tokio::spawn(retrieve_new_blocks(w3.clone(), rx, conn));
+
+    debug!("setting up CTRL+C listener");
+    tokio::signal::ctrl_c()
+        .await
+        .expect("failed to pause until ctrl-c");
+
+    info!("got CTRL+C. shutting down...");
+}
+
+pub async fn run_glados_monitor_beacon(conn: DatabaseConnection, client: HttpClient) {
+    tokio::spawn(follow_beacon_head(conn, client));
 
     debug!("setting up CTRL+C listener");
     tokio::signal::ctrl_c()
@@ -181,8 +196,13 @@ pub async fn import_pre_merge_accumulators(
                                         epoch_hash: H256::from_slice(&content_key_raw[1..]),
                                     });
                                 debug!(content_key = %content_key, "Importing");
-                                let content_key_db =
-                                    content::get_or_create(&content_key, Utc::now(), &conn).await?;
+                                let content_key_db = content::get_or_create(
+                                    SubProtocol::History,
+                                    &content_key,
+                                    Utc::now(),
+                                    &conn,
+                                )
+                                .await?;
                                 info!(content_key = %content_key, database_id = content_key_db.id, "Imported");
                             }
                             Err(_) => info!(
