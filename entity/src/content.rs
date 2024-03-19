@@ -62,6 +62,7 @@ impl ActiveModelBehavior for ActiveModel {}
 
 pub async fn get_or_create<T: OverlayContentKey>(
     content_key: &T,
+    available_at: DateTime<Utc>,
     conn: &DatabaseConnection,
 ) -> Result<Model> {
     // First try to lookup an existing entry.
@@ -80,7 +81,7 @@ pub async fn get_or_create<T: OverlayContentKey>(
         content_id: Set(content_key.content_id().to_vec()),
         content_key: Set(content_key.to_bytes()),
         protocol_id: Set(SubProtocol::History),
-        first_available_at: Set(Utc::now()),
+        first_available_at: Set(available_at),
     };
     Ok(content_key.insert(conn).await?)
 }

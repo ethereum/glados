@@ -130,17 +130,40 @@ async fn select_fourfours_content_for_audit(
             strategy = "4444s",
             "Getting hash for block number {block_number}."
         );
-        let block_hash = w3
+        let block = match w3
             .eth()
             .block(BlockId::Number(BlockNumber::Number(block_number.into())))
             .await
-            .unwrap()
-            .unwrap()
-            .hash
-            .unwrap();
+        {
+            Ok(Some(block)) => block,
+            Ok(None) => {
+                error!(strategy = "4444s", block.number=?block_number, "Block not found");
+                continue;
+            }
+            Err(err) => {
+                error!(strategy = "4444s", block.number=?block_number, err=?err, "Could not get block");
+                continue;
+            }
+        };
 
-        let items_to_audit =
-            store_block_keys(block_number, block_hash.as_fixed_bytes(), &conn).await;
+        let block_hash = block.hash.unwrap();
+
+        let timestamp = block.timestamp.as_u64() as i64;
+        let block_timestamp = match Utc.timestamp_opt(timestamp, 0) {
+            chrono::LocalResult::Single(time) => time,
+            _ => {
+                error!(block.number=?block_number, block.timestamp=?timestamp, "Could not convert timestamp");
+                continue;
+            }
+        };
+
+        let items_to_audit = store_block_keys(
+            block_number,
+            block_hash.as_fixed_bytes(),
+            block_timestamp,
+            &conn,
+        )
+        .await;
         debug!(
             strategy = "4444s",
             item_count = items_to_audit.len(),

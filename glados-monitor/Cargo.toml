@@ -12,6 +12,7 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 anyhow = "1.0.68"
 glados-core = { path = "../glados-core" }
 migration = { path = "../migration" }
+chrono = "0.4.22"
 entity = { path = "../entity" }
 clap = { version = "4.0.24", features = ["derive"] }
 web3 = "0.18.0"
