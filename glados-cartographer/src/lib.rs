@@ -526,10 +526,10 @@ async fn do_routing_table_enumeration(
         };
         debug!(enr.node_id=?H256::from(enr.node_id().raw()), distance=distance, count=enrs_at_distance.len(), "Routing Table Info");
         for found_enr in enrs_at_distance {
-            if census.is_known(enr.node_id()).await {
+            if census.is_known(found_enr.node_id()).await {
                 continue;
             } else {
-                census.add_known(enr.node_id()).await;
+                census.add_known(found_enr.node_id()).await;
                 to_ping_tx
                     .send(found_enr)
                     .await
