@@ -159,19 +159,6 @@ lazy_static! {
             "trin-sgp1-2".to_string(),
         );
         nicknames.insert(
-            "0xbb5db6d2d53a9d96629ed4a4ffbadba07ec1c9b56167f05e50148fb22bad00c6".to_string(),
-            "trin-ams3-3".to_string(),
-        );
-        nicknames.insert(
-            "0xf53c7ed77c74f20fb2b681d59ecba3775ab25b95c6d3439856ee9f8548c7864b".to_string(),
-            "trin-nyc1-3".to_string(),
-        );
-        nicknames.insert(
-            "0x42917e309c0f985abf441dd75110ec64e95f2bf8f1e830b99853856e04b1cce0".to_string(),
-            "trin-sgp1-3".to_string(),
-        );
-
-        nicknames.insert(
             "0x794cbd50977f0b202db565d292d0ca8377cebc3497eaea21822afd967e7d2364".to_string(),
             "trin-nyc1-18".to_string(),
         );
