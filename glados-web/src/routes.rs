@@ -1171,7 +1171,7 @@ pub struct RecordInfo {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CensusTimeSeriesData {
-    node_ids: Vec<String>,
+    node_ids_with_nicknames: Vec<(String, Option<String>)>,
     censuses: Vec<CensusStatuses>,
     enrs: HashMap<i32, String>,
 }
@@ -1259,9 +1259,16 @@ pub async fn census_timeseries(
     let enr_id_map: HashMap<i32, String> = records.into_iter().map(|r| (r.id, r.raw)).collect();
 
     let (node_ids, censuses) = decouple_nodes_and_censuses(node_statuses);
+    let node_ids_with_nicknames: Vec<(String, Option<String>)> = node_ids
+        .iter()
+        .map(|id| {
+            let nickname = node::NODE_NICKNAME_MAP.get(id).cloned();
+            (id.clone(), nickname)
+        })
+        .collect();
 
     Ok(Json(CensusTimeSeriesData {
-        node_ids,
+        node_ids_with_nicknames,
         censuses,
         enrs: enr_id_map,
     }))
