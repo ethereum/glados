@@ -13,7 +13,26 @@
             <h1>Node Details: {{ node.node_id_as_hex() }}</h1>
         </div>
     </div>
-    <br/>
+    <br />
+    {% if node.get_nickname().is_some() %}
+    <div class="row">
+        <div class="col">
+            <div class="card shadow-sm enr-card">
+                <div class="card-body">
+                    <h2>{{ node.get_nickname().unwrap() }}</h2>
+                    <p><a
+                            href="https://trin-bench.ethdevops.io/d/e23mBdEVkb/trin-metrics?orgId=1&var-protocol=All&var-node={{ node.get_nickname().unwrap() }}">
+                            Trin Metrics</a></p>
+
+                    <p><a
+                            href="https://trin-bench.ethdevops.io/d/rYdddlPWk/node-exporter-full?orgId=1&refresh=1m&var-DS_PROMETHEUS=default&var-job=node&var-node={{ node.get_nickname().unwrap() }}">
+                            Node Metrics</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <br />
+    {% endif %}
     <div class="row">
         <div class="col">
             {% match latest_enr %}
@@ -38,7 +57,7 @@
             {% endmatch %}
         </div>
     </div>
-    <br/>
+    <br />
     <div class="row">
         <div class="col">
             <div class="card shadow-sm enr-card">
@@ -46,29 +65,31 @@
                     <h2> ENR List</h2>
                     <table class="table">
                         <thead>
-                        <tr>
-                            <th scope="col">Sequence Number</th>
-                        </tr>
+                            <tr>
+                                <th scope="col">Sequence Number</th>
+                            </tr>
                         </thead>
                         <tbody>
-                        {% for record in enr_list %}
-                        <tr>
-                            <td>
-                                <a href="/network/node/{{ node.node_id_as_hex() }}/enr/{{ record.sequence_number }}/">{{ record.sequence_number }}</a>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td>No known ENRs</td>
-                        </tr>
-                        {% endfor %}
+                            {% for record in enr_list %}
+                            <tr>
+                                <td>
+                                    <a
+                                        href="/network/node/{{ node.node_id_as_hex() }}/enr/{{ record.sequence_number }}/">{{
+                                        record.sequence_number }}</a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td>No known ENRs</td>
+                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
     </div>
-    <br/>
+    <br />
     <div class="row">
         <div class="col">
             <div class="card shadow-sm enr-card">
@@ -76,23 +97,24 @@
                     <h2>Closest Nodes</h2>
                     <table class="table">
                         <thead>
-                        <tr>
-                            <th scope="col">Node ID</th>
-                            <th scope="col">Distance</th>
-                        </tr>
+                            <tr>
+                                <th scope="col">Node ID</th>
+                                <th scope="col">Distance</th>
+                            </tr>
                         </thead>
                         <tbody>
-                        {% for neighbor_node in closest_node_list %}
-                        <tr>
-                            <td>
-                                <a href="/network/node/{{ neighbor_node.node_id_as_hex() }}/">{{ neighbor_node.node_id_as_hex() }}</a>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td>No closest nodes</td>
-                        </tr>
-                        {% endfor %}
+                            {% for neighbor_node in closest_node_list %}
+                            <tr>
+                                <td>
+                                    <a href="/network/node/{{ neighbor_node.node_id_as_hex() }}/">{{
+                                        neighbor_node.node_id_as_hex() }}</a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td>No closest nodes</td>
+                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -156,14 +178,14 @@
     }
 
     {% match latest_enr %}
-        {% when Some with (enr) %}
-        let {enr: decodedEnr, seq, signature} = ENR.ENR.decodeTxt("{{ enr.raw }}");
-        decodedEnrData("signature", getDisplayValue(decodedEnr, "signature", signature));
-        decodedEnrData("seq", seq);
-        for (let [key, value] of decodedEnr.entries()) {
-            decodedEnrData(key, getDisplayValue(decodedEnr, key, value));
-        }
-        {% when None %}
+    {% when Some with (enr) %}
+    let { enr: decodedEnr, seq, signature } = ENR.ENR.decodeTxt("{{ enr.raw }}");
+    decodedEnrData("signature", getDisplayValue(decodedEnr, "signature", signature));
+    decodedEnrData("seq", seq);
+    for (let [key, value] of decodedEnr.entries()) {
+        decodedEnrData(key, getDisplayValue(decodedEnr, key, value));
+    }
+    {% when None %}
     {% endmatch %}
 
 </script>
