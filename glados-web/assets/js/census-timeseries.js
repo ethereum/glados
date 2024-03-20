@@ -8,9 +8,9 @@ function createSquareChart(width, data) {
     // node_ids and enr_statuses are arrays of the same length and order.
     /*{
          "node_ids": [
-           "0x9891fe3fdfcec2707f877306fc6e5596b1405fedf70ad2911496c2ac40dfeda5",
-           "0x08653f55f8120591717aae0426c10c25f0e6a7db078c2e1516b4f3059cefff35",
-           "0xbefb246b22757267608a436d265018374592291f284c536f73c933b29a91e10a"
+           ["0x9891fe3fdfcec2707f877306fc6e5596b1405fedf70ad2911496c2ac40dfeda5", null],
+           ["0x08653f55f8120591717aae0426c10c25f0e6a7db078c2e1516b4f3059cefff35", "node-nickname"],
+           ["0xbefb246b22757267608a436d265018374592291f284c536f73c933b29a91e10a", null]
          ],
          "censuses": [
            {
@@ -29,20 +29,10 @@ function createSquareChart(width, data) {
        }*/
 
     // Create a combined array of node IDs and their ENRs during each census.
-    let nodesAndEnrStatuses = zipNodesAndCensusData(data.node_ids, data.censuses, data.enrs);
+    let nodesAndEnrStatuses = zipNodesAndCensusData(data.node_ids_with_nicknames, data.censuses, data.enrs);
 
     // Sort the combined array based on latestClientString and secondarily nodeId
-    nodesAndEnrStatuses.sort((a, b) => {
-        // Place empty at the end instead of front
-        if (a.latestClientString === null && b.latestClientString !== null) return 1;
-        if (a.latestClientString !== null && b.latestClientString === null) return -1;
-        const clientComparison = (a.latestClientString || "").localeCompare(b.latestClientString || "");
-        if (clientComparison !== 0) {
-            return clientComparison;
-        }
-        // If latestClientString is equal, then compare by nodeId
-        return a.nodeId.localeCompare(b.nodeId);
-    });
+    nodesAndEnrStatuses.sort((a, b) => sortNodes(a, b));
 
     console.log(`Number of nodes: ${nodesAndEnrStatuses.length}`);
 
@@ -245,6 +235,12 @@ function createSquareChart(width, data) {
                     .attr("y", yPos + 30)
                     .attr("text-anchor", "start")
                     .text(nodesAndEnrStatuses[index].latestClientString);
+                group.append("text")
+                    .attr("class", "client-string-label")
+                    .attr("x", -200)
+                    .attr("y", yPos + -20)
+                    .attr("text-anchor", "start")
+                    .text(nodesAndEnrStatuses[index].nodeNickName);
             }
 
         });
@@ -273,9 +269,8 @@ function createSquareChart(width, data) {
 
 
 // Combines decoupled node and census response from API
-function zipNodesAndCensusData(nodes, censuses, records) {
-    return nodes.map((nodeId, index) => {
-
+function zipNodesAndCensusData(nodeIdsWithNickNames, censuses, records) {
+    return nodeIdsWithNickNames.map(([nodeId, nickname], index) => {
         // Map enr_ids to their corresponding recordString
         const statuses = censuses.map(census => {
             const enrId = census.enr_statuses[index];
@@ -313,6 +308,7 @@ function zipNodesAndCensusData(nodes, censuses, records) {
 
         return {
             nodeId: nodeId,
+            nodeNickName: nickname,
             latestClientString: clientName,
             statuses: statuses
         };
@@ -392,4 +388,46 @@ async function censusTimeSeriesChart(daysAgo) {
     } else {
         console.log('No data available to plot the census chart');
     }
+}
+
+// Sorts by latestClientString and secondarily by nodeId
+// Also sorts by nickname, such that nicknamed nodes (aka trin testnet nodes) 
+// come first amongst trin nodes, after fluffy nodes.
+function sortNodes(a, b) {
+    // Place empty at the end instead of front
+    if (a.latestClientString === null && b.latestClientString !== null) return 1;
+    if (a.latestClientString !== null && b.latestClientString === null) return -1;
+
+    // Check if latestClientString starts with "f"
+    const aStartsWithF = a.latestClientString && a.latestClientString.startsWith("f");
+    const bStartsWithF = b.latestClientString && b.latestClientString.startsWith("f");
+
+    // If both start with "f" or both don't start with "f", compare nodeNickName
+    if (aStartsWithF === bStartsWithF) {
+        // If both have nodeNickName, sort by nodeNickName
+        if (a.nodeNickName && b.nodeNickName) {
+
+            // Extract the prefix and number from the nodeNickName
+            const [aPrefixA, aNumberA] = a.nodeNickName.split(/-(\d+)$/);
+            const [bPrefixB, bNumberB] = b.nodeNickName.split(/-(\d+)$/);
+
+            // If the prefixes are the same, sort by the number
+            if (aPrefixA === bPrefixB) {
+                return Number(aNumberA) - Number(bNumberB);
+            }
+
+            // If the prefixes are different, sort by the nodeNickName
+            return a.nodeNickName.localeCompare(b.nodeNickName);
+        }
+        // If only one has nodeNickName, prioritize it
+        if (a.nodeNickName) return -1;
+        if (b.nodeNickName) return 1;
+    }
+
+    // If one starts with "f" and the other doesn't, prioritize the one starting with "f"
+    if (aStartsWithF && !bStartsWithF) return -1;
+    if (!aStartsWithF && bStartsWithF) return 1;
+
+    // If latestClientString is equal, then compare by nodeId
+    return a.nodeId.localeCompare(b.nodeId);
 }
