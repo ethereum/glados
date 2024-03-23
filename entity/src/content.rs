@@ -67,6 +67,7 @@ pub async fn get_or_create<T: OverlayContentKey>(
 ) -> Result<Model> {
     // First try to lookup an existing entry.
     if let Some(content_key_model) = Entity::find()
+        .filter(Column::ProtocolId.eq(SubProtocol::History))
         .filter(Column::ContentKey.eq(content_key.to_bytes()))
         .one(conn)
         .await?
