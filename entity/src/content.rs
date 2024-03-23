@@ -92,6 +92,7 @@ pub async fn get<T: OverlayContentKey>(
     conn: &DatabaseConnection,
 ) -> Result<Option<Model>> {
     Ok(Entity::find()
+        .filter(Column::ProtocolId.eq(SubProtocol::History))
         .filter(Column::ContentKey.eq(content_key.to_bytes()))
         .one(conn)
         .await?)
