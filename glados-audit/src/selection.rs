@@ -3,10 +3,11 @@ use std::collections::HashSet;
 use chrono::{DateTime, TimeZone, Utc};
 use ethportal_api::HistoryContentKey;
 use glados_core::db::store_block_keys;
+use migration::{Alias, Expr, Query};
 use rand::{thread_rng, Rng};
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect, RelationTrait,
+    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, FromQueryResult, JoinType,
+    QueryFilter, QueryOrder, QuerySelect, RelationTrait,
 };
 use tokio::{
     sync::mpsc,
@@ -15,7 +16,7 @@ use tokio::{
 use tracing::{debug, error, warn};
 
 use entity::{
-    content::{self, Model},
+    content,
     content_audit::{self, SelectionStrategy},
     execution_metadata,
 };
@@ -214,6 +215,7 @@ async fn add_to_queue(
 /// 3. Looking up each one separately, then sending them all in the channel.
 ///
 /// At regular intervals the channel capacity is assessed and new tasks are added to reach capacity.
+
 async fn select_random_content_for_audit(
     tx: mpsc::Sender<AuditTask>,
     conn: DatabaseConnection,
@@ -224,15 +226,28 @@ async fn select_random_content_for_audit(
     loop {
         interval.tick().await;
 
-        let num_keys = match content::Entity::find().count(&conn).await {
-            // Skip if no keys yet.
-            Ok(0) => continue,
-            Ok(count) => count as u32,
+        let max_content_id = match MaxContentId::find_by_statement(
+            conn.get_database_backend().build(
+                &Query::select()
+                    .from(content::Entity)
+                    .expr_as(Expr::max(Expr::col(content::Column::Id)), Alias::new("id"))
+                    .take(),
+            ),
+        )
+        .one(&conn)
+        .await
+        {
+            Ok(Some(value)) => value.id,
+            Ok(None) => {
+                error!("Could not find max content id");
+                continue;
+            }
             Err(err) => {
                 error!(audit.strategy="random", err=?err, "Could not make audit query");
                 continue;
             }
         };
+
         let keys_required = tx.capacity();
         if keys_required == 0 {
             continue;
@@ -242,23 +257,20 @@ async fn select_random_content_for_audit(
             // Thread safe block for the rng, which is not `Send`.
             let mut rng = thread_rng();
             for _ in 0..keys_required {
-                random_ids.insert(rng.gen_range(0..num_keys));
+                random_ids.insert(rng.gen_range(0..max_content_id as u32));
             }
         }
-        let mut content_key_db_entries: Vec<Model> = vec![];
-        for random_id in random_ids {
-            match content::Entity::find()
-                .filter(content::Column::Id.eq(random_id))
-                .all(&conn)
-                .await
-            {
-                Ok(found) => content_key_db_entries.extend(found),
-                Err(err) => {
-                    error!(audit.strategy="random", err=?err, "Could not make audit query");
-                    continue;
-                }
-            };
-        }
+        let content_key_db_entries = match content::Entity::find()
+            .filter(content::Column::Id.is_in(random_ids))
+            .all(&conn)
+            .await
+        {
+            Ok(found) => found,
+            Err(err) => {
+                error!(audit.strategy="random", err=?err, "Could not make audit query");
+                continue;
+            }
+        };
         let item_count = content_key_db_entries.len();
         debug!(
             strategy = "random",
@@ -271,6 +283,11 @@ async fn select_random_content_for_audit(
         )
         .await;
     }
+}
+/// Used by random strategy to get the maximum content id.
+#[derive(FromQueryResult, Debug, Clone, Copy)]
+pub struct MaxContentId {
+    pub id: i32,
 }
 
 /// Finds and sends audit tasks for [SelectionStrategy::SelectOldestUnaudited].
