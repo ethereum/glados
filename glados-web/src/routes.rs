@@ -1068,9 +1068,14 @@ pub async fn is_content_in_deadzone(
 }
 
 pub async fn get_audit_stats_handler(
+    http_args: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<Vec<audit_stats::Model>>, StatusCode> {
-    let stats = audit_stats::get_recent_stats(&state.database_connection)
+    let weeks_ago: i32 = match http_args.get("weeks-ago") {
+        None => 0,
+        Some(days_ago) => days_ago.parse::<i32>().unwrap_or(0),
+    };
+    let stats = audit_stats::get_recent_stats(&state.database_connection, weeks_ago)
         .await
         .map_err(|e| {
             error!(err=?e, "Could not look up audit stat history");

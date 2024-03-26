@@ -83,12 +83,20 @@ pub async fn create(
 }
 
 /// Get the most recent audit stat series of the last 7 days.
-pub async fn get_recent_stats(conn: &DatabaseConnection) -> Result<Vec<Model>, DbErr> {
+pub async fn get_recent_stats(
+    conn: &DatabaseConnection,
+    weeks_ago: i32,
+) -> Result<Vec<Model>, DbErr> {
+    let beginning_days_ago =
+        TimeDelta::try_days(7 * (weeks_ago + 1) as i64).expect("Couldn't calculate days ago.");
     let seven_days = TimeDelta::try_days(7).expect("Couldn't calculate 7 day delta.");
-    let one_week_ago = Utc::now() - seven_days;
+
+    let beginning = Utc::now() - beginning_days_ago;
+    let end = beginning + seven_days;
 
     Entity::find()
-        .filter(Column::Timestamp.gt(one_week_ago))
+        .filter(Column::Timestamp.gt(beginning))
+        .filter(Column::Timestamp.lt(end))
         .order_by_asc(Column::Timestamp)
         .all(conn)
         .await
