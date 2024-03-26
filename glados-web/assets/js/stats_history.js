@@ -1,3 +1,5 @@
+let weeksAgo = 0;
+
 function createMultiLineChart(height, width, dataSets) {
     // Declare the chart dimensions and margins.
     const marginTop = 20;
@@ -180,6 +182,42 @@ function createMultiLineChart(height, width, dataSets) {
         .attr("font-size", "12px")
         .style("background", "white");
 
+    // Add buttons to the bottom of the legend
+    const buttons = svg.append("g")
+        .attr("transform", `translate(${width - marginRight + 20}, ${dataSets.length * 20 + 30})`);
+
+    // Add the previous button ("<")
+    buttons.append("text")
+        .attr("class", "previous-button")
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("font-size", "12px")
+        .attr("text-anchor", "start")
+        .text("< Previous")
+        .style("cursor", "pointer")
+        .on("click", () => {
+            weeksAgo++;
+            updateChart(weeksAgo);
+        });
+
+    if (weeksAgo !== 0) {
+        // Add the next button (">")
+        buttons.append("text")
+            .attr("class", "next-button")
+            .attr("x", 15)
+            .attr("y", 20)
+            .attr("font-size", "12px")
+            .attr("text-anchor", "start")
+            .text("Next >")
+            .style("cursor", "pointer")
+            .on("click", () => {
+                if (weeksAgo > 0) {
+                    weeksAgo--;
+                    updateChart(weeksAgo);
+                }
+            });
+    }
+
     return svg.node();
 }
 
@@ -212,11 +250,10 @@ function convertDataForChart(data) {
     );
 }
 
-// Fetch the stats records from the API.
-function getStatsRecords() {
-    const baseUrl = "api/stat-history/";
+function getStatsRecords(weeksAgo) {
+    const baseUrl = `api/stat-history/?weeks-ago=${weeksAgo}`;
 
-    return fetch(`${baseUrl}`)
+    return fetch(baseUrl)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Network response was not ok');
@@ -228,20 +265,24 @@ function getStatsRecords() {
         });
 }
 
-// Create the stats history chart using data from the API and add it to the DOM.
-async function statsHistoryChart() {
-    try {
-        const data = await getStatsRecords();
-        console.log(data);
+async function updateChart(weeksAgo) {
+    const data = await getStatsRecords(weeksAgo);
+    console.log(data);
 
-        let dataSets = convertDataForChart(data);
-        console.log(dataSets)
-        if (dataSets && dataSets.length > 0) {
-            document.getElementById('stats-history-graph').appendChild(createMultiLineChart(400, 670, dataSets));
-        } else {
-            console.log('No data available to plot the stats chart');
-        }
-    } catch (error) {
-        console.error('There was an error processing your request:', error.message);
+    let dataSets = convertDataForChart(data);
+    console.log(dataSets);
+
+    // Clear the existing chart
+    d3.select("#stats-history-graph").html("");
+
+    // Create a new chart with the updated data
+    if (dataSets && dataSets.length > 0) {
+        document.getElementById('stats-history-graph').appendChild(createMultiLineChart(400, 670, dataSets, weeksAgo));
+    } else {
+        console.log('No data available to plot the stats chart');
     }
+}
+
+async function statsHistoryChart() {
+    updateChart(weeksAgo);
 }
