@@ -6,8 +6,8 @@ use glados_core::db::store_block_keys;
 use migration::{Alias, Expr, Query};
 use rand::{thread_rng, Rng};
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, FromQueryResult, JoinType,
-    QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+    ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult,
+    QueryFilter, QueryOrder, QuerySelect, Statement, Value,
 };
 use tokio::{
     sync::mpsc,
@@ -18,7 +18,6 @@ use tracing::{debug, error, warn};
 use entity::{
     content,
     content_audit::{self, SelectionStrategy},
-    execution_metadata,
 };
 use web3::types::{BlockId, BlockNumber};
 
@@ -72,31 +71,45 @@ async fn select_latest_content_for_audit(
             error!("Channel is closed.");
             panic!();
         }
-        let keys_required = tx.capacity();
+        let keys_required = tx.capacity() as i32;
         if keys_required == 0 {
             continue;
         };
-        let content_key_db_entries = match content::Entity::find()
-            .left_join(entity::content_audit::Entity)
-            .filter(content_audit::Column::CreatedAt.is_null())
-            .filter(content::Column::FirstAvailableAt.lt(Utc::now()
-                - chrono::TimeDelta::try_seconds(10).expect("Couldn't calculate 10 seconds")))
-            .join(
-                JoinType::InnerJoin,
-                entity::content::Relation::ExecutionMetadata.def(),
-            )
-            .filter(execution_metadata::Column::BlockNumber.gt(MERGE_BLOCK_HEIGHT))
-            .order_by_desc(content::Column::FirstAvailableAt)
-            .limit(keys_required as u64)
+
+        let content_key_db_entries: Vec<content::Model> =
+            match content::Model::find_by_statement(Statement::from_sql_and_values(
+                DbBackend::Postgres,
+                "SELECT *
+                    FROM content
+                    WHERE content.first_available_at > NOW() - INTERVAL '24 hours'
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM content_audit
+                        WHERE content_audit.content_key = content.id
+                    )
+                    AND content.first_available_at < NOW() - INTERVAL '10 seconds'
+                    AND EXISTS (
+                        SELECT 1
+                        FROM execution_metadata
+                        WHERE execution_metadata.content = content.id
+                        AND execution_metadata.block_number > $1
+                    )
+                    ORDER BY content.first_available_at DESC
+                    LIMIT $2;",
+                vec![
+                    Value::Int(Some(MERGE_BLOCK_HEIGHT)),
+                    Value::Int(Some(keys_required)),
+                ],
+            ))
             .all(&conn)
             .await
-        {
-            Ok(content_key_db_entries) => content_key_db_entries,
-            Err(err) => {
-                error!(audit.strategy="latest", err=?err, "Could not make audit query");
-                continue;
-            }
-        };
+            {
+                Ok(content_key_db_entries) => content_key_db_entries,
+                Err(err) => {
+                    error!(audit.strategy="latest", err=?err, "Could not make audit query");
+                    continue;
+                }
+            };
         let item_count = content_key_db_entries.len();
         debug!(
             strategy = "latest",
@@ -371,6 +384,7 @@ mod tests {
 
     use chrono::Utc;
     use enr::NodeId;
+    use entity::execution_metadata;
     use entity::{
         client_info,
         content::{self, SubProtocol},
@@ -507,11 +521,13 @@ mod tests {
         // Await strategy results
         while let Some(task) = rx.recv().await {
             let key_model = content::Entity::find()
+                .filter(content::Column::ProtocolId.eq(SubProtocol::History))
                 .filter(content::Column::ContentKey.eq(task.content_key.to_bytes()))
                 .one(&conn)
                 .await
                 .unwrap()
                 .unwrap();
+
             // Check that strategy only yields expected keys.
             assert!(expected_key_ids.contains(&key_model.id));
             checked_ids.insert(key_model.id);
