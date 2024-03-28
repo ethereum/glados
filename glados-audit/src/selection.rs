@@ -387,12 +387,15 @@ mod tests {
 
     use super::*;
 
+    use pgtemp::PgTempDB;
+
     /// Creates a new in-memory SQLite database for a unit test.
     #[allow(dead_code)]
-    async fn setup_database() -> Result<DbConn, DbErr> {
-        let conn: DbConn = Database::connect("sqlite::memory:").await?;
+    async fn setup_database() -> Result<(DbConn, PgTempDB), DbErr> {
+        let pgtemp = PgTempDB::async_new().await;
+        let conn: DbConn = Database::connect(&pgtemp.connection_uri()).await?;
         Migrator::up(&conn, None).await.unwrap();
-        Ok(conn)
+        Ok((conn, pgtemp))
     }
 
     /// Creates a database and fills it with entries for testing with
@@ -416,8 +419,8 @@ mod tests {
     /// - [0, 2, 2, ..., 2]
     /// - ...
     /// - [0, 45, 45, ..., 45]
-    async fn get_populated_test_audit_db() -> Result<DbConn, DbErr> {
-        let conn = setup_database().await?;
+    async fn get_populated_test_audit_db() -> Result<(DbConn, PgTempDB), DbErr> {
+        let (conn, temp_db) = setup_database().await?;
         for num in 1..=45 {
             let block_hash = [num; 32];
             let content_key =
@@ -485,7 +488,7 @@ mod tests {
             .await?
             .unwrap();
         assert_eq!(item_index_18_audit.result, AuditResult::Success);
-        Ok(conn)
+        Ok((conn, temp_db))
     }
 
     /// Tests that the `SelectionStrategy::Latest` selects the correct values
@@ -493,7 +496,7 @@ mod tests {
     #[tokio::test]
     async fn test_latest_strategy() {
         // Orchestration
-        let conn = get_populated_test_audit_db().await.unwrap();
+        let (conn, _) = get_populated_test_audit_db().await.unwrap();
         const CHANNEL_SIZE: usize = 20;
         let (tx, mut rx) = channel::<AuditTask>(CHANNEL_SIZE);
         // Start strategy
@@ -532,7 +535,7 @@ mod tests {
     #[tokio::test]
     async fn test_select_oldest_unaudited_strategy() {
         // Orchestration
-        let conn = get_populated_test_audit_db().await.unwrap();
+        let (conn, _) = get_populated_test_audit_db().await.unwrap();
         const CHANNEL_SIZE: usize = 10;
         let (tx, mut rx) = channel::<AuditTask>(CHANNEL_SIZE);
         // Start strategy
@@ -567,7 +570,7 @@ mod tests {
     #[tokio::test]
     async fn test_random_strategy() {
         // Orchestration
-        let conn = get_populated_test_audit_db().await.unwrap();
+        let (conn, _) = get_populated_test_audit_db().await.unwrap();
         const CHANNEL_SIZE: usize = 10;
         let (tx, mut rx) = channel::<AuditTask>(CHANNEL_SIZE);
         // Start strategy
