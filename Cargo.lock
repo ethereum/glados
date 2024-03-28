@@ -2277,6 +2277,7 @@ dependencies = [
  "ethportal-api",
  "glados-core",
  "migration",
+ "pgtemp",
  "rand",
  "sea-orm",
  "serde_json",
@@ -3699,6 +3700,18 @@ dependencies = [
  "memchr",
  "thiserror",
  "ucd-trie",
+]
+
+[[package]]
+name = "pgtemp"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11fbb73566e38f90abdd281c5e6c0b99152a0c41d409fb35c985ffe02a3f39bc"
+dependencies = [
+ "libc",
+ "tempfile",
+ "tokio",
+ "url",
 ]
 
 [[package]]

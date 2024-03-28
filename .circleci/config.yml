@@ -85,6 +85,9 @@ jobs:
                 name: Install libssl-dev for openssl-sys
                 command: sudo apt install -y libssl-dev clang
             - run:
+                name: Install postgres for testing
+                command: sudo apt install -y postgresql postgresql-client
+            - run:
                 name: Install rustfmt
                 command: rustup component add rustfmt
             - run:
@@ -101,7 +104,7 @@ jobs:
                 command: cargo build --workspace
             - run:
                 name: Test Glados workspace
-                command: cargo test --workspace -- --nocapture
+                command: export POSTGRES_PATH=$(find /usr/lib/postgresql/ -type d -name "bin") && PATH=$PATH:$POSTGRES_PATH cargo test --workspace -- --nocapture
 workflows:
   merge-test:
     jobs:
