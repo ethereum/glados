@@ -113,10 +113,7 @@ async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusC
             census_node::Entity,
             census_node::Column::DataRadius,
         )))
-        .expr(Expr::col((
-            record::Entity,
-            record::Column::Raw,
-        )))
+        .expr(Expr::col((record::Entity, record::Column::Raw)))
         .expr(Expr::col((node::Entity, node::Column::NodeId)))
         .from(census_node::Entity)
         .from(node::Entity)
@@ -124,7 +121,10 @@ async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusC
         .from_subquery(
             Query::select()
                 .from(census::Entity)
-                .expr_as(Expr::col(census::Column::StartedAt), Alias::new("started_at"))
+                .expr_as(
+                    Expr::col(census::Column::StartedAt),
+                    Alias::new("started_at"),
+                )
                 .expr_as(Expr::col(census::Column::Duration), Alias::new("duration"))
                 .order_by(census::Column::StartedAt, Order::Desc)
                 .limit(1)
@@ -132,16 +132,15 @@ async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusC
             Alias::new("latest_census"),
         )
         .and_where(
-            Expr::col((census_node::Entity, census_node::Column::SurveyedAt))
-                .gte(Expr::col((Alias::new("latest_census"), Alias::new("started_at")))),
+            Expr::col((census_node::Entity, census_node::Column::SurveyedAt)).gte(Expr::col((
+                Alias::new("latest_census"),
+                Alias::new("started_at"),
+            ))),
         )
         .and_where(
-            Expr::col((census_node::Entity, census_node::Column::SurveyedAt))
-                .lt(Expr::cust(if builder == DbBackend::Sqlite {
-                    "STRFTIME('%Y-%m-%dT%H:%M:%S.%f', DATETIME(latest_census.started_at, '+' || latest_census.duration || ' seconds'))"
-                } else {
-                    "latest_census.started_at + latest_census.duration * interval '1 second'"
-                })),
+            Expr::col((census_node::Entity, census_node::Column::SurveyedAt)).lt(Expr::cust(
+                "latest_census.started_at + latest_census.duration * interval '1 second'",
+            )),
         )
         .and_where(
             Expr::col((census_node::Entity, census_node::Column::RecordId))

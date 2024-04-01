@@ -389,7 +389,7 @@ mod tests {
 
     use pgtemp::PgTempDB;
 
-    /// Creates a new in-memory SQLite database for a unit test.
+    /// Creates a temporary Postgres database that will be deleted once the PgTempDB goes out of scope.
     #[allow(dead_code)]
     async fn setup_database() -> Result<(DbConn, PgTempDB), DbErr> {
         let pgtemp = PgTempDB::async_new().await;
@@ -496,7 +496,7 @@ mod tests {
     #[tokio::test]
     async fn test_latest_strategy() {
         // Orchestration
-        let (conn, _) = get_populated_test_audit_db().await.unwrap();
+        let (conn, _db) = get_populated_test_audit_db().await.unwrap();
         const CHANNEL_SIZE: usize = 20;
         let (tx, mut rx) = channel::<AuditTask>(CHANNEL_SIZE);
         // Start strategy
@@ -535,7 +535,7 @@ mod tests {
     #[tokio::test]
     async fn test_select_oldest_unaudited_strategy() {
         // Orchestration
-        let (conn, _) = get_populated_test_audit_db().await.unwrap();
+        let (conn, _db) = get_populated_test_audit_db().await.unwrap();
         const CHANNEL_SIZE: usize = 10;
         let (tx, mut rx) = channel::<AuditTask>(CHANNEL_SIZE);
         // Start strategy
@@ -570,7 +570,7 @@ mod tests {
     #[tokio::test]
     async fn test_random_strategy() {
         // Orchestration
-        let (conn, _) = get_populated_test_audit_db().await.unwrap();
+        let (conn, _db) = get_populated_test_audit_db().await.unwrap();
         const CHANNEL_SIZE: usize = 10;
         let (tx, mut rx) = channel::<AuditTask>(CHANNEL_SIZE);
         // Start strategy

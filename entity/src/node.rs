@@ -7,8 +7,7 @@ use ethereum_types::U256;
 use ethportal_api::utils::bytes::hex_encode;
 
 use sea_orm::{
-    entity::prelude::*, ActiveValue::NotSet, DatabaseBackend, FromQueryResult, QueryOrder,
-    QuerySelect, Set,
+    entity::prelude::*, ActiveValue::NotSet, FromQueryResult, QueryOrder, QuerySelect, Set,
 };
 use sea_query::Expr;
 
@@ -97,17 +96,10 @@ pub async fn closest_xor(
     let raw_node_id = U256::from_big_endian(&node_id.raw());
     let node_id_high: i64 = (raw_node_id >> 193).as_u64().try_into().unwrap();
 
-    let distance_expression = match conn.get_database_backend() {
-        DatabaseBackend::Sqlite => Expr::cust_with_values(
-            "(\"node\".\"node_id_high\" | ?1) - (\"node\".\"node_id_high\" & ?2)",
-            [node_id_high, node_id_high],
-        ),
-        DatabaseBackend::Postgres => Expr::cust_with_values(
-            "(\"node\".\"node_id_high\" | $1) - (\"node\".\"node_id_high\" & $2)",
-            [node_id_high, node_id_high],
-        ),
-        DatabaseBackend::MySql => panic!("Unsupported"),
-    };
+    let distance_expression = Expr::cust_with_values(
+        "(\"node\".\"node_id_high\" | $1) - (\"node\".\"node_id_high\" & $2)",
+        [node_id_high, node_id_high],
+    );
 
     let nodes = Entity::find()
         .column_as(distance_expression, "distance")

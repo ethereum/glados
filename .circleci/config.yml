@@ -104,7 +104,8 @@ jobs:
                 command: cargo build --workspace
             - run:
                 name: Test Glados workspace
-                command: export POSTGRES_PATH=$(find /usr/lib/postgresql/ -type d -name "bin") && PATH=$PATH:$POSTGRES_PATH cargo test --workspace -- --nocapture
+                # Add postgresql bin to the PATH and then run the tests.
+                command: PATH=$PATH:$(find /usr/lib/postgresql/ -type d -name "bin") cargo test --workspace -- --nocapture
 workflows:
   merge-test:
     jobs:

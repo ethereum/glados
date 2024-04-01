@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
         "database connection established"
     );
 
-    if cli.migrate || cli.database_url == "sqlite::memory:" {
+    if cli.migrate {
         info!("running database migrations");
         Migrator::up(&conn, None)
             .await

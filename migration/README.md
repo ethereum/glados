@@ -5,21 +5,21 @@ Install
 ```command
 cargo install sea-orm-cli
 ```
-Create (if none already created) a new blank database file:
-```command
-touch /path/to/my-database.sqlite
+Create (if none already created) a new blank postgres instance:
+`docker run --name postgres -e POSTGRES_DB=glados POSTGRES_PASSWORD=password -d -p 5432:5432 postgres`
+`export DATABASE_URL=postgres://postgres:password@localhost:5432/glados`
 ```
 Generate all entities. Commands are made from the project root directory.
 ```command
-DATABASE_URL=sqlite:////path/to/my-database.sqlite sea-orm-cli generate entity -o entity/src
+sea-orm-cli generate entity -o entity/src
 ```
 Generate entity only for `MyNewTable` as defined in a migration (`./migration/src/*.rs`) file:
 ```command
-DATABASE_URL=sqlite:////path/to/my-database.sqlite sea-orm-cli generate entity -o entity/src -t my_new_table
+sea-orm-cli generate entity -o entity/src -t my_new_table
 ```
 Make the tables/changes in the new database:
 ```command
-DATABASE_URL=sqlite:////path/to/my-database.sqlite sea-orm-cli migrate up
+sea-orm-cli migrate up
 ```
 ## Running Migrator CLI
 

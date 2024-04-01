@@ -2,8 +2,6 @@ use clap::{Parser, ValueEnum};
 use std::path::PathBuf;
 use url::Url;
 
-const DEFAULT_DB_URL: &str = "sqlite::memory:";
-
 // 15 minutes
 const DEFAULT_CENSUS_INTERVAL: &str = "900";
 
@@ -13,7 +11,7 @@ const DEFAULT_CONCURRENCY: &str = "4";
 #[derive(Clone, Debug, Eq, Parser, PartialEq)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    #[arg(short, long, default_value = DEFAULT_DB_URL)]
+    #[arg(short, long)]
     pub database_url: String,
     #[arg(short = 'p', long, requires = "transport")]
     pub ipc_path: Option<PathBuf>,
