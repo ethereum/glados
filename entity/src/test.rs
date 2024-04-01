@@ -20,23 +20,21 @@ use migration::{Migrator, MigratorTrait};
 use crate::content::SubProtocol;
 use crate::content_audit::SelectionStrategy;
 use crate::{client_info, content, content_audit, node, record};
+use pgtemp::PgTempDB;
 
 #[allow(dead_code)]
-async fn setup_database() -> Result<DbConn, DbErr> {
-    let base_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite::memory:".to_owned());
-
-    let conn: DbConn = Database::connect(&base_url).await?;
-
+// Temporary Postgres db will be deleted once PgTempDB goes out of scope, so keep it in scope.
+async fn setup_database() -> Result<(DbConn, PgTempDB), DbErr> {
+    let db: PgTempDB = PgTempDB::async_new().await;
+    let conn: DbConn = Database::connect(db.connection_uri()).await?;
     Migrator::up(&conn, None).await.unwrap();
 
-    println!("Setup database schema");
-
-    Ok(conn)
+    Ok((conn, db))
 }
 
 #[tokio::test]
 async fn test_node_crud() -> Result<(), DbErr> {
-    let conn = setup_database().await?;
+    let (conn, _db) = setup_database().await?;
 
     let node_id_a: Vec<u8> = vec![
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
@@ -89,8 +87,6 @@ async fn test_node_crud() -> Result<(), DbErr> {
 
 #[tokio::test]
 async fn crud_record() -> Result<(), DbErr> {
-    let _conn = setup_database().await?;
-
     use enr::{k256, Enr};
     use rand::thread_rng;
     use std::net::Ipv4Addr;
@@ -125,7 +121,7 @@ fn sample_history_key() -> HistoryContentKey {
 /// Tests that the database helper method id_as_hash() works.
 #[tokio::test]
 async fn test_content_id_as_hash() -> Result<(), DbErr> {
-    let conn = setup_database().await?;
+    let (conn, _db) = setup_database().await?;
     let key = sample_history_key();
     let content_id_hash = H256::from_slice(&key.content_id());
     let content_model = content::get_or_create(&key, Utc::now(), &conn)
@@ -138,7 +134,7 @@ async fn test_content_id_as_hash() -> Result<(), DbErr> {
 /// Tests that the database helper method id_as_hex() works.
 #[tokio::test]
 async fn test_content_id_as_hex() -> Result<(), DbErr> {
-    let conn = setup_database().await?;
+    let (conn, _db) = setup_database().await?;
     let key = sample_history_key();
     let content_id_hash = H256::from_slice(&key.content_id());
     let content_id_hex = hex_encode(content_id_hash);
@@ -152,7 +148,7 @@ async fn test_content_id_as_hex() -> Result<(), DbErr> {
 /// Tests that the database helper method key_as_hex() works.
 #[tokio::test]
 async fn test_content_key_as_hex() -> Result<(), DbErr> {
-    let conn = setup_database().await?;
+    let (conn, _db) = setup_database().await?;
     let key = sample_history_key();
     let content_model = content::get_or_create(&key, Utc::now(), &conn)
         .await
@@ -168,7 +164,7 @@ async fn test_content_key_as_hex() -> Result<(), DbErr> {
 /// presence or absence of a key in the database.
 #[tokio::test]
 async fn test_content_get_or_create() -> Result<(), DbErr> {
-    let conn = setup_database().await?;
+    let (conn, _db) = setup_database().await?;
     let key = sample_history_key();
 
     // Ensure our database is empty
@@ -197,7 +193,7 @@ async fn test_content_get_or_create() -> Result<(), DbErr> {
 
 #[tokio::test]
 async fn test_audit_crud() -> Result<(), DbErr> {
-    let conn = setup_database().await?;
+    let (conn, _db) = setup_database().await?;
     let key = sample_history_key();
 
     let content_key_active_model = content::ActiveModel {
@@ -265,7 +261,7 @@ async fn test_audit_crud() -> Result<(), DbErr> {
 /// No two keys should have the same protocol_id, content_key and content_id combination.
 #[tokio::test]
 async fn test_content_table_unique_constraints() {
-    let conn = setup_database().await.unwrap();
+    let (conn, _db) = setup_database().await.unwrap();
     let id_a = vec![1; 32];
     let id_b = vec![2; 32];
     let key_a = vec![3; 32];
@@ -289,7 +285,7 @@ async fn test_content_table_unique_constraints() {
         .await
         .unwrap_err()
         .to_string()
-        .contains("UNIQUE constraint failed"));
+        .contains("violates unique constraint"));
 
     assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 1);
 
@@ -310,7 +306,7 @@ async fn test_content_table_unique_constraints() {
         .await
         .unwrap_err()
         .to_string()
-        .contains("UNIQUE constraint failed"));
+        .contains("violates unique constraint"));
     assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
 
     // DB=2. Add same content_key, different content_id, same protocol (rejects). DB=2.
@@ -327,7 +323,7 @@ async fn test_content_table_unique_constraints() {
         .await
         .unwrap_err()
         .to_string()
-        .contains("UNIQUE constraint failed"));
+        .contains("violates unique constraint"));
     assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
 
     // DB=2. Repeat addition (rejects). DB=2.
@@ -336,7 +332,7 @@ async fn test_content_table_unique_constraints() {
         .await
         .unwrap_err()
         .to_string()
-        .contains("UNIQUE constraint failed"));
+        .contains("violates unique constraint"));
     assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
 
     // DB=2. Add different content_key, same content_id, same protocol (rejects). DB=2.
@@ -352,17 +348,15 @@ async fn test_content_table_unique_constraints() {
         .await
         .unwrap_err()
         .to_string()
-        .contains("UNIQUE constraint failed"));
+        .contains("violates unique constraint"));
     assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
 }
 
-// This test fails on sqlite which is expected.  The test is still useful as the query can be
-// modified to work on sqlite for debugging purposes.
 #[tokio::test]
 async fn test_query_closest() {
     use env_logger;
     env_logger::init();
-    let conn = setup_database().await.unwrap();
+    let (conn, _db) = setup_database().await.unwrap();
 
     let node_id_a = NodeId::random();
     let node_id_b = NodeId::random();

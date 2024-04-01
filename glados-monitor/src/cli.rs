@@ -6,7 +6,7 @@ use clap::{Parser, Subcommand};
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
     // Connection to a database where content keys will be injected
-    #[arg(short, long, default_value = "sqlite::memory:")]
+    #[arg(short, long)]
     pub database_url: String,
 
     #[arg(short, long, default_value = "false")]

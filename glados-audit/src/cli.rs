@@ -1,13 +1,12 @@
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use entity::content_audit::SelectionStrategy;
 
-const DEFAULT_DB_URL: &str = "sqlite::memory:";
 const DEFAULT_STATS_PERIOD: &str = "300";
 
 #[derive(Parser, Debug, Eq, PartialEq)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    #[arg(short, long, default_value = DEFAULT_DB_URL)]
+    #[arg(short, long)]
     pub database_url: String,
     #[arg(
         short,
@@ -75,7 +74,7 @@ pub enum Command {
 impl Default for Args {
     fn default() -> Self {
         Self {
-            database_url: DEFAULT_DB_URL.to_string(),
+            database_url: "".to_string(),
             provider_url: "".to_string(),
             concurrency: 4,
             latest_strategy_weight: 1,
@@ -95,13 +94,21 @@ impl Default for Args {
 mod test {
     use super::*;
 
+    const DATABASE_URL: &str = "postgres://localhost:5432";
+
     /// Tests that the defaults are correct when the minimum required flags are passed.
     #[test]
     fn test_minimum_args() {
         const PORTAL_CLIENT_STRING: &str = "ipc:////path/to/ipc";
-        let result = Args::parse_from(["test", "--portal-client", PORTAL_CLIENT_STRING]);
+        let result = Args::parse_from([
+            "test",
+            "--portal-client",
+            PORTAL_CLIENT_STRING,
+            "--database-url",
+            DATABASE_URL,
+        ]);
         let expected = Args {
-            database_url: DEFAULT_DB_URL.to_string(),
+            database_url: DATABASE_URL.to_string(),
             portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
             ..Default::default()
         };
@@ -116,9 +123,11 @@ mod test {
             "3",
             "--portal-client",
             PORTAL_CLIENT_STRING,
+            "--database-url",
+            DATABASE_URL,
         ]);
         let expected = Args {
-            database_url: DEFAULT_DB_URL.to_string(),
+            database_url: DATABASE_URL.to_string(),
             concurrency: 3,
             strategy: None,
             portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
@@ -137,9 +146,11 @@ mod test {
             "latest",
             "--portal-client",
             PORTAL_CLIENT_STRING,
+            "--database-url",
+            DATABASE_URL,
         ]);
         let expected = Args {
-            database_url: DEFAULT_DB_URL.to_string(),
+            database_url: DATABASE_URL.to_string(),
             concurrency: 4,
             strategy: Some(vec![SelectionStrategy::Latest]),
             portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
@@ -163,9 +174,11 @@ mod test {
             "latest",
             "--strategy",
             "random", // Duplicate is permitted
+            "--database-url",
+            DATABASE_URL,
         ]);
         let expected = Args {
-            database_url: DEFAULT_DB_URL.to_string(),
+            database_url: DATABASE_URL.to_string(),
             concurrency: 4,
             strategy: Some(vec![
                 SelectionStrategy::Random,
@@ -189,8 +202,11 @@ mod test {
             PROVIDER_URL,
             "--portal-client",
             PORTAL_CLIENT_STRING,
+            "--database-url",
+            DATABASE_URL,
         ]);
         let expected = Args {
+            database_url: DATABASE_URL.to_string(),
             provider_url: PROVIDER_URL.to_string(),
             portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
             ..Default::default()
