@@ -88,16 +88,19 @@ function PieChart(data, {
 
 function pie_chart_count(client_diversity_data) {
     const char_array = [];
-
+    let blue = '#3498DB'
+    let purple = '#9B59B6'
+    let orange = '#E67E22'
+    let grey = '#808080'
     client_diversity_data.forEach(i => {
         if (i.client_name === "t" || i.client_name === "\\x74") {
-            char_array.push({ name: "Trin", value: i.client_count });
+            char_array.push({ name: "Trin", value: i.client_count, color: purple });
         } else if (i.client_name === "f" || i.client_name === "\\x66") {
-            char_array.push({ name: "Fluffy", value: i.client_count });
+            char_array.push({ name: "Fluffy", value: i.client_count, color: blue });
         } else if (i.client_name === "u" || i.client_name === "\\x75") {
-            char_array.push({ name: "Ultralight", value: i.client_count });
+            char_array.push({ name: "Ultralight", value: i.client_count, color: orange });
         } else {
-            char_array.push({ name: "Unknown", value: i.client_count });
+            char_array.push({ name: "Unknown", value: i.client_count, color: grey });
         }
     });
 
@@ -112,7 +115,7 @@ function pie_chart_count(client_diversity_data) {
     };
 
     const clients = new Set(char_array.map(d => d.name));
-    const colors = clients.size > 1 ? undefined : ["white"];
+    const colors = clients.size > 1 ? char_array.map(d => d.color) : ["white"];
 
     const chart = PieChart(char_array, {
         name: d => d.name,
