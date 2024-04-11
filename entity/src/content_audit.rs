@@ -178,7 +178,7 @@ impl Model {
     }
     /// A convenience method for displaying the strategy.
     ///
-    /// A few early databse entries do not have a recorded strategy.
+    /// A few early database entries do not have a recorded strategy.
     pub fn strategy_as_text(&self) -> String {
         match &self.strategy_used {
             Some(s) => s.as_text(),
