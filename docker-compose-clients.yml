@@ -7,4 +7,4 @@ services:
 
   fluffy:
     image: statusim/nimbus-fluffy:amd64-master-latest
-    command: "--rpc --rpc-address=0.0.0.0 --storage-capacity=0"
+    command: "--rpc --rpc-address=0.0.0.0 --storage-capacity=0 --disable-poke"
