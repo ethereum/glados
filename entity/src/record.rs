@@ -55,12 +55,19 @@ pub async fn get_or_create(enr: &Enr, conn: &DatabaseConnection) -> Result<Model
         return Ok(enr_model);
     }
 
+    // Wrap-around large sequence numbers
+    // TODO: migrate DB schema to use BigInt
+    let seq = match enr.seq().try_into() {
+        Ok(seq) => seq,
+        Err(_) => (enr.seq() % 4294967295).try_into().unwrap(),
+    };
+
     // If no record exists, create one and return it
     let enr_model_unsaved = ActiveModel {
         id: NotSet,
         node_id: Set(node_id.id),
         raw: Set(enr.to_base64()),
-        sequence_number: Set(enr.seq().try_into().unwrap()),
+        sequence_number: Set(seq),
     };
     let enr_model = enr_model_unsaved.insert(conn).await?;
 
