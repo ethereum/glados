@@ -1,5 +1,9 @@
+use std::vec;
+
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
-use entity::content_audit::SelectionStrategy;
+use entity::content_audit::{
+    BeaconSelectionStrategy, HistorySelectionStrategy, StateSelectionStrategy,
+};
 
 const DEFAULT_STATS_PERIOD: &str = "300";
 
@@ -15,10 +19,63 @@ pub struct Args {
         help = "web3 api provider url, eg https://mainnet.infura.io/v3/..."
     )]
     pub provider_url: String,
+
     #[arg(short, long, default_value = "4", help = "number of auditing threads")]
     pub concurrency: u8,
-    #[arg(short, long, action(ArgAction::Append), value_enum, default_value = None, help = "Specific strategy to use. Default is to use all available strategies. May be passed multiple times for multiple strategies (--strategy latest --strategy random). Duplicates are permitted (--strategy random --strategy random).")]
-    pub strategy: Option<Vec<SelectionStrategy>>,
+
+    #[arg(
+        long = "history",
+        default_missing_value("true"),
+        default_value("true"),
+        num_args(0..=1),
+        require_equals(true),
+        action = ArgAction::Set,
+        help = "Run audits for history subnetwork. Default is true."
+    )]
+    pub history: bool,
+
+    #[arg(
+        long,
+        action(ArgAction::Append),
+        value_enum,
+        default_value = None,
+        requires_if("false", "history"),
+        help = "Specific strategy to use. Default is to use all available strategies. May be passed multiple times for multiple strategies (--strategy latest --strategy random). Duplicates are permitted (--strategy random --strategy random)."
+    )]
+    pub history_strategy: Option<Vec<HistorySelectionStrategy>>,
+
+    #[arg(
+        long = "beacon",
+        help = "Run audits for beacon subnetwork. Default is false."
+    )]
+    pub beacon: bool,
+
+    #[arg(
+        long,
+        action(ArgAction::Append),
+        value_enum,
+        default_value = None,
+        requires = "beacon",
+        help = "Specific strategy to use. Default is to use all available strategies. May be passed multiple times for multiple strategies (--strategy latest --strategy random). Duplicates are permitted (--strategy random --strategy random)."
+    )]
+    pub beacon_strategy: Option<Vec<BeaconSelectionStrategy>>,
+
+    #[arg(
+        long = "state",
+        help = "Run audits for state subnetwork. Default is false."
+    )]
+    pub state: bool,
+
+    #[arg(
+        long,
+        action(ArgAction::Append),
+        value_enum,
+        default_value = None,
+        requires = "state",
+        help = "Specific strategy to use. Default is to use all available strategies. May be passed multiple times for multiple strategies (--strategy latest --strategy random). Duplicates are permitted (--strategy random --strategy random)."
+    )]
+    pub state_strategy: Option<Vec<StateSelectionStrategy>>,
+
     #[arg(
         short,
         long,
@@ -53,10 +110,13 @@ pub struct Args {
         help = "relative weight of the 'four_fours' strategy"
     )]
     pub four_fours_strategy_weight: u8,
+
     #[arg(long, default_value = DEFAULT_STATS_PERIOD, help = "stats recording period (seconds)")]
     pub stats_recording_period: u64,
+
     #[arg(long, action(ArgAction::Append))]
     pub portal_client: Vec<String>,
+
     #[command(subcommand)]
     pub subcommand: Option<Command>,
 }
@@ -82,7 +142,12 @@ impl Default for Args {
             oldest_strategy_weight: 1,
             random_strategy_weight: 1,
             four_fours_strategy_weight: 1,
-            strategy: None,
+            history: true,
+            history_strategy: None,
+            beacon: false,
+            beacon_strategy: None,
+            state: false,
+            state_strategy: None,
             portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
             subcommand: None,
             stats_recording_period: 300,
@@ -129,7 +194,7 @@ mod test {
         let expected = Args {
             database_url: DATABASE_URL.to_string(),
             concurrency: 3,
-            strategy: None,
+            history_strategy: None,
             portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
             ..Default::default()
         };
@@ -142,7 +207,7 @@ mod test {
         const PORTAL_CLIENT_STRING: &str = "ipc:////path/to/ipc";
         let result = Args::parse_from([
             "test",
-            "--strategy",
+            "--history-strategy",
             "latest",
             "--portal-client",
             PORTAL_CLIENT_STRING,
@@ -152,7 +217,7 @@ mod test {
         let expected = Args {
             database_url: DATABASE_URL.to_string(),
             concurrency: 4,
-            strategy: Some(vec![SelectionStrategy::Latest]),
+            history_strategy: Some(vec![HistorySelectionStrategy::Latest]),
             portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
             ..Default::default()
         };
@@ -168,11 +233,11 @@ mod test {
             "test",
             "--portal-client",
             PORTAL_CLIENT_STRING,
-            "--strategy",
+            "--history-strategy",
             "random",
-            "--strategy",
+            "--history-strategy",
             "latest",
-            "--strategy",
+            "--history-strategy",
             "random", // Duplicate is permitted
             "--database-url",
             DATABASE_URL,
@@ -180,10 +245,10 @@ mod test {
         let expected = Args {
             database_url: DATABASE_URL.to_string(),
             concurrency: 4,
-            strategy: Some(vec![
-                SelectionStrategy::Random,
-                SelectionStrategy::Latest,
-                SelectionStrategy::Random,
+            history_strategy: Some(vec![
+                HistorySelectionStrategy::Random,
+                HistorySelectionStrategy::Latest,
+                HistorySelectionStrategy::Random,
             ]),
             portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
             ..Default::default()

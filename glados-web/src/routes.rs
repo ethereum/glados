@@ -12,9 +12,9 @@ use entity::{
     content_audit::{self, AuditResult},
     execution_metadata, key_value, node, record,
 };
-use ethportal_api::jsonrpsee::core::__reexports::serde_json;
 use ethportal_api::types::distance::{Distance, Metric, XorMetric};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
+use ethportal_api::{jsonrpsee::core::__reexports::serde_json, BeaconContentKey, StateContentKey};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use glados_core::stats::{filter_audits, get_audit_stats, AuditFilters, Period};
 use migration::{Alias, JoinType, Order};
@@ -887,11 +887,26 @@ pub async fn contentkey_detail(
             StatusCode::NOT_FOUND
         })?;
 
-    let content_key: HistoryContentKey = HistoryContentKey::try_from(content_key_raw.clone())
-        .map_err(|e| {
-            error!(content.key=content_key_hex, err=?e, "Could not create key from bytes.");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let (content_id, content_kind) =
+        if let Ok(content_key) = HistoryContentKey::try_from(content_key_raw.clone()) {
+            let content_id = hex_encode(content_key.content_id());
+            let content_kind = content_key.to_string();
+            (content_id, content_kind)
+        } else if let Ok(content_key) = StateContentKey::try_from(content_key_raw.clone()) {
+            let content_id = hex_encode(content_key.content_id());
+            let content_kind = content_key.to_string();
+            (content_id, content_kind)
+        } else if let Ok(content_key) = BeaconContentKey::try_from(content_key_raw.clone()) {
+            let content_id = hex_encode(content_key.content_id());
+            let content_kind = content_key.to_string();
+            (content_id, content_kind)
+        } else {
+            error!(
+                content.key = content_key_hex,
+                "Could not create key from bytes"
+            );
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        };
     let metadata_model = execution_metadata::Entity::find()
         .filter(execution_metadata::Column::Content.eq(content_key_model.id))
         .one(&state.database_connection)
@@ -902,8 +917,6 @@ pub async fn contentkey_detail(
         })?;
     let block_number = metadata_model.map(|m| m.block_number);
 
-    let content_id = hex_encode(content_key.content_id());
-    let content_kind = content_key.to_string();
     let template = ContentKeyDetailTemplate {
         content_key: content_key_hex,
         content_key_model,

@@ -26,7 +26,6 @@ env_logger = "0.10.0"
 rand = "0.8.5"
 rstest = "0.16.0"
 serde = "1.0.167"
-primitive-types = "0.10.1"
 
 
 

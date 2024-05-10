@@ -13,6 +13,7 @@ use std::{
         Arc,
     },
     thread::available_parallelism,
+    vec,
 };
 
 use tokio::{
@@ -24,15 +25,21 @@ use tracing::{debug, error, info, warn};
 use entity::{
     client_info,
     content::{self, SubProtocol},
-    content_audit::{self, SelectionStrategy},
+    content_audit::{
+        self, BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy,
+        StateSelectionStrategy,
+    },
     execution_metadata, node,
 };
 use glados_core::jsonrpc::PortalClient;
 
-use crate::{selection::start_audit_selection_task, validation::content_is_valid};
+use crate::{
+    selection::start_audit_selection_task, state::spawn_state_audit, validation::content_is_valid,
+};
 
 pub mod cli;
 pub(crate) mod selection;
+mod state;
 pub mod stats;
 pub(crate) mod validation;
 
@@ -43,10 +50,20 @@ pub struct AuditConfig {
     pub database_url: String,
     /// For getting on-the-fly block information.
     pub provider_url: String,
-    /// Specific strategies to run.
-    pub strategies: Vec<SelectionStrategy>,
+    /// Audit History
+    pub history: bool,
+    /// Specific history audit strategies to run.
+    pub history_strategies: Vec<HistorySelectionStrategy>,
+    /// Audit Beacon
+    pub beacon: bool,
+    /// Specific beacon audit strategies to run.
+    pub beacon_strategies: Vec<BeaconSelectionStrategy>,
+    /// Audit State
+    pub state: bool,
+    /// Specific state audit strategies to run.
+    pub state_strategies: Vec<StateSelectionStrategy>,
     /// Weight for each strategy.
-    pub weights: HashMap<SelectionStrategy, u8>,
+    pub weights: HashMap<HistorySelectionStrategy, u8>,
     /// Number requests to a Portal node active at the same time.
     pub concurrency: u8,
     /// Portal Clients
@@ -72,31 +89,34 @@ impl AuditConfig {
             )
         }
 
-        let strategies = match args.strategy {
+        let strategies = match args.history_strategy {
             Some(s) => s,
             None => {
                 vec![
-                    SelectionStrategy::Latest,
-                    SelectionStrategy::Random,
-                    SelectionStrategy::Failed,
-                    SelectionStrategy::SelectOldestUnaudited,
-                    SelectionStrategy::FourFours,
+                    HistorySelectionStrategy::Latest,
+                    HistorySelectionStrategy::Random,
+                    HistorySelectionStrategy::Failed,
+                    HistorySelectionStrategy::SelectOldestUnaudited,
+                    HistorySelectionStrategy::FourFours,
                 ]
             }
         };
-        let mut weights: HashMap<SelectionStrategy, u8> = HashMap::new();
+        let mut weights: HashMap<HistorySelectionStrategy, u8> = HashMap::new();
         for strat in &strategies {
             let weight = match strat {
-                SelectionStrategy::Latest => args.latest_strategy_weight,
-                SelectionStrategy::Random => args.random_strategy_weight,
-                SelectionStrategy::Failed => args.failed_strategy_weight,
-                SelectionStrategy::SelectOldestUnaudited => args.oldest_strategy_weight,
-                SelectionStrategy::FourFours => args.four_fours_strategy_weight,
-                SelectionStrategy::SpecificContentKey => 0,
+                HistorySelectionStrategy::Latest => args.latest_strategy_weight,
+                HistorySelectionStrategy::Random => args.random_strategy_weight,
+                HistorySelectionStrategy::Failed => args.failed_strategy_weight,
+                HistorySelectionStrategy::SelectOldestUnaudited => args.oldest_strategy_weight,
+                HistorySelectionStrategy::FourFours => args.four_fours_strategy_weight,
+                HistorySelectionStrategy::SpecificContentKey => 0,
             };
             weights.insert(strat.clone(), weight);
         }
-        if args.provider_url.is_empty() && strategies.contains(&SelectionStrategy::FourFours) {
+        if args.provider_url.is_empty()
+            && args.history
+            && strategies.contains(&HistorySelectionStrategy::FourFours)
+        {
             return Err(anyhow::anyhow!(
                 "No provider URL provided, required when `four_fours` strategy is enabled."
             ));
@@ -110,11 +130,16 @@ impl AuditConfig {
         Ok(AuditConfig {
             database_url: args.database_url,
             provider_url: args.provider_url,
-            strategies,
             weights,
             concurrency: args.concurrency,
             portal_clients,
             stats_recording_period: args.stats_recording_period,
+            history: args.history,
+            history_strategies: strategies,
+            beacon: args.beacon,
+            beacon_strategies: args.beacon_strategy.unwrap_or_default(),
+            state: args.state,
+            state_strategies: args.state_strategy.unwrap_or_default(),
         })
     }
 }
@@ -145,7 +170,7 @@ pub async fn run_glados_command(conn: DatabaseConnection, command: cli::Command)
     let content_key = HistoryContentKey::try_from(content_key).unwrap();
 
     let task = AuditTask {
-        strategy: SelectionStrategy::SpecificContentKey,
+        strategy: SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey),
         content: content::get_or_create(SubProtocol::History, &content_key, Utc::now(), &conn)
             .await?,
     };
@@ -156,33 +181,71 @@ pub async fn run_glados_command(conn: DatabaseConnection, command: cli::Command)
 }
 
 pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
-    let mut task_channels: Vec<TaskChannel> = vec![];
-    for strategy in &config.strategies {
-        // Each strategy sends tasks to a separate channel.
-        let (tx, rx) = mpsc::channel::<AuditTask>(100);
-        let Some(weight) = config.weights.get(strategy) else {
-            error!(strategy=?strategy, "no weight for strategy");
-            return;
-        };
-        let task_channel = TaskChannel {
-            strategy: strategy.clone(),
-            weight: *weight,
-            rx,
-        };
-        task_channels.push(task_channel);
-        // Strategies generate tasks in their own thread for their own channel.
-        tokio::spawn(start_audit_selection_task(
-            strategy.clone(),
-            tx,
-            conn.clone(),
+    // if state network is enabled, run state audits
+    if config.state {
+        spawn_state_audit(conn.clone(), config.clone()).await;
+    }
+
+    if config.beacon {
+        let mut task_channels: Vec<TaskChannel> = vec![];
+        for strategy in &config.beacon_strategies {
+            // Each strategy sends tasks to a separate channel.
+            let (tx, rx) = mpsc::channel::<AuditTask>(100);
+            let task_channel = TaskChannel {
+                strategy: SelectionStrategy::Beacon(strategy.clone()),
+                weight: 1,
+                rx,
+            };
+            task_channels.push(task_channel);
+            // Strategies generate tasks in their own thread for their own channel.
+            tokio::spawn(start_audit_selection_task(
+                SelectionStrategy::Beacon(strategy.clone()),
+                tx,
+                conn.clone(),
+                config.clone(),
+            ));
+        }
+        // Collation of generated tasks, taken proportional to weights.
+        let (collation_tx, collation_rx) = mpsc::channel::<AuditTask>(100);
+        tokio::spawn(start_collation(collation_tx, task_channels));
+        // Perform collated audit tasks.
+        tokio::spawn(perform_content_audits(
             config.clone(),
+            collation_rx,
+            conn.clone(),
         ));
     }
-    // Collation of generated tasks, taken proportional to weights.
-    let (collation_tx, collation_rx) = mpsc::channel::<AuditTask>(100);
-    tokio::spawn(start_collation(collation_tx, task_channels));
-    // Perform collated audit tasks.
-    tokio::spawn(perform_content_audits(config, collation_rx, conn));
+
+    if config.history {
+        let mut task_channels: Vec<TaskChannel> = vec![];
+        for strategy in &config.history_strategies {
+            // Each strategy sends tasks to a separate channel.
+            let (tx, rx) = mpsc::channel::<AuditTask>(100);
+            let Some(weight) = config.weights.get(strategy) else {
+                error!(strategy=?strategy, "no weight for strategy");
+                return;
+            };
+            let task_channel = TaskChannel {
+                strategy: SelectionStrategy::History(strategy.clone()),
+                weight: *weight,
+                rx,
+            };
+            task_channels.push(task_channel);
+            // Strategies generate tasks in their own thread for their own channel.
+            tokio::spawn(start_audit_selection_task(
+                SelectionStrategy::History(strategy.clone()),
+                tx,
+                conn.clone(),
+                config.clone(),
+            ));
+        }
+        // Collation of generated tasks, taken proportional to weights.
+        let (collation_tx, collation_rx) = mpsc::channel::<AuditTask>(100);
+        tokio::spawn(start_collation(collation_tx, task_channels));
+        // Perform collated audit tasks.
+        tokio::spawn(perform_content_audits(config, collation_rx, conn));
+    }
+
     debug!("setting up CTRL+C listener");
     tokio::signal::ctrl_c()
         .await
@@ -287,7 +350,7 @@ async fn perform_single_audit(
         client.url = client.api.client_url.clone(),
         "auditing content",
     );
-    let (content_response, trace) = if client.clone().supports_trace() {
+    let (content_response, trace) = if client.supports_trace() {
         match client.api.get_content_with_trace(&task.content).await {
             Ok(c) => c,
             Err(e) => {

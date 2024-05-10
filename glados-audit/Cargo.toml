@@ -17,6 +17,7 @@ entity = { path = "../entity" }
 env_logger = "0.9.3"
 pgtemp = "0.2.1"
 enr = "0.10.0"
+eth_trie = { git = "https://github.com/kolbyml/eth-trie.rs.git", rev = "11ec003e3276e1413f06328ab746af5d99f112bb" }
 web3 = "0.18.0"
 ethportal-api = { git = "https://github.com/ethereum/trin" }
 glados-core = { path = "../glados-core" }

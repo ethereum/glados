@@ -29,6 +29,7 @@ use entity::content;
 
 pub mod beacon;
 pub mod cli;
+pub mod state;
 
 pub async fn run_glados_monitor(conn: DatabaseConnection, w3: web3::Web3<web3::transports::Http>) {
     let (tx, rx) = mpsc::channel(100);
@@ -333,14 +334,16 @@ pub async fn bulk_download_block_data(
 
 pub fn panda_ops_web3(provider_url: &str) -> Result<Web3<Http>> {
     let mut headers = header::HeaderMap::new();
-    let client_id = env::var("PANDAOPS_CLIENT_ID")
-        .map_err(|_| anyhow!("PANDAOPS_CLIENT_ID env var not set."))?;
-    let client_id = header::HeaderValue::from_str(&client_id);
-    let client_secret = env::var("PANDAOPS_CLIENT_SECRET")
-        .map_err(|_| anyhow!("PANDAOPS_CLIENT_SECRET env var not set."))?;
-    let client_secret = header::HeaderValue::from_str(&client_secret);
-    headers.insert("CF-Access-Client-Id", client_id?);
-    headers.insert("CF-Access-Client-Secret", client_secret?);
+    if provider_url.contains("ethpandaops.io") {
+        let client_id = env::var("PANDAOPS_CLIENT_ID")
+            .map_err(|_| anyhow!("PANDAOPS_CLIENT_ID env var not set."))?;
+        let client_id = header::HeaderValue::from_str(&client_id);
+        let client_secret = env::var("PANDAOPS_CLIENT_SECRET")
+            .map_err(|_| anyhow!("PANDAOPS_CLIENT_SECRET env var not set."))?;
+        let client_secret = header::HeaderValue::from_str(&client_secret);
+        headers.insert("CF-Access-Client-Id", client_id?);
+        headers.insert("CF-Access-Client-Secret", client_secret?);
+    }
 
     let client = reqwest::Client::builder()
         .default_headers(headers)

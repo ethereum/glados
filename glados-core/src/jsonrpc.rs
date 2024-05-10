@@ -50,7 +50,7 @@ pub struct PortalClient {
 
 /// HTTP-based transport for connecting to a Portal network node.
 pub struct HttpClientManager {
-    client: HttpClient,
+    pub client: HttpClient,
 }
 
 const CONTENT_NOT_FOUND_ERROR_CODE: i32 = -39001;
@@ -217,7 +217,7 @@ impl PortalClient {
         })
     }
 
-    pub fn supports_trace(self) -> bool {
+    pub fn supports_trace(&self) -> bool {
         self.client_info.contains("trin") || self.client_info.contains("fluffy")
     }
 }
