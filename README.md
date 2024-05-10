@@ -45,7 +45,7 @@ See the [DOCKER_GUIDE.md](/DOCKER_GUIDE.md)
 
 Glados needs a postgres database to use. To run a postgres instance locally using docker:
 
-`docker run --name postgres -e POSTGRES_DB=glados POSTGRES_PASSWORD=password -d -p 5432:5432 postgres`
+`docker run --name postgres -e POSTGRES_DB=glados -e POSTGRES_PASSWORD=password -d -p 5432:5432 postgres`
 
 This postgres instance can be accessed via `postgres://postgres:password@localhost:5432/glados`. This value will be referred to as the `DATABASE_URL`.
 
