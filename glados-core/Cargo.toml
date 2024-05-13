@@ -3,14 +3,14 @@ name = "glados-core"
 version = "0.1.0"
 edition = "2021"
 publish = false
-rust-version = "1.75.0"
+rust-version = "1.76.0"
 authors = ["Piper Merriam <piper@pipermerriam.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+alloy-primitives = "0.7.0"
 anyhow = "1.0.68"
-ethereum-types = "0.14.0"
 chrono = "0.4.22"
 entity = { path = "../entity" }
 sea-orm = "0.11.3"
@@ -23,7 +23,6 @@ tracing = "0.1.37"
 ethportal-api = { git = "https://github.com/ethereum/trin" }
 url = "2.3.1"
 jsonrpsee = { version = "0.20.0", features = ["async-client", "client"] }
-rustc-hex = "2.1.0"
 
 [dev-dependencies]
 rstest = "0.11.0"

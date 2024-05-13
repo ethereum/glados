@@ -1,10 +1,10 @@
+use alloy_primitives::B256;
+use alloy_primitives::U256;
 use anyhow::{bail, Result};
 use chrono::{DateTime, Duration, Utc};
 use clap::Parser;
 use cli::Args;
 use enr::NodeId;
-use ethereum_types::H256;
-use ethereum_types::U256;
 use ethportal_api::Enr;
 use ethportal_api::HistoryNetworkApiClient;
 use ethportal_api::{generate_random_remote_enr, jsonrpsee::http_client::HttpClientBuilder};
@@ -242,7 +242,7 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
     let (to_enumerate_tx, to_enumerate_rx): (Sender<Enr>, Receiver<Enr>) = mpsc::channel(256);
 
     info!(
-        target.node_id=?H256::from(target.raw()),
+        target.node_id=?B256::from(target.raw()),
         "Starting DHT census",
     );
 
@@ -250,7 +250,7 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
     let initial_enrs = match client.recursive_find_nodes(target).await {
         Ok(initial_enrs) => initial_enrs,
         Err(err) => {
-            error!(target.node_id=?H256::from(target.raw()), err=?err, "Error during census initialization");
+            error!(target.node_id=?B256::from(target.raw()), err=?err, "Error during census initialization");
             return;
         }
     };
@@ -433,18 +433,18 @@ async fn do_liveliness_check(
             record_model
         }
         Err(err) => {
-            error!(enr.node_id=?H256::from(enr.node_id().raw()), err=?err, "Error saving ENR to database");
+            error!(enr.node_id=?B256::from(enr.node_id().raw()), err=?err, "Error saving ENR to database");
             census.add_errored(enr.node_id()).await;
             return;
         }
     };
 
     // Perform liviliness check
-    debug!(node_id=?H256::from(enr.node_id().raw()), "Liveliness check");
+    debug!(node_id=?B256::from(enr.node_id().raw()), "Liveliness check");
 
     match client.ping(enr.to_owned()).await {
         Ok(pong_info) => {
-            debug!(node_id=?H256::from(enr.node_id().raw()), "Liveliness passed");
+            debug!(node_id=?B256::from(enr.node_id().raw()), "Liveliness passed");
 
             // Mark node as known to be alive
             census
@@ -461,7 +461,7 @@ async fn do_liveliness_check(
             }
         }
         Err(err) => {
-            warn!(node_id=?H256::from(enr.node_id().raw()), err=?err, "Liveliness failed");
+            warn!(node_id=?B256::from(enr.node_id().raw()), err=?err, "Liveliness failed");
 
             // Add node to error list.
             census.add_errored(enr.node_id()).await;
@@ -514,17 +514,17 @@ async fn do_routing_table_enumeration(
         TransportConfig::IPC(_path) => panic!("not implemented"),
     };
 
-    debug!(enr.node_id=?H256::from(enr.node_id().raw()), "Enumerating Routing Table");
+    debug!(enr.node_id=?B256::from(enr.node_id().raw()), "Enumerating Routing Table");
 
     for distance in 245..257 {
         let enrs_at_distance = match client.find_nodes(enr.to_owned(), vec![distance]).await {
             Ok(result) => result,
             Err(msg) => {
-                warn!(enr.node_id=?H256::from(enr.node_id().raw()), distance=?distance, msg=?msg, "Error fetching routing table info");
+                warn!(enr.node_id=?B256::from(enr.node_id().raw()), distance=?distance, msg=?msg, "Error fetching routing table info");
                 continue;
             }
         };
-        debug!(enr.node_id=?H256::from(enr.node_id().raw()), distance=distance, count=enrs_at_distance.len(), "Routing Table Info");
+        debug!(enr.node_id=?B256::from(enr.node_id().raw()), distance=distance, count=enrs_at_distance.len(), "Routing Table Info");
         for found_enr in enrs_at_distance {
             if census.is_known(found_enr.node_id()).await {
                 continue;

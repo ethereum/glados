@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use alloy_primitives::B256;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, TimeZone, Utc};
-use ethereum_types::H256;
 use ethportal_api::utils::bytes::hex_decode;
 use ethportal_api::{EpochAccumulatorKey, HistoryContentKey};
 use futures::future::join_all;
@@ -110,7 +110,7 @@ async fn retrieve_new_blocks(
 
         let block_num =
             i32::try_from(block_number_to_retrieve).expect("Block num does not fit in i32.");
-        store_block_keys(block_num, block_hash.as_fixed_bytes(), block_time, &conn).await;
+        store_block_keys(block_num, &block_hash.0, block_time, &conn).await;
     }
 }
 
@@ -118,7 +118,7 @@ async fn retrieve_new_blocks(
 async fn fetch_block_info(
     block_number: web3::types::U64,
     w3: &web3::Web3<web3::transports::Http>,
-) -> Result<(H256, DateTime<Utc>)> {
+) -> Result<(B256, DateTime<Utc>)> {
     let block = w3
         .eth()
         .block(BlockId::from(block_number))
@@ -150,7 +150,7 @@ async fn fetch_block_info(
         }
     };
 
-    Ok((H256::from_slice(block_hash_bytes), block_timestamp))
+    Ok((B256::from_slice(block_hash_bytes), block_timestamp))
 }
 
 pub async fn import_pre_merge_accumulators(
@@ -178,7 +178,7 @@ pub async fn import_pre_merge_accumulators(
                             Ok(content_key_raw) => {
                                 let content_key =
                                     HistoryContentKey::EpochAccumulator(EpochAccumulatorKey {
-                                        epoch_hash: H256::from_slice(&content_key_raw[1..]),
+                                        epoch_hash: B256::from_slice(&content_key_raw[1..]),
                                     });
                                 debug!(content_key = %content_key, "Importing");
                                 let content_key_db =
@@ -255,8 +255,7 @@ pub async fn bulk_download_block_data(
 
                 let block_number =
                     i32::try_from(block_number).expect("Block num does not fit in i32.");
-                store_block_keys(block_number, block_hash.as_fixed_bytes(), block_time, &conn)
-                    .await;
+                store_block_keys(block_number, &block_hash.0, block_time, &conn).await;
                 drop(permit);
             });
         }
@@ -301,13 +300,7 @@ pub async fn bulk_download_block_data(
 
                         let block_number =
                             i32::try_from(block_number).expect("Block num does not fit in i32.");
-                        store_block_keys(
-                            block_number,
-                            block_hash.as_fixed_bytes(),
-                            block_time,
-                            &conn,
-                        )
-                        .await;
+                        store_block_keys(block_number, &block_hash.0, block_time, &conn).await;
                     })
                 })
                 .collect();
