@@ -1,7 +1,8 @@
 use std::str::FromStr;
 use std::{path::PathBuf, time::Duration};
 
-use ethereum_types::{H256, U256};
+use alloy_primitives::hex::{self, FromHex};
+use alloy_primitives::{B256, U256};
 use ethportal_api::OverlayContentKey;
 use jsonrpsee::{
     core::{client::ClientT, params::ArrayParams},
@@ -79,7 +80,7 @@ pub enum JsonRpcError {
 
     #[error("unable to convert {input} to hash")]
     InvalidHash {
-        source: rustc_hex::FromHexError,
+        source: hex::FromHexError,
         input: String,
     },
 
@@ -161,7 +162,7 @@ struct RoutingTableInfoRaw {
 }
 
 pub struct RoutingTableEntry {
-    pub node_id: H256,
+    pub node_id: B256,
     pub enr: Enr,
     pub status: String,
     pub distance: U256,
@@ -170,7 +171,7 @@ pub struct RoutingTableEntry {
 
 #[allow(non_snake_case)]
 pub struct RoutingTableInfo {
-    pub localKey: H256,
+    pub localKey: B256,
     pub buckets: Vec<RoutingTableEntry>,
 }
 
@@ -272,7 +273,7 @@ impl PortalApi {
                 input: response.to_string(),
             })?;
         let local_node_id =
-            H256::from_str(&result_raw.localKey).map_err(|e| JsonRpcError::InvalidHash {
+            B256::from_hex(&result_raw.localKey).map_err(|e| JsonRpcError::InvalidHash {
                 source: e,
                 input: result_raw.localKey.to_string(),
             })?;
@@ -356,12 +357,12 @@ impl PortalApi {
 }
 
 fn parse_routing_table_entry(
-    local_node_id: &H256,
+    local_node_id: &B256,
     raw_node_id: &str,
     encoded_enr: &str,
     status: &String,
 ) -> Result<RoutingTableEntry, JsonRpcError> {
-    let node_id = H256::from_str(raw_node_id).map_err(|e| JsonRpcError::InvalidHash {
+    let node_id = B256::from_str(raw_node_id).map_err(|e| JsonRpcError::InvalidHash {
         source: e,
         input: raw_node_id.to_string(),
     })?;
@@ -370,7 +371,7 @@ fn parse_routing_table_entry(
         enr_string: encoded_enr.to_string(),
     })?;
 
-    let distance = distance_xor(node_id.as_fixed_bytes(), local_node_id.as_fixed_bytes());
+    let distance = distance_xor(&node_id.0, &local_node_id.0);
     let log_distance = distance_log2(distance)?;
     Ok(RoutingTableEntry {
         node_id,
@@ -386,7 +387,7 @@ fn distance_xor(x: &[u8; 32], y: &[u8; 32]) -> U256 {
     for i in 0..32 {
         z[i] = x[i] ^ y[i];
     }
-    U256::from_big_endian(z.as_slice())
+    U256::from_be_slice(z.as_slice())
 }
 
 fn distance_log2(distance: U256) -> Result<u16, JsonRpcError> {

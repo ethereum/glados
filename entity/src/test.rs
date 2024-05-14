@@ -1,10 +1,10 @@
 #![allow(unused_imports)]
 use std::str::FromStr;
 
+use alloy_primitives::{B256, U256};
 #[cfg(test)]
 use chrono::prelude::*;
 use enr::NodeId;
-use ethereum_types::{H256, U256};
 #[cfg(test)]
 use ethportal_api::types::node_id::generate_random_node_id;
 use ethportal_api::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
@@ -123,7 +123,7 @@ fn sample_history_key() -> HistoryContentKey {
 async fn test_content_id_as_hash() -> Result<(), DbErr> {
     let (conn, _db) = setup_database().await?;
     let key = sample_history_key();
-    let content_id_hash = H256::from_slice(&key.content_id());
+    let content_id_hash = B256::from_slice(&key.content_id());
     let content_model = content::get_or_create(&key, Utc::now(), &conn)
         .await
         .unwrap();
@@ -136,7 +136,7 @@ async fn test_content_id_as_hash() -> Result<(), DbErr> {
 async fn test_content_id_as_hex() -> Result<(), DbErr> {
     let (conn, _db) = setup_database().await?;
     let key = sample_history_key();
-    let content_id_hash = H256::from_slice(&key.content_id());
+    let content_id_hash = B256::from_slice(&key.content_id());
     let content_id_hex = hex_encode(content_id_hash);
     let content_model = content::get_or_create(&key, Utc::now(), &conn)
         .await
@@ -370,13 +370,22 @@ async fn test_query_closest() {
     let distance_a_c = node_a.node_id_high ^ node_c.node_id_high;
     let distance_b_c = node_b.node_id_high ^ node_c.node_id_high;
 
-    let node_id_a_full = U256::from_big_endian(&node_id_a.raw());
-    let node_id_b_full = U256::from_big_endian(&node_id_b.raw());
-    let node_id_c_full = U256::from_big_endian(&node_id_c.raw());
+    let node_id_a_full = U256::from_be_slice(&node_id_a.raw());
+    let node_id_b_full = U256::from_be_slice(&node_id_b.raw());
+    let node_id_c_full = U256::from_be_slice(&node_id_c.raw());
 
-    assert_eq!(node_a.node_id_high as u64, (node_id_a_full >> 193).as_u64());
-    assert_eq!(node_b.node_id_high as u64, (node_id_b_full >> 193).as_u64());
-    assert_eq!(node_c.node_id_high as u64, (node_id_c_full >> 193).as_u64());
+    assert_eq!(
+        node_a.node_id_high as u64,
+        node_id_a_full.wrapping_shr(193).to::<u64>()
+    );
+    assert_eq!(
+        node_b.node_id_high as u64,
+        node_id_b_full.wrapping_shr(193).to::<u64>()
+    );
+    assert_eq!(
+        node_c.node_id_high as u64,
+        node_id_c_full.wrapping_shr(193).to::<u64>()
+    );
 
     let distance_a_b_full = node_id_a_full ^ node_id_b_full;
     let distance_a_c_full = node_id_a_full ^ node_id_c_full;
@@ -384,9 +393,18 @@ async fn test_query_closest() {
 
     //let distance_a_b_alt = (node_id_a_full | node_id_b_full) - (node_id_a_full & node_id_b_full);
 
-    assert_eq!((distance_a_b_full >> 193).as_u64(), distance_a_b as u64);
-    assert_eq!((distance_a_c_full >> 193).as_u64(), distance_a_c as u64);
-    assert_eq!((distance_b_c_full >> 193).as_u64(), distance_b_c as u64);
+    assert_eq!(
+        distance_a_b_full.wrapping_shr(193).to::<u64>(),
+        distance_a_b as u64
+    );
+    assert_eq!(
+        distance_a_c_full.wrapping_shr(193).to::<u64>(),
+        distance_a_c as u64
+    );
+    assert_eq!(
+        distance_b_c_full.wrapping_shr(193).to::<u64>(),
+        distance_b_c as u64
+    );
 
     assert_eq!(
         distance_a_b_full > distance_a_c_full,
