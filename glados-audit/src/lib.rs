@@ -211,6 +211,8 @@ async fn start_collation(
                     Err(_) => break,
                 }
             }
+            // Limit check for new tasks to 5/sec
+            sleep(Duration::from_millis(200)).await;
         }
     }
 }
