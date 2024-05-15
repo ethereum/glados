@@ -18,7 +18,7 @@
                     }}</a></li>
             {% else %}{% endif %}
             <li>Nodes on the network that will accept this content: 
-                <a href="https://glados.ethdevops.io/api/is-content-in-deadzone/{{ content_key }}" id="nodes_that_will_accept_this_account">Loading...</a>
+                <a href="/api/is-content-in-deadzone/{{ content_key }}" id="nodes_that_will_accept_this_account">Loading...</a>
                 </a>
             </li>
         </ul>
@@ -42,7 +42,7 @@
 </div>
 
 <script>
-    fetch('https://glados.ethdevops.io/api/is-content-in-deadzone/{{ content_key }}')
+    fetch('/api/is-content-in-deadzone/{{ content_key }}')
         .then(response => response.json())
         .then(data => {
             document.getElementById('nodes_that_will_accept_this_account').innerText = data.length;
