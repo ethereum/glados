@@ -17,6 +17,10 @@
             <li>Block number: <a href="https://etherscan.io/block/{{ block_number.unwrap() }}">{{ block_number.unwrap()
                     }}</a></li>
             {% else %}{% endif %}
+            <li>Nodes on the network that will accept this content: 
+                <a href="https://glados.ethdevops.io/api/is-content-in-deadzone/{{ content_key }}" id="nodes_that_will_accept_this_account">Loading...</a>
+                </a>
+            </li>
         </ul>
     </div>
     <div class="col">
@@ -36,4 +40,12 @@
     </div>
 </div>
 </div>
+
+<script>
+    fetch('https://glados.ethdevops.io/api/is-content-in-deadzone/{{ content_key }}')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('nodes_that_will_accept_this_account').innerText = data.length;
+        });
+</script>
 {% endblock %}
