@@ -1,15 +1,15 @@
 use anyhow::Result;
 use clap::Parser;
+use glados_monitor::{
+    beacon::panda_ops_http,
+    bulk_download_block_data,
+    cli::{Cli, Commands},
+    import_pre_merge_accumulators, panda_ops_web3, run_glados_monitor, run_glados_monitor_beacon,
+};
+use migration::{Migrator, MigratorTrait};
 use sea_orm::{Database, DatabaseConnection};
 use tokio::{signal, task};
 use tracing::{debug, info};
-
-use glados_monitor::{
-    bulk_download_block_data,
-    cli::{Cli, Commands},
-    import_pre_merge_accumulators, panda_ops_web3, run_glados_monitor,
-};
-use migration::{Migrator, MigratorTrait};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -51,12 +51,15 @@ async fn main() -> Result<()> {
             task::spawn(follow_head_command(conn, provider_url.to_string()))
         }
         Some(Commands::FollowHeadPandaops { provider_url }) => {
-            info!("Running follow head");
+            info!("Running follow head beacon");
             task::spawn(follow_head_command_pandaops(conn, provider_url.to_string()))
         }
         Some(Commands::ImportPreMergeAccumulators { path }) => {
             info!("Importing pre-merge accumulators");
             task::spawn(import_pre_merge_accumulators(conn, path.to_path_buf()))
+        }
+        Some(Commands::FollowBeaconPandaops {}) => {
+            task::spawn(follow_beacon_command_pandaops(conn))
         }
         Some(Commands::BulkDownloadBlockData {
             start_block_number,
@@ -121,6 +124,12 @@ async fn follow_head_command(conn: DatabaseConnection, provider_url: String) -> 
     );
 
     run_glados_monitor(conn, w3).await;
+    Ok(())
+}
+
+async fn follow_beacon_command_pandaops(conn: DatabaseConnection) -> Result<()> {
+    let http_client = panda_ops_http()?;
+    run_glados_monitor_beacon(conn, http_client).await;
     Ok(())
 }
 
