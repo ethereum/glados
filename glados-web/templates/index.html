@@ -79,13 +79,24 @@
                 </div>
             </div>
         </div>
+        <div class="col-lg-13 col-md-18 col-sm-18 margin-bottom">
+            <div class="card pie-box h-100">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <div id="census-stacked"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
 </div>
 <script>
-    pie_chart_count({{ client_diversity_data| json | safe }})
-    radius_node_id_scatter_chart({{ average_radius_chart| json | safe }})
-    statsHistoryChart()
+    pie_chart_count({{ client_diversity_data| json | safe }});
+    const census_data = {{ average_radius_chart| json | safe }};
+    radius_node_id_scatter_chart(census_data);
+    radius_stacked_chart(census_data);
+    statsHistoryChart();
 
 </script>
 

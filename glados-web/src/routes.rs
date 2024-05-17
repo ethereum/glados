@@ -74,6 +74,10 @@ pub struct RadiusChartData {
 #[derive(Serialize, Debug)]
 pub struct CalculatedRadiusChartData {
     pub data_radius: f64,
+    /// Top byte of the advertised radius
+    pub radius_top: u8,
+    /// Percentage coverage, not including the top byte
+    pub radius_lower_fraction: f64,
     pub node_id: u64,
     pub node_id_string: String,
     pub raw_enr: String,
@@ -157,13 +161,12 @@ async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusC
 
     let mut radius_percentages: Vec<CalculatedRadiusChartData> = vec![];
     for i in radius_chart_data {
-        let radius_high_bytes: [u8; 4] = [
+        let radius_fraction = xor_distance_to_fraction([
             i.data_radius[0],
             i.data_radius[1],
             i.data_radius[2],
             i.data_radius[3],
-        ];
-        let radius_int = u32::from_be_bytes(radius_high_bytes);
+        ]);
         let node_id_high_bytes: [u8; 8] = [
             i.node_id[0],
             i.node_id[1],
@@ -175,17 +178,25 @@ async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusC
             i.node_id[7],
         ];
 
-        let percentage = (radius_int as f64 / u32::MAX as f64) * 100.0;
-        let formatted_percentage = format!("{:.2}", percentage);
+        let formatted_percentage = format!("{:.2}", radius_fraction * 100.0);
 
         let mut node_id_bytes: [u8; 32] = [0; 32];
         if i.node_id.len() == 32 {
             node_id_bytes.copy_from_slice(&i.node_id);
         }
 
+        let radius_lower_fraction = xor_distance_to_fraction([
+            i.data_radius[1],
+            i.data_radius[2],
+            i.data_radius[3],
+            i.data_radius[4],
+        ]);
+
         let node_id_string = hex_encode(node_id_bytes);
         radius_percentages.push(CalculatedRadiusChartData {
             data_radius: formatted_percentage.parse().unwrap(),
+            radius_top: i.data_radius[0],
+            radius_lower_fraction,
             node_id: u64::from_be_bytes(node_id_high_bytes),
             node_id_string,
             raw_enr: i.raw,
@@ -193,6 +204,11 @@ async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusC
     }
 
     radius_percentages
+}
+
+fn xor_distance_to_fraction(radius_high_bytes: [u8; 4]) -> f64 {
+    let radius_int = u32::from_be_bytes(radius_high_bytes);
+    radius_int as f64 / u32::MAX as f64
 }
 
 async fn get_max_census_id(state: &Arc<State>) -> Option<MaxCensusId> {
