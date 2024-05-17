@@ -85,4 +85,13 @@ The CLI needs a DATABASE_URL to know what relational database to connect to.
 $ cargo run -p glados-web -- --database-url DATABASE_URL
 ```
 
+This must be run from the project root, or static assets will fail to load, with 404 errors.
+
+### Running a census with `glados-cartographer`
+
+First, launch a portal client, like trin, with an HTTP endpoint. Assuming you already launched postgres using Docker, the cartographer command would look like:
+```sh
+cargo run -p glados-cartographer -- --database-url postgres://postgres:password@localhost:5432/glados --transport http --http-url http://localhost:8545 --concurrency 10
+```
+
 You should then be able to view the web application at `http://127.0.0.1:3001/` in your browser.
