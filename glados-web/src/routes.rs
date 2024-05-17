@@ -29,8 +29,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Formatter;
 use std::sync::Arc;
 use std::{fmt::Display, io};
-use tracing::error;
-use tracing::info;
+use tracing::{error, info, warn};
 
 use crate::templates::{
     AuditDashboardTemplate, AuditTableTemplate, CensusExplorerTemplate, ContentAuditDetailTemplate,
@@ -208,7 +207,7 @@ async fn get_max_census_id(state: &Arc<State>) -> Option<MaxCensusId> {
     {
         Ok(val) => val,
         Err(err) => {
-            error!("{err}");
+            warn!("Census data unavailable: {err}");
             None
         }
     }
