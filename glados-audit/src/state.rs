@@ -37,7 +37,7 @@ async fn save_state_audit(
 ) -> Result<()> {
     let content_model = store_content_key(
         &content_key,
-        "state_itermidate_trie_node",
+        "state_intermediate_trie_node",
         block_number,
         Utc::now(),
         conn,
