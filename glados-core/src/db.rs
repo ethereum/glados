@@ -15,9 +15,10 @@ use tracing::{debug, error};
 pub async fn store_state_root(
     block_number: i32,
     state_root: Vec<u8>,
+    available_at: DateTime<Utc>,
     conn: &DatabaseConnection,
 ) -> Result<state_roots::Model> {
-    state_roots::get_or_create(block_number, state_root, conn).await
+    state_roots::get_or_create(block_number, state_root, available_at, conn).await
 }
 
 /// Stores the content keys and block metadata for the given block.

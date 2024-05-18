@@ -18,6 +18,11 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(StateRoots::StateRoot).binary().not_null())
+                    .col(
+                        ColumnDef::new(StateRoots::FirstAvailableAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await
@@ -35,4 +40,5 @@ enum StateRoots {
     Table,
     BlockNumber,
     StateRoot,
+    FirstAvailableAt, // datetime
 }

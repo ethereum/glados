@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use alloy_primitives::B256;
 use anyhow::{anyhow, Result};
+use chrono::{DateTime, TimeZone, Utc};
 use futures::future::join_all;
 use glados_core::db::store_state_root;
 use sea_orm::DatabaseConnection;
@@ -80,7 +81,7 @@ pub async fn populate_state_roots_range_command(
                 let block_number = *block_number;
                 tokio::spawn(async move {
                     // In case of failure, retry until successful
-                    let state_root = loop {
+                    let (state_root, block_time) = loop {
                         match fetch_state_root(block_number.into(), &w3).await {
                             Ok(state_root) => break state_root,
                             Err(err) => {
@@ -97,7 +98,8 @@ pub async fn populate_state_roots_range_command(
                     let block_number =
                         i32::try_from(block_number).expect("Block num does not fit in i32.");
                     if let Err(err) =
-                        store_state_root(block_number, state_root.0.to_vec(), &conn).await
+                        store_state_root(block_number, state_root.0.to_vec(), block_time, &conn)
+                            .await
                     {
                         warn!(
                             error = ?err,
@@ -114,11 +116,11 @@ pub async fn populate_state_roots_range_command(
     Ok(())
 }
 
-/// Gets the block hash and timestamp for the given block number.
+/// Gets the state root and timestamp for the given block number.
 async fn fetch_state_root(
     block_number: web3::types::U64,
     w3: &web3::Web3<web3::transports::Http>,
-) -> Result<B256> {
+) -> Result<(B256, DateTime<Utc>)> {
     let block = w3
         .eth()
         .block(BlockId::from(block_number))
@@ -137,7 +139,18 @@ async fn fetch_state_root(
         "received block",
     );
 
-    Ok(B256::from_slice(block_hash_bytes))
+    let timestamp = block.timestamp.as_u64() as i64;
+    let block_timestamp = match Utc.timestamp_opt(timestamp, 0) {
+        chrono::LocalResult::Single(time) => time,
+        _ => {
+            return Err(anyhow!(
+                "Failed to convert block timestamp to Utc: {}",
+                timestamp
+            ))
+        }
+    };
+
+    Ok((B256::from_slice(block_hash_bytes), block_timestamp))
 }
 
 pub async fn run_glados_monitor_state(
@@ -169,7 +182,7 @@ async fn retrieve_new_state_roots(
         };
         debug!(block.number=?block_number_to_retrieve, "fetching block");
 
-        let state_root = match fetch_state_root(block_number_to_retrieve, &w3).await {
+        let (state_root, block_time) = match fetch_state_root(block_number_to_retrieve, &w3).await {
             Ok(state_root) => state_root,
             Err(e) => {
                 error!(block.number=?block_number_to_retrieve, err=?e, "Failed to fetch block");
@@ -179,7 +192,9 @@ async fn retrieve_new_state_roots(
 
         let block_num =
             i32::try_from(block_number_to_retrieve).expect("Block num does not fit in i32.");
-        if let Err(err) = store_state_root(block_num, state_root.0.to_vec(), &conn).await {
+        if let Err(err) =
+            store_state_root(block_num, state_root.0.to_vec(), block_time, &conn).await
+        {
             warn!(
                 error = ?err,
                 block_number = block_num,
