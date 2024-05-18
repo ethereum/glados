@@ -128,12 +128,10 @@ async fn fetch_state_root(
         .map_err(|e| anyhow!("Failed to retrieve block: {}", e))?
         .ok_or_else(|| anyhow!("No block found at {block_number}"))?;
 
-    let block_hash = block.state_root;
-
-    let block_hash_bytes = block_hash.as_bytes();
+    let state_root = block.state_root;
 
     info!(
-        block.hash=?block_hash,
+        block.state_root=?state_root,
         block.number=?block_number,
         block.timestamp=?block.timestamp,
         "received block",
@@ -150,7 +148,7 @@ async fn fetch_state_root(
         }
     };
 
-    Ok((B256::from_slice(block_hash_bytes), block_timestamp))
+    Ok((state_root.0.into(), block_timestamp))
 }
 
 pub async fn run_glados_monitor_state(

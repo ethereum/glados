@@ -89,16 +89,20 @@ async fn process_trie_node(
             }
         }
         Node::Extension(extension_node) => {
-            let hash_node =
-                &extension_node.read().expect("Read should never fail").node;
-            match hash_node {
+            let extension_node =
+                &extension_node.read().expect("Read should never fail");
+            let prefix = extension_node.prefix.get_data();
+            let node = &extension_node.node;
+            match node {
                 Node::Hash(hash_node) => {
                     Ok(Some((
                         StateContentKey::AccountTrieNode(AccountTrieNodeKey {
-                            path: Nibbles::try_from_unpacked_nibbles(path).expect("Bug building path in random_state_walk"),
+                            path: Nibbles::try_from_unpacked_nibbles([path, prefix]
+                                .concat()
+                                .as_slice()).expect("Bug building path in random_state_walk"),
                             node_hash: hash_node.hash,
                         }),
-                        0,
+                        prefix.first().copied().unwrap_or(0) as usize,
                     )))
                 }
                 other_node => {
@@ -147,7 +151,9 @@ async fn process_trie_node(
         Node::Hash(hash_node) => {
             Ok(Some((
                 StateContentKey::AccountTrieNode(AccountTrieNodeKey {
-                    path: Nibbles::try_from_unpacked_nibbles(path).expect("Bug building path in random_state_walk"),
+                    path: Nibbles::try_from_unpacked_nibbles([path, &[0u8]]
+                        .concat()
+                        .as_slice()).expect("Bug building path in random_state_walk"),
                     node_hash: hash_node.hash,
                 }),
                 0,

@@ -8,7 +8,7 @@ use sea_orm::{entity::prelude::*, QuerySelect, Set};
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "state_roots")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[sea_orm(primary_key, auto_increment = false)]
     pub block_number: i32,
     #[sea_orm(unique)]
     pub state_root: Vec<u8>,

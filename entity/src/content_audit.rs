@@ -155,16 +155,19 @@ impl IntoEnumIterator for SelectionStrategy {
     type Iterator = std::vec::IntoIter<Self>;
 
     fn iter() -> Self::Iterator {
-        vec![
-            SelectionStrategy::History(HistorySelectionStrategy::Latest),
-            SelectionStrategy::History(HistorySelectionStrategy::Random),
-            SelectionStrategy::History(HistorySelectionStrategy::Failed),
-            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited),
-            SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey),
-            SelectionStrategy::History(HistorySelectionStrategy::FourFours),
-            SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest),
-            SelectionStrategy::State(StateSelectionStrategy::StateRoots),
+        // write this programmtically
+        [
+            HistorySelectionStrategy::iter()
+                .map(SelectionStrategy::History)
+                .collect::<Vec<SelectionStrategy>>(),
+            BeaconSelectionStrategy::iter()
+                .map(SelectionStrategy::Beacon)
+                .collect::<Vec<SelectionStrategy>>(),
+            StateSelectionStrategy::iter()
+                .map(SelectionStrategy::State)
+                .collect::<Vec<SelectionStrategy>>(),
         ]
+        .concat()
         .into_iter()
     }
 }
