@@ -220,8 +220,8 @@ async fn initalize_beacon_or_history(
             .iter()
             .map(|strats| SelectionStrategy::Beacon(strats.clone()))
             .collect(),
-        SubProtocol::State => {
-            panic!("State protocol not supported for function: initalize_beacon_or_history()")
+        other => {
+            panic!("{other:?} protocol not supported for function: initalize_beacon_or_history()")
         }
     };
 
