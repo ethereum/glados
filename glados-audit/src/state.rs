@@ -73,20 +73,12 @@ async fn save_state_audit(
 }
 
 async fn process_trie_node(
-    conn: &DatabaseConnection,
-    portal_client: PortalClient,
-    block_number: i32,
-    path: &[u8],
-    content_key: StateContentKey,
+    content_key: AccountTrieNodeKey,
     trie_node: Node,
-    available_at: DateTime<Utc>,
-) -> Result<Option<(StateContentKey, usize)>, (anyhow::Error, StateContentKey)> {
+) -> Result<(AccountTrieNodeKey, bool), (anyhow::Error, AccountTrieNodeKey)> {
     match trie_node {
         Node::Leaf(_leaf_node) => {
-            match save_state_audit(conn, content_key.clone(), true, block_number, portal_client.clone(), available_at).await.map_err(|err| (err, content_key)) {
-                Ok(_) => Ok(None),
-                Err(err) => Err(err),
-            }
+            Ok((content_key, true))
         }
         Node::Extension(extension_node) => {
             let extension_node =
@@ -95,15 +87,15 @@ async fn process_trie_node(
             let node = &extension_node.node;
             match node {
                 Node::Hash(hash_node) => {
-                    Ok(Some((
-                        StateContentKey::AccountTrieNode(AccountTrieNodeKey {
-                            path: Nibbles::try_from_unpacked_nibbles([path, prefix]
+                    Ok((
+                        AccountTrieNodeKey {
+                            path: Nibbles::try_from_unpacked_nibbles([content_key.path.nibbles(), prefix]
                                 .concat()
                                 .as_slice()).expect("Bug building path in random_state_walk"),
                             node_hash: hash_node.hash,
-                        }),
-                        prefix.first().copied().unwrap_or(0) as usize,
-                    )))
+                        },
+                        false,
+                    ))
                 }
                 other_node => {
                     Err((anyhow!(
@@ -120,26 +112,25 @@ async fn process_trie_node(
                 .iter()
                 .enumerate()
                 .filter_map(|(index, child)| match child {
-                    Node::Hash(hash_node) => Some((
-                        index,
-                        StateContentKey::AccountTrieNode(AccountTrieNodeKey {
+                    Node::Hash(hash_node) => Some(
+                        AccountTrieNodeKey {
                             path: Nibbles::try_from_unpacked_nibbles(
-                                [path, &[index as u8]]
+                                [content_key.path.nibbles(), &[index as u8]]
                                     .concat()
                                     .as_slice(),
                             )
                             .expect("Bug building path in random_state_walk"),
                             node_hash: hash_node.hash,
-                        }),
-                    )),
+                        },
+                    ),
                     _ => {
                         None
                     }
                 })
                 .choose(&mut rand::thread_rng());
             match optional_random_node {
-                Some((index, random_node)) => {
-                    Ok(Some((random_node, index)))
+                Some(random_node) => {
+                    Ok((random_node, false))
                 }
                 None => {
                     Err((anyhow!(
@@ -149,15 +140,9 @@ async fn process_trie_node(
             }
         }
         Node::Hash(hash_node) => {
-            Ok(Some((
-                StateContentKey::AccountTrieNode(AccountTrieNodeKey {
-                    path: Nibbles::try_from_unpacked_nibbles([path, &[0u8]]
-                        .concat()
-                        .as_slice()).expect("Bug building path in random_state_walk"),
-                    node_hash: hash_node.hash,
-                }),
-                0,
-            )))
+            Err((anyhow!(
+                "Hash shouldn't be returned from the network: {content_key:?} {hash_node:?}"
+            ), content_key))
         }
         Node::Empty => {
             Err((anyhow!(
@@ -168,79 +153,76 @@ async fn process_trie_node(
 }
 
 async fn random_state_walk(
-    conn: &DatabaseConnection,
     state_root: B256,
-    portal_client: PortalClient,
     client: HttpClient,
-    block_number: i32,
-    available_at: DateTime<Utc>,
-) -> Result<(), (anyhow::Error, StateContentKey)> {
-    let mut stack = vec![StateContentKey::AccountTrieNode(AccountTrieNodeKey {
+) -> Result<AccountTrieNodeKey, (anyhow::Error, AccountTrieNodeKey)> {
+    let root_content_key = AccountTrieNodeKey {
         path: Nibbles::try_from_unpacked_nibbles(&[])
             .expect("Bug building path in random_state_walk"),
         node_hash: state_root,
-    })];
-    let mut path: Vec<u8> = vec![];
-    while let Some(content_key) = stack.pop() {
-        match StateNetworkApiClient::recursive_find_content(&client, content_key.clone()).await {
+    };
+    let mut current_content_key = root_content_key.clone();
+    loop {
+        let content_value = match StateNetworkApiClient::recursive_find_content(
+            &client,
+            StateContentKey::AccountTrieNode(current_content_key.clone()),
+        )
+        .await
+        {
             Ok(response) => match response {
                 ContentInfo::Content {
                     content: content_value,
                     ..
-                } => match content_value {
-                    StateContentValue::TrieNode(encoded_trie_node) => {
-                        let trie_node = encoded_trie_node.node.as_trie_node().expect("Trie node received from the portal network should be decoded as a trie node");
-                        match process_trie_node(
-                            conn,
-                            portal_client.clone(),
-                            block_number,
-                            &path,
-                            content_key,
-                            trie_node,
-                            available_at,
-                        )
-                        .await?
-                        {
-                            Some((next_content_key, next_path_index)) => {
-                                path.push(next_path_index as u8);
-                                stack.push(next_content_key);
-                            }
-                            None => return Ok(()),
-                        }
-                    }
-                    other_state_content_value => {
-                        return Err((anyhow!(
-                                "State random walk audit recevied unexpected content type: {other_state_content_value:?}"
-                            ), content_key));
-                    }
-                },
+                } => content_value,
                 other_content_info => {
                     return Err((
                         anyhow!(
                         "Error unexpected recursive_find_content response: {other_content_info:?}"
                     ),
-                        content_key,
+                        current_content_key,
                     ));
                 }
             },
             Err(err) => {
                 return Err((
                     anyhow!("Error recursive_find_content failed with: {err:?}"),
-                    content_key,
+                    current_content_key,
                 ));
             }
+        };
+
+        let encoded_trie_node = match content_value {
+            StateContentValue::TrieNode(encoded_trie_node) => encoded_trie_node,
+            other_state_content_value => {
+                return Err((anyhow!(
+                        "State random walk audit recevied unexpected content type: {other_state_content_value:?}"
+                    ), current_content_key));
+            }
+        };
+
+        if encoded_trie_node.node.node_hash() != current_content_key.node_hash {
+            return Err((
+                anyhow!(
+                    "State random walk audit recevied unexpected node hash: {current_content_key:?} {encoded_trie_node:?}"
+                ),
+                current_content_key,
+            ));
         }
+
+        let trie_node = encoded_trie_node
+            .node
+            .as_trie_node()
+            .expect("Trie node received from the portal network should be decoded as a trie node");
+        match process_trie_node(current_content_key, trie_node).await? {
+            (next_content_key, false) => {
+                current_content_key = next_content_key;
+            }
+            (next_content_key, true) => return Ok(next_content_key),
+        }
+
         // Limit check for new tasks to 10/sec
         sleep(Duration::from_millis(100)).await;
     }
-    Err((
-        anyhow!("Walk exhausted without finding a leaf node or failing, maybe there is a bug? this should not happen."),
-        StateContentKey::AccountTrieNode(AccountTrieNodeKey {
-            path: Nibbles::try_from_unpacked_nibbles(&[])
-                .expect("Bug building path in random_state_walk"),
-            node_hash: state_root,
-        }),
-    ))
 }
 
 pub async fn spawn_state_audit(conn: DatabaseConnection, config: AuditConfig) {
@@ -280,29 +262,26 @@ pub async fn spawn_state_audit(conn: DatabaseConnection, config: AuditConfig) {
                 Transport::HTTP(http) => http.client,
             };
 
-            if let Err((err, content_key)) = random_state_walk(
+            let (state_audit_result, content_key) =
+                match random_state_walk(state_root, client).await {
+                    Ok(content_key) => (true, content_key),
+                    Err((err, content_key)) => {
+                        error!(err=?err, content_key=?content_key, "Error during state audit.");
+                        (false, content_key)
+                    }
+                };
+
+            if let Err(err) = save_state_audit(
                 &conn,
-                state_root,
-                portal_client.clone(),
-                client,
+                StateContentKey::AccountTrieNode(content_key),
+                state_audit_result,
                 block_number,
+                portal_client.clone(),
                 available_at,
             )
             .await
             {
-                if let Err(err) = save_state_audit(
-                    &conn,
-                    content_key.clone(),
-                    false,
-                    block_number,
-                    portal_client.clone(),
-                    available_at,
-                )
-                .await
-                {
-                    error!(err=?err, "Error saving state audit.");
-                }
-                error!(err=?err, content_key=?content_key, "Error during state audit.");
+                error!(err=?err, "Error saving state audit.");
             }
         }
     });

@@ -187,63 +187,11 @@ pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
     }
 
     if config.beacon {
-        let mut task_channels: Vec<TaskChannel> = vec![];
-        for strategy in &config.beacon_strategies {
-            // Each strategy sends tasks to a separate channel.
-            let (tx, rx) = mpsc::channel::<AuditTask>(100);
-            let task_channel = TaskChannel {
-                strategy: SelectionStrategy::Beacon(strategy.clone()),
-                weight: 1,
-                rx,
-            };
-            task_channels.push(task_channel);
-            // Strategies generate tasks in their own thread for their own channel.
-            tokio::spawn(start_audit_selection_task(
-                SelectionStrategy::Beacon(strategy.clone()),
-                tx,
-                conn.clone(),
-                config.clone(),
-            ));
-        }
-        // Collation of generated tasks, taken proportional to weights.
-        let (collation_tx, collation_rx) = mpsc::channel::<AuditTask>(100);
-        tokio::spawn(start_collation(collation_tx, task_channels));
-        // Perform collated audit tasks.
-        tokio::spawn(perform_content_audits(
-            config.clone(),
-            collation_rx,
-            conn.clone(),
-        ));
+        initalize_beacon_or_history(conn.clone(), config.clone(), SubProtocol::Beacon).await;
     }
 
     if config.history {
-        let mut task_channels: Vec<TaskChannel> = vec![];
-        for strategy in &config.history_strategies {
-            // Each strategy sends tasks to a separate channel.
-            let (tx, rx) = mpsc::channel::<AuditTask>(100);
-            let Some(weight) = config.weights.get(strategy) else {
-                error!(strategy=?strategy, "no weight for strategy");
-                return;
-            };
-            let task_channel = TaskChannel {
-                strategy: SelectionStrategy::History(strategy.clone()),
-                weight: *weight,
-                rx,
-            };
-            task_channels.push(task_channel);
-            // Strategies generate tasks in their own thread for their own channel.
-            tokio::spawn(start_audit_selection_task(
-                SelectionStrategy::History(strategy.clone()),
-                tx,
-                conn.clone(),
-                config.clone(),
-            ));
-        }
-        // Collation of generated tasks, taken proportional to weights.
-        let (collation_tx, collation_rx) = mpsc::channel::<AuditTask>(100);
-        tokio::spawn(start_collation(collation_tx, task_channels));
-        // Perform collated audit tasks.
-        tokio::spawn(perform_content_audits(config, collation_rx, conn));
+        initalize_beacon_or_history(conn.clone(), config.clone(), SubProtocol::History).await;
     }
 
     debug!("setting up CTRL+C listener");
@@ -253,6 +201,61 @@ pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
 
     info!("got CTRL+C. shutting down...");
     std::process::exit(0);
+}
+
+async fn initalize_beacon_or_history(
+    conn: DatabaseConnection,
+    config: AuditConfig,
+    protocol: SubProtocol,
+) {
+    let mut task_channels: Vec<TaskChannel> = vec![];
+    let strategies = match protocol {
+        SubProtocol::History => config
+            .history_strategies
+            .iter()
+            .map(|strats| SelectionStrategy::History(strats.clone()))
+            .collect::<Vec<_>>(),
+        SubProtocol::Beacon => config
+            .beacon_strategies
+            .iter()
+            .map(|strats| SelectionStrategy::Beacon(strats.clone()))
+            .collect(),
+        SubProtocol::State => {
+            panic!("State protocol not supported for function: initalize_beacon_or_history()")
+        }
+    };
+
+    for strategy in strategies {
+        // Each strategy sends tasks to a separate channel.
+        let (tx, rx) = mpsc::channel::<AuditTask>(100);
+        let weight = if let SelectionStrategy::History(strategy) = &strategy {
+            let Some(weight) = config.weights.get(strategy) else {
+                error!(strategy=?strategy, "no weight for strategy");
+                return;
+            };
+            weight
+        } else {
+            &1
+        };
+        let task_channel = TaskChannel {
+            strategy: strategy.clone(),
+            weight: *weight,
+            rx,
+        };
+        task_channels.push(task_channel);
+        // Strategies generate tasks in their own thread for their own channel.
+        tokio::spawn(start_audit_selection_task(
+            strategy.clone(),
+            tx,
+            conn.clone(),
+            config.clone(),
+        ));
+    }
+    // Collation of generated tasks, taken proportional to weights.
+    let (collation_tx, collation_rx) = mpsc::channel::<AuditTask>(100);
+    tokio::spawn(start_collation(collation_tx, task_channels));
+    // Perform collated audit tasks.
+    tokio::spawn(perform_content_audits(config, collation_rx, conn));
 }
 
 /// Listens to tasks coming on different strategy channels and selects
