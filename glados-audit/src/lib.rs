@@ -187,11 +187,35 @@ pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
     }
 
     if config.beacon {
-        initalize_beacon_or_history(conn.clone(), config.clone(), SubProtocol::Beacon).await;
+        let strategies = config
+            .beacon_strategies
+            .iter()
+            .map(|strats| {
+                (
+                    SelectionStrategy::Beacon(strats.clone()),
+                    /* weight= */ 1,
+                )
+            })
+            .collect();
+        start_audit(conn.clone(), config.clone(), strategies).await;
     }
 
     if config.history {
-        initalize_beacon_or_history(conn.clone(), config.clone(), SubProtocol::History).await;
+        let strategies = config
+            .history_strategies
+            .iter()
+            .filter_map(|strats| {
+                let strategy = SelectionStrategy::History(strats.clone());
+                match config.weights.get(strats) {
+                    Some(weight) => Some((strategy, *weight)),
+                    None => {
+                        error!(strategy=?strategy, "no weight for strategy");
+                        None
+                    }
+                }
+            })
+            .collect();
+        start_audit(conn.clone(), config.clone(), strategies).await;
     }
 
     debug!("setting up CTRL+C listener");
@@ -203,43 +227,18 @@ pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
     std::process::exit(0);
 }
 
-async fn initalize_beacon_or_history(
+async fn start_audit(
     conn: DatabaseConnection,
     config: AuditConfig,
-    protocol: SubProtocol,
+    strategies: Vec<(SelectionStrategy, u8)>,
 ) {
     let mut task_channels: Vec<TaskChannel> = vec![];
-    let strategies = match protocol {
-        SubProtocol::History => config
-            .history_strategies
-            .iter()
-            .map(|strats| SelectionStrategy::History(strats.clone()))
-            .collect::<Vec<_>>(),
-        SubProtocol::Beacon => config
-            .beacon_strategies
-            .iter()
-            .map(|strats| SelectionStrategy::Beacon(strats.clone()))
-            .collect(),
-        other => {
-            panic!("{other:?} protocol not supported for function: initalize_beacon_or_history()")
-        }
-    };
-
-    for strategy in strategies {
+    for (strategy, weight) in strategies {
         // Each strategy sends tasks to a separate channel.
         let (tx, rx) = mpsc::channel::<AuditTask>(100);
-        let weight = if let SelectionStrategy::History(strategy) = &strategy {
-            let Some(weight) = config.weights.get(strategy) else {
-                error!(strategy=?strategy, "no weight for strategy");
-                return;
-            };
-            weight
-        } else {
-            &1
-        };
         let task_channel = TaskChannel {
             strategy: strategy.clone(),
-            weight: *weight,
+            weight,
             rx,
         };
         task_channels.push(task_channel);
