@@ -2,11 +2,14 @@
 use crate::content;
 use crate::utils;
 use anyhow::{bail, Result};
-use chrono::DateTime;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use clap::ValueEnum;
 use ethportal_api::OverlayContentKey;
-use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
+use sea_orm::{
+    entity::prelude::*, strum::IntoEnumIterator, ActiveValue::NotSet, DeriveActiveEnum, Set,
+    TryGetable,
+};
+use sea_query::{ArrayType, Nullable, SeaRc, ValueType, ValueTypeErr};
 
 #[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
@@ -19,7 +22,7 @@ pub enum AuditResult {
 #[clap(rename_all = "snake_case")]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 /// Each strategy is responsible for selecting which content key(s) to begin audits for.
-pub enum SelectionStrategy {
+pub enum HistorySelectionStrategy {
     /// Content that is:
     /// 1. Not yet audited
     /// 2. Sorted by date entered into glados database (newest first).
@@ -39,6 +42,190 @@ pub enum SelectionStrategy {
     SpecificContentKey = 4,
     /// Perform audits of random fourfours data.
     FourFours = 5,
+}
+
+impl From<i32> for HistorySelectionStrategy {
+    fn from(value: i32) -> Self {
+        match value {
+            0 => HistorySelectionStrategy::Latest,
+            1 => HistorySelectionStrategy::Random,
+            2 => HistorySelectionStrategy::Failed,
+            3 => HistorySelectionStrategy::SelectOldestUnaudited,
+            4 => HistorySelectionStrategy::SpecificContentKey,
+            5 => HistorySelectionStrategy::FourFours,
+            _ => panic!("Invalid value for HistorySelectionStrategy"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq, EnumIter, DeriveActiveEnum, ValueEnum)]
+#[clap(rename_all = "snake_case")]
+#[sea_orm(rs_type = "i32", db_type = "Integer")]
+/// Each strategy is responsible for selecting which content key(s) to begin audits for.
+pub enum BeaconSelectionStrategy {
+    /// Content that is:
+    /// 1. Not yet audited
+    /// 2. Sorted by date entered into glados database (newest first).
+    Latest = 0,
+}
+
+impl From<i32> for BeaconSelectionStrategy {
+    fn from(value: i32) -> Self {
+        match value {
+            0 => BeaconSelectionStrategy::Latest,
+            _ => panic!("Invalid value for BeaconSelectionStrategy"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq, EnumIter, DeriveActiveEnum, ValueEnum)]
+#[clap(rename_all = "snake_case")]
+#[sea_orm(rs_type = "i32", db_type = "Integer")]
+/// Each strategy is responsible for selecting which content key(s) to begin audits for.
+pub enum StateSelectionStrategy {
+    /// Does a random walk of the state at a random walk.
+    StateRoots = 0,
+}
+
+impl From<i32> for StateSelectionStrategy {
+    fn from(value: i32) -> Self {
+        match value {
+            0 => StateSelectionStrategy::StateRoots,
+            _ => panic!("Invalid value for StateSelectionStrategy"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub enum SelectionStrategy {
+    History(HistorySelectionStrategy),
+    Beacon(BeaconSelectionStrategy),
+    State(StateSelectionStrategy),
+}
+
+impl From<SelectionStrategy> for Value {
+    fn from(value: SelectionStrategy) -> Self {
+        match value {
+            SelectionStrategy::History(h) => Value::Int(Some(h as i32)),
+            SelectionStrategy::Beacon(b) => Value::Int(Some(0x10000 + b as i32)),
+            SelectionStrategy::State(s) => Value::Int(Some(0x20000 + s as i32)),
+        }
+    }
+}
+
+impl Nullable for SelectionStrategy {
+    fn null() -> Value {
+        Value::Int(None)
+    }
+}
+
+impl ValueType for SelectionStrategy {
+    fn try_from(v: Value) -> Result<Self, ValueTypeErr> {
+        match v {
+            Value::Int(Some(value)) => match value >> 16 {
+                0 => Ok(SelectionStrategy::History(HistorySelectionStrategy::from(
+                    value & 0xFFFF,
+                ))),
+                1 => Ok(SelectionStrategy::Beacon(BeaconSelectionStrategy::from(
+                    value & 0xFFFF,
+                ))),
+                2 => Ok(SelectionStrategy::State(StateSelectionStrategy::from(
+                    value & 0xFFFF,
+                ))),
+                _ => Err(ValueTypeErr),
+            },
+            _ => Err(ValueTypeErr),
+        }
+    }
+
+    fn type_name() -> String {
+        stringify!(SelectionStrategy).to_owned()
+    }
+
+    fn array_type() -> ArrayType {
+        ArrayType::Int
+    }
+
+    fn column_type() -> ColumnType {
+        ColumnType::Integer
+    }
+}
+
+impl IntoEnumIterator for SelectionStrategy {
+    type Iterator = std::vec::IntoIter<Self>;
+
+    fn iter() -> Self::Iterator {
+        [
+            HistorySelectionStrategy::iter()
+                .map(SelectionStrategy::History)
+                .collect::<Vec<_>>(),
+            BeaconSelectionStrategy::iter()
+                .map(SelectionStrategy::Beacon)
+                .collect::<Vec<_>>(),
+            StateSelectionStrategy::iter()
+                .map(SelectionStrategy::State)
+                .collect::<Vec<_>>(),
+        ]
+        .concat()
+        .into_iter()
+    }
+}
+
+#[derive(Debug, Iden)]
+#[iden = "selection_strategy"]
+pub struct SelectionStrategyEnum;
+
+impl ActiveEnum for SelectionStrategy {
+    type Value = i32;
+
+    type ValueVec = Vec<Self::Value>;
+
+    fn name() -> sea_orm::DynIden {
+        SeaRc::new(SelectionStrategyEnum)
+    }
+
+    fn to_value(&self) -> Self::Value {
+        match self {
+            SelectionStrategy::History(h) => h.to_value(),
+            SelectionStrategy::Beacon(b) => 0x10000 + b.to_value(),
+            SelectionStrategy::State(s) => 0x20000 + s.to_value(),
+        }
+    }
+
+    fn try_from_value(v: &Self::Value) -> std::prelude::v1::Result<Self, DbErr> {
+        match v >> 16 {
+            0 => Ok(SelectionStrategy::History(HistorySelectionStrategy::from(
+                v & 0xFFFF,
+            ))),
+            1 => Ok(SelectionStrategy::Beacon(BeaconSelectionStrategy::from(
+                v & 0xFFFF,
+            ))),
+            2 => Ok(SelectionStrategy::State(StateSelectionStrategy::from(
+                v & 0xFFFF,
+            ))),
+            _ => Err(DbErr::Type(
+                "Invalid value for SelectionStrategy".to_string(),
+            )),
+        }
+    }
+
+    fn db_type() -> ColumnDef {
+        ColumnType::Integer.def()
+    }
+}
+
+impl TryGetable for SelectionStrategy {
+    fn try_get_by<I: sea_orm::ColIdx>(
+        res: &QueryResult,
+        index: I,
+    ) -> std::prelude::v1::Result<Self, sea_orm::TryGetError> {
+        let value = i32::try_get_by(res, index)?;
+        SelectionStrategy::try_from_value(&value).map_err(|_| {
+            sea_orm::TryGetError::DbErr(DbErr::Type(
+                "Invalid value for SelectionStrategy".to_string(),
+            ))
+        })
+    }
 }
 
 impl AuditResult {
@@ -156,12 +343,22 @@ impl SelectionStrategy {
     /// Display implementation.
     pub fn as_text(&self) -> String {
         match self {
-            SelectionStrategy::Latest => "Latest".to_string(),
-            SelectionStrategy::Random => "Random".to_string(),
-            SelectionStrategy::Failed => "Failed".to_string(),
-            SelectionStrategy::FourFours => "FourFours".to_string(),
-            SelectionStrategy::SelectOldestUnaudited => "Select Oldest Unaudited".to_string(),
-            SelectionStrategy::SpecificContentKey => "Specific Content Key".to_string(),
+            SelectionStrategy::History(HistorySelectionStrategy::Latest) => "Latest".to_string(),
+            SelectionStrategy::History(HistorySelectionStrategy::Random) => "Random".to_string(),
+            SelectionStrategy::History(HistorySelectionStrategy::Failed) => "Failed".to_string(),
+            SelectionStrategy::History(HistorySelectionStrategy::FourFours) => {
+                "FourFours".to_string()
+            }
+            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited) => {
+                "Select Oldest Unaudited".to_string()
+            }
+            SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey) => {
+                "Specific Content Key".to_string()
+            }
+            SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest) => "Latest".to_string(),
+            SelectionStrategy::State(StateSelectionStrategy::StateRoots) => {
+                "State Roots".to_string()
+            }
         }
     }
 }
@@ -184,5 +381,164 @@ impl Model {
             Some(s) => s.as_text(),
             None => "No strategy recorded".to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{ActiveEnum, Value};
+
+    use crate::content_audit::StateSelectionStrategy;
+
+    use super::{BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy};
+
+    #[test]
+    fn test_selection_strategy_to_value() {
+        assert_eq!(
+            SelectionStrategy::History(HistorySelectionStrategy::Latest).to_value(),
+            0
+        );
+        assert_eq!(
+            SelectionStrategy::History(HistorySelectionStrategy::Random).to_value(),
+            1
+        );
+        assert_eq!(
+            SelectionStrategy::History(HistorySelectionStrategy::Failed).to_value(),
+            2
+        );
+        assert_eq!(
+            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited).to_value(),
+            3
+        );
+        assert_eq!(
+            SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey).to_value(),
+            4
+        );
+        assert_eq!(
+            SelectionStrategy::History(HistorySelectionStrategy::FourFours).to_value(),
+            5
+        );
+        assert_eq!(
+            SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest).to_value(),
+            0x10000
+        );
+        assert_eq!(
+            SelectionStrategy::State(StateSelectionStrategy::StateRoots).to_value(),
+            0x20000
+        );
+    }
+
+    #[test]
+    fn test_selection_strategy_try_from_value() {
+        assert_eq!(
+            SelectionStrategy::try_from_value(&0).unwrap(),
+            SelectionStrategy::History(HistorySelectionStrategy::Latest)
+        );
+        assert_eq!(
+            SelectionStrategy::try_from_value(&1).unwrap(),
+            SelectionStrategy::History(HistorySelectionStrategy::Random)
+        );
+        assert_eq!(
+            SelectionStrategy::try_from_value(&2).unwrap(),
+            SelectionStrategy::History(HistorySelectionStrategy::Failed)
+        );
+        assert_eq!(
+            SelectionStrategy::try_from_value(&3).unwrap(),
+            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited)
+        );
+        assert_eq!(
+            SelectionStrategy::try_from_value(&4).unwrap(),
+            SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey)
+        );
+        assert_eq!(
+            SelectionStrategy::try_from_value(&5).unwrap(),
+            SelectionStrategy::History(HistorySelectionStrategy::FourFours)
+        );
+        assert_eq!(
+            SelectionStrategy::try_from_value(&0x10000).unwrap(),
+            SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest)
+        );
+        assert_eq!(
+            SelectionStrategy::try_from_value(&0x20000).unwrap(),
+            SelectionStrategy::State(StateSelectionStrategy::StateRoots)
+        );
+    }
+
+    #[test]
+    fn test_selection_strategy_as_text() {
+        assert_eq!(
+            SelectionStrategy::History(HistorySelectionStrategy::Latest).as_text(),
+            "Latest"
+        );
+        assert_eq!(
+            SelectionStrategy::History(HistorySelectionStrategy::Random).as_text(),
+            "Random"
+        );
+        assert_eq!(
+            SelectionStrategy::History(HistorySelectionStrategy::Failed).as_text(),
+            "Failed"
+        );
+        assert_eq!(
+            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited).as_text(),
+            "Select Oldest Unaudited"
+        );
+        assert_eq!(
+            SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey).as_text(),
+            "Specific Content Key"
+        );
+        assert_eq!(
+            SelectionStrategy::History(HistorySelectionStrategy::FourFours).as_text(),
+            "FourFours"
+        );
+        assert_eq!(
+            SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest).as_text(),
+            "Latest"
+        );
+        assert_eq!(
+            SelectionStrategy::State(StateSelectionStrategy::StateRoots).as_text(),
+            "State Roots"
+        );
+    }
+
+    #[test]
+    fn test_from_selection_strategy_to_value() {
+        assert_eq!(
+            Value::from(SelectionStrategy::History(HistorySelectionStrategy::Latest)),
+            Value::Int(Some(0))
+        );
+        assert_eq!(
+            Value::from(SelectionStrategy::History(HistorySelectionStrategy::Random)),
+            Value::Int(Some(1))
+        );
+        assert_eq!(
+            Value::from(SelectionStrategy::History(HistorySelectionStrategy::Failed)),
+            Value::Int(Some(2))
+        );
+        assert_eq!(
+            Value::from(SelectionStrategy::History(
+                HistorySelectionStrategy::SelectOldestUnaudited
+            )),
+            Value::Int(Some(3))
+        );
+        assert_eq!(
+            Value::from(SelectionStrategy::History(
+                HistorySelectionStrategy::SpecificContentKey
+            )),
+            Value::Int(Some(4))
+        );
+        assert_eq!(
+            Value::from(SelectionStrategy::History(
+                HistorySelectionStrategy::FourFours
+            )),
+            Value::Int(Some(5))
+        );
+        assert_eq!(
+            Value::from(SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest)),
+            Value::Int(Some(0x10000))
+        );
+        assert_eq!(
+            Value::from(SelectionStrategy::State(StateSelectionStrategy::StateRoots)),
+            Value::Int(Some(0x20000))
+        );
     }
 }

@@ -12,5 +12,6 @@ pub mod execution_metadata;
 pub mod key_value;
 pub mod node;
 pub mod record;
+pub mod state_roots;
 pub mod test;
 pub mod utils;

@@ -15,8 +15,8 @@ use tokio::{
 use tracing::{debug, error, warn};
 
 use entity::{
-    content,
-    content_audit::{self, SelectionStrategy},
+    content::{self, SubProtocol},
+    content_audit::{self, BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy},
 };
 use web3::types::{BlockId, BlockNumber};
 
@@ -30,20 +30,30 @@ pub async fn start_audit_selection_task(
     conn: DatabaseConnection,
     config: AuditConfig,
 ) {
-    match strategy {
-        SelectionStrategy::Latest => select_latest_content_for_audit(tx, conn).await,
-        SelectionStrategy::Random => select_random_content_for_audit(tx, conn).await,
-        SelectionStrategy::FourFours => {
+    match &strategy {
+        SelectionStrategy::History(HistorySelectionStrategy::Latest)
+        | SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest) => {
+            select_latest_content_for_audit(tx, conn, strategy).await
+        }
+        SelectionStrategy::History(HistorySelectionStrategy::Random) => {
+            select_random_content_for_audit(tx, conn).await
+        }
+        SelectionStrategy::History(HistorySelectionStrategy::FourFours) => {
             // Fourfours strategy downloads its own keys rather than waiting on glados-monitor to put them in the DB.
             let w3 = web3::Web3::new(web3::transports::Http::new(&config.provider_url).unwrap());
             select_fourfours_content_for_audit(tx, conn, w3).await
         }
-        SelectionStrategy::Failed => warn!("Need to implement SelectionStrategy::Failed"),
-        SelectionStrategy::SelectOldestUnaudited => {
+        SelectionStrategy::History(HistorySelectionStrategy::Failed) => {
+            warn!("Need to implement SelectionStrategy::Failed")
+        }
+        SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited) => {
             select_oldest_unaudited_content_for_audit(tx, conn).await
         }
-        SelectionStrategy::SpecificContentKey => {
+        SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey) => {
             error!("SpecificContentKey is not a valid audit strategy")
+        }
+        _ => {
+            error!("Strategy not implemented")
         }
     }
 }
@@ -60,10 +70,15 @@ pub async fn start_audit_selection_task(
 async fn select_latest_content_for_audit(
     tx: mpsc::Sender<AuditTask>,
     conn: DatabaseConnection,
+    strategy: SelectionStrategy,
 ) -> ! {
     debug!("initializing audit process for 'latest' strategy");
     let mut interval = interval(Duration::from_secs(10));
-
+    let protocol_id = match &strategy {
+        SelectionStrategy::History(_) => SubProtocol::History as i32,
+        SelectionStrategy::Beacon(_) => SubProtocol::Beacon as i32,
+        SelectionStrategy::State(_) => SubProtocol::State as i32,
+    };
     loop {
         interval.tick().await;
         if tx.is_closed() {
@@ -81,6 +96,7 @@ async fn select_latest_content_for_audit(
                 "SELECT *
                     FROM content
                     WHERE content.first_available_at > NOW() - INTERVAL '24 hours'
+                    AND content.protocol_id = $3
                     AND NOT EXISTS (
                         SELECT 1
                         FROM content_audit
@@ -105,6 +121,7 @@ async fn select_latest_content_for_audit(
                 vec![
                     Value::Int(Some(MERGE_BLOCK_HEIGHT)),
                     Value::Int(Some(keys_required)),
+                    Value::Int(Some(protocol_id)),
                 ],
             ))
             .all(&conn)
@@ -121,12 +138,7 @@ async fn select_latest_content_for_audit(
             strategy = "latest",
             item_count, "Adding content keys to the audit queue."
         );
-        add_to_queue(
-            tx.clone(),
-            SelectionStrategy::Latest,
-            content_key_db_entries,
-        )
-        .await;
+        add_to_queue(tx.clone(), strategy.clone(), content_key_db_entries).await;
     }
 }
 
@@ -189,7 +201,12 @@ async fn select_fourfours_content_for_audit(
             item_count = items_to_audit.len(),
             "Adding content keys to the audit queue."
         );
-        add_to_queue(tx.clone(), SelectionStrategy::FourFours, items_to_audit).await;
+        add_to_queue(
+            tx.clone(),
+            SelectionStrategy::History(HistorySelectionStrategy::FourFours),
+            items_to_audit,
+        )
+        .await;
     }
 }
 
@@ -289,7 +306,7 @@ async fn select_random_content_for_audit(
         );
         add_to_queue(
             tx.clone(),
-            SelectionStrategy::Random,
+            SelectionStrategy::History(HistorySelectionStrategy::Random),
             content_key_db_entries,
         )
         .await;
@@ -369,7 +386,7 @@ async fn select_oldest_unaudited_content_for_audit(
         );
         add_to_queue(
             tx.clone(),
-            SelectionStrategy::SelectOldestUnaudited,
+            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited),
             content_key_db_entries,
         )
         .await;
@@ -382,6 +399,7 @@ mod tests {
 
     use chrono::Utc;
     use enr::NodeId;
+    use entity::content_audit::HistorySelectionStrategy;
     use entity::execution_metadata;
     use entity::{
         client_info,
@@ -482,7 +500,9 @@ mod tests {
                     id: NotSet,
                     content_key: Set(content_key_model.id),
                     created_at: Set(Utc::now()),
-                    strategy_used: Set(Some(SelectionStrategy::Random)),
+                    strategy_used: Set(Some(SelectionStrategy::History(
+                        HistorySelectionStrategy::Random,
+                    ))),
                     result: Set(result),
                     trace: Set("".to_owned()),
                     client_info: Set(Some(client_info_model.id)),
@@ -512,7 +532,11 @@ mod tests {
         const CHANNEL_SIZE: usize = 20;
         let (tx, mut rx) = channel::<AuditTask>(CHANNEL_SIZE);
         // Start strategy
-        tokio::spawn(select_latest_content_for_audit(tx.clone(), conn.clone()));
+        tokio::spawn(select_latest_content_for_audit(
+            tx.clone(),
+            conn.clone(),
+            SelectionStrategy::History(HistorySelectionStrategy::Latest),
+        ));
         let mut checked_ids: HashSet<i32> = HashSet::new();
         // There are 15 correct values: [31, 32, ... 45], after which the queue should be empty
         let expected_key_ids: Vec<i32> = (31..=45).collect();
@@ -588,7 +612,11 @@ mod tests {
         const CHANNEL_SIZE: usize = 10;
         let (tx, mut rx) = channel::<AuditTask>(CHANNEL_SIZE);
         // Start strategy
-        tokio::spawn(select_latest_content_for_audit(tx.clone(), conn.clone()));
+        tokio::spawn(select_latest_content_for_audit(
+            tx.clone(),
+            conn.clone(),
+            SelectionStrategy::History(HistorySelectionStrategy::Latest),
+        ));
         let mut checked_ids: HashSet<i32> = HashSet::new();
         // There are 45 possible correct values: [1, 2, ... 45]
         let expected_key_ids: Vec<i32> = (1..=45).collect();

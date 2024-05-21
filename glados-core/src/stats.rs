@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 
 use entity::{
     content::{self, SubProtocol},
-    content_audit::{self, AuditResult, SelectionStrategy},
+    content_audit::{self, AuditResult, HistorySelectionStrategy, SelectionStrategy},
 };
 use sea_orm::{
     sea_query::{Expr, IntoCondition},
@@ -22,18 +22,20 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
     // Strategy filters
     let audits = match filters.strategy {
         StrategyFilter::All => audits,
-        StrategyFilter::Random => {
-            audits.filter(content_audit::Column::StrategyUsed.eq(SelectionStrategy::Random))
-        }
-        StrategyFilter::Latest => {
-            audits.filter(content_audit::Column::StrategyUsed.eq(SelectionStrategy::Latest))
-        }
-        StrategyFilter::Oldest => audits.filter(
-            content_audit::Column::StrategyUsed.eq(SelectionStrategy::SelectOldestUnaudited),
+        StrategyFilter::Random => audits.filter(
+            content_audit::Column::StrategyUsed
+                .eq(SelectionStrategy::History(HistorySelectionStrategy::Random)),
         ),
-        StrategyFilter::FourFours => {
-            audits.filter(content_audit::Column::StrategyUsed.eq(SelectionStrategy::FourFours))
-        }
+        StrategyFilter::Latest => audits.filter(
+            content_audit::Column::StrategyUsed
+                .eq(SelectionStrategy::History(HistorySelectionStrategy::Latest)),
+        ),
+        StrategyFilter::Oldest => audits.filter(content_audit::Column::StrategyUsed.eq(
+            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited),
+        )),
+        StrategyFilter::FourFours => audits.filter(content_audit::Column::StrategyUsed.eq(
+            SelectionStrategy::History(HistorySelectionStrategy::FourFours),
+        )),
     };
     // Success filters
     let audits = match filters.success {

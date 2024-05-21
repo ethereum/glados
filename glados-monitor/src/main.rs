@@ -5,6 +5,7 @@ use glados_monitor::{
     bulk_download_block_data,
     cli::{Cli, Commands},
     import_pre_merge_accumulators, panda_ops_web3, run_glados_monitor, run_glados_monitor_beacon,
+    state::{follow_head_state_command, populate_state_roots_range_command},
 };
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{Database, DatabaseConnection};
@@ -69,6 +70,25 @@ async fn main() -> Result<()> {
         }) => {
             info!("Bulk downloading block data");
             task::spawn(bulk_download_block_data(
+                conn,
+                *start_block_number,
+                *end_block_number,
+                provider_url.to_string(),
+                *concurrency,
+            ))
+        }
+        Some(Commands::FollowHeadState { provider_url }) => {
+            info!("Running follow head state");
+            task::spawn(follow_head_state_command(conn, provider_url.to_string()))
+        }
+        Some(Commands::PopulateStateRootsRange {
+            start_block_number,
+            end_block_number,
+            provider_url,
+            concurrency,
+        }) => {
+            info!("Downloading state roots for selected range");
+            task::spawn(populate_state_roots_range_command(
                 conn,
                 *start_block_number,
                 *end_block_number,

@@ -18,7 +18,7 @@ use ethportal_api::utils::bytes::hex_encode;
 use migration::{Migrator, MigratorTrait};
 
 use crate::content::SubProtocol;
-use crate::content_audit::SelectionStrategy;
+use crate::content_audit::{HistorySelectionStrategy, SelectionStrategy};
 use crate::{client_info, content, content_audit, node, record};
 use pgtemp::PgTempDB;
 
@@ -230,7 +230,9 @@ async fn test_audit_crud() -> Result<(), DbErr> {
         id: NotSet,
         content_key: Set(searched_content_model.id),
         created_at: Set(Utc::now()),
-        strategy_used: Set(Some(SelectionStrategy::Random)),
+        strategy_used: Set(Some(SelectionStrategy::History(
+            HistorySelectionStrategy::Random,
+        ))),
         result: Set(content_audit::AuditResult::Success),
         trace: Set("".to_owned()),
         client_info: Set(Some(client_info_model.id)),
@@ -251,7 +253,9 @@ async fn test_audit_crud() -> Result<(), DbErr> {
     );
     assert_eq!(
         searched_content_audit_model.strategy_used,
-        Some(content_audit::SelectionStrategy::Random)
+        Some(content_audit::SelectionStrategy::History(
+            HistorySelectionStrategy::Random
+        ))
     );
 
     Ok(())
