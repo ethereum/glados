@@ -57,9 +57,15 @@ pub async fn get_or_create(enr: &Enr, conn: &DatabaseConnection) -> Result<Model
 
     // Wrap-around large sequence numbers
     // TODO: migrate DB schema to use BigInt
-    let seq = match enr.seq().try_into() {
+    let seq: i32 = match enr.seq().try_into() {
         Ok(seq) => seq,
-        Err(_) => (enr.seq() % 4294967295).try_into().unwrap(),
+        Err(_) => {
+            if enr.seq() > i32::MAX as u64 {
+                (enr.seq() % i32::MAX as u64) as i32
+            } else {
+                enr.seq() as i32
+            }
+        }
     };
 
     // If no record exists, create one and return it
