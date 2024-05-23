@@ -14,43 +14,6 @@ function radius_stacked_chart(data) {
         .attr("transform",
             `translate(${margin.left}, ${margin.top})`);
 
-    // Add X axis
-    const x = d3.scaleLinear()
-        .domain([0, num_buckets])
-        .range([ 0, width ]);
-    const ticks = Array(17).fill(0).map((none, index) => index * 16);
-    ticks[ticks.length - 1] -= 1;
-    svg.append("g")
-        .attr("transform", `translate(0, ${height})`)
-        .call(d3.axisBottom(x).tickValues(ticks).tickFormat(d3.format("#0x")))
-        .selectAll("text")
-        .style("text-anchor", "end")
-        .attr("dx", "-.8em")
-        .attr("dy", ".15em")
-        .attr("transform", "rotate(-55)");
-    // X-axis label
-    svg.append("text")
-        .attr("class", "x label")
-        .attr("text-anchor", "middle")
-        .attr("x", width / 2)
-        .attr("y", height + margin.top + margin.bottom - 15)
-        .text("First byte of Content ID");
-
-    // Add Y axis
-    const y = d3.scaleLinear()
-        .domain([0, 16])
-        .range([ height, 0]);
-    svg.append("g")
-        .call(d3.axisLeft(y));
-    // Y-axis label
-    svg.append("text")
-        .attr("class", "y label")
-        .attr("text-anchor", "end")
-        .attr("y", 0)
-        .attr("dy", "-2.5em")
-        .attr("transform", "rotate(-90)")
-        .text("# of nodes claiming to want content ->>");
-
     // Indexed data
     // based on shape of data produced in this example: https://d3js.org/d3-shape/stack#_stack
     const full = Array(num_buckets).fill(0);
@@ -84,6 +47,44 @@ function radius_stacked_chart(data) {
         }
       })
       (indexedData);
+
+    // Add X axis
+    const x = d3.scaleLinear()
+        .domain([0, num_buckets])
+        .range([ 0, width ]);
+    const ticks = Array(17).fill(0).map((none, index) => index * 16);
+    ticks[ticks.length - 1] -= 1;
+    svg.append("g")
+        .attr("transform", `translate(0, ${height})`)
+        .call(d3.axisBottom(x).tickValues(ticks).tickFormat(d3.format("#0x")))
+        .selectAll("text")
+        .style("text-anchor", "end")
+        .attr("dx", "-.8em")
+        .attr("dy", ".15em")
+        .attr("transform", "rotate(-55)");
+    // X-axis label
+    svg.append("text")
+        .attr("class", "x label")
+        .attr("text-anchor", "middle")
+        .attr("x", width / 2)
+        .attr("y", height + margin.top + margin.bottom - 15)
+        .text("First byte of Content ID");
+
+    // Add Y axis
+    const maxBarHeight = d3.max(stackedData, d => d3.max(d, d => d[1]));
+    const y = d3.scaleLinear()
+        .domain([0, Math.ceil(maxBarHeight)])
+        .range([ height, 0]);
+    svg.append("g")
+        .call(d3.axisLeft(y));
+    // Y-axis label
+    svg.append("text")
+        .attr("class", "y label")
+        .attr("text-anchor", "end")
+        .attr("y", 0)
+        .attr("dy", "-2.5em")
+        .attr("transform", "rotate(-90)")
+        .text("# of nodes claiming to want content ->>");
 
     const hover = d3.select("#hover");
 
