@@ -16,7 +16,10 @@ use ethportal_api::types::distance::{Distance, Metric, XorMetric};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{jsonrpsee::core::__reexports::serde_json, BeaconContentKey, StateContentKey};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
-use glados_core::stats::{filter_audits, get_audit_stats, AuditFilters, Period};
+use glados_core::stats::{
+    filter_audits, get_audit_stats, AuditFilters, ContentTypeFilter, Period, StrategyFilter,
+    SuccessFilter,
+};
 use migration::{Alias, JoinType, Order};
 use sea_orm::sea_query::{Expr, Query, SeaRc};
 use sea_orm::{sea_query::SimpleExpr, Statement};
@@ -374,17 +377,32 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
     };
 
     let radius_percentages = generate_radius_graph_data(&state).await;
-    let open_filter = content_audit::Entity::find();
     // Run queries for content dashboard data concurrently
     let (hour_stats, day_stats, week_stats) = tokio::join!(
         get_audit_stats(
-            open_filter.clone(),
+            filter_audits(AuditFilters {
+                strategy: StrategyFilter::FourFours,
+                content_type: ContentTypeFilter::All,
+                success: SuccessFilter::All
+            }),
             Period::Hour,
             &state.database_connection
         ),
-        get_audit_stats(open_filter.clone(), Period::Day, &state.database_connection),
         get_audit_stats(
-            open_filter.clone(),
+            filter_audits(AuditFilters {
+                strategy: StrategyFilter::FourFours,
+                content_type: ContentTypeFilter::All,
+                success: SuccessFilter::All
+            }),
+            Period::Day,
+            &state.database_connection
+        ),
+        get_audit_stats(
+            filter_audits(AuditFilters {
+                strategy: StrategyFilter::FourFours,
+                content_type: ContentTypeFilter::All,
+                success: SuccessFilter::All
+            }),
             Period::Week,
             &state.database_connection
         ),
