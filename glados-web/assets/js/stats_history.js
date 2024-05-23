@@ -116,7 +116,7 @@ function createMultiLineChart(height, width, dataSets) {
         .attr("fill", (d, i) => colors[i % colors.length]);
 
     // Add text to the legend.
-    const labels = ["All", "Latest", "Random", "Oldest", "4444s",
+    const labels = ["All", "Latest", "Random", "4444s",
         "All Headers", "All Bodies", "All Receipts",
         "Latest Headers", "Latest Bodies", "Latest Receipts",
         "Random Headers", "Random Bodies", "Random Receipts",
@@ -226,7 +226,6 @@ function convertDataForChart(data) {
         'success_rate_all',
         'success_rate_latest',
         'success_rate_random',
-        'success_rate_oldest',
         'success_rate_four_fours',
         'success_rate_all_headers',
         'success_rate_all_bodies',
