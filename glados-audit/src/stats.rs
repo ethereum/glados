@@ -29,7 +29,6 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         all,
         latest,
         random,
-        oldest,
         fourfours,
         all_headers,
         all_bodies,
@@ -65,15 +64,6 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         get_audit_stats(
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::Random,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All
-            }),
-            Period::Hour,
-            conn
-        ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::Oldest,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All
             }),
@@ -203,7 +193,7 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
     let success_rate_all = all?.pass_percent;
     let success_rate_latest = latest?.pass_percent;
     let success_rate_random = random?.pass_percent;
-    let success_rate_oldest = oldest?.pass_percent;
+    let success_rate_oldest = 0.0;
     let success_rate_fourfours = fourfours?.pass_percent;
     let success_rate_all_headers = all_headers?.pass_percent;
     let success_rate_all_bodies = all_bodies?.pass_percent;

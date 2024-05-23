@@ -96,7 +96,6 @@ impl AuditConfig {
                     HistorySelectionStrategy::Latest,
                     HistorySelectionStrategy::Random,
                     HistorySelectionStrategy::Failed,
-                    HistorySelectionStrategy::SelectOldestUnaudited,
                     HistorySelectionStrategy::FourFours,
                 ]
             }
