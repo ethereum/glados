@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::{net::SocketAddr, path::Path};
 
 use anyhow::{bail, Result};
-use axum::http::StatusCode;
+use axum::http::{StatusCode, Uri};
 use axum::{
     extract::Extension,
     routing::{get, get_service},
@@ -113,7 +113,7 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
 }
 
 /// Global routing error handler to prevent panics.
-async fn handler_404() -> StatusCode {
-    tracing::error!("404: Non-existent page visited");
+async fn handler_404(uri: Uri) -> StatusCode {
+    tracing::error!("404: Nothing to serve for '{uri}'");
     StatusCode::NOT_FOUND
 }

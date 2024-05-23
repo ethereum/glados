@@ -1,3 +1,156 @@
+function radius_stacked_chart(data) {
+    const bucket_bit_width = 8;
+    const num_buckets = 2 ** bucket_bit_width;
+    const margin = {top: 10, right: 15, bottom: 60, left: 65},
+        width = 1060 - margin.left - margin.right,
+        height = 425 - margin.top - margin.bottom;
+
+    // append the svg object to the body of the page
+    const svg = d3.select("#census-stacked")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform",
+            `translate(${margin.left}, ${margin.top})`);
+
+    // Add X axis
+    const x = d3.scaleLinear()
+        .domain([0, num_buckets])
+        .range([ 0, width ]);
+    const ticks = Array(17).fill(0).map((none, index) => index * 16);
+    ticks[ticks.length - 1] -= 1;
+    svg.append("g")
+        .attr("transform", `translate(0, ${height})`)
+        .call(d3.axisBottom(x).tickValues(ticks).tickFormat(d3.format("#0x")))
+        .selectAll("text")
+        .style("text-anchor", "end")
+        .attr("dx", "-.8em")
+        .attr("dy", ".15em")
+        .attr("transform", "rotate(-55)");
+    // X-axis label
+    svg.append("text")
+        .attr("class", "x label")
+        .attr("text-anchor", "middle")
+        .attr("x", width / 2)
+        .attr("y", height + margin.top + margin.bottom - 15)
+        .text("First byte of Content ID");
+
+    // Add Y axis
+    const y = d3.scaleLinear()
+        .domain([0, 16])
+        .range([ height, 0]);
+    svg.append("g")
+        .call(d3.axisLeft(y));
+    // Y-axis label
+    svg.append("text")
+        .attr("class", "y label")
+        .attr("text-anchor", "end")
+        .attr("y", 0)
+        .attr("dy", "-2.5em")
+        .attr("transform", "rotate(-90)")
+        .text("# of nodes claiming to want content ->>");
+
+    // Indexed data
+    // based on shape of data produced in this example: https://d3js.org/d3-shape/stack#_stack
+    const full = Array(num_buckets).fill(0);
+    const part = Array(num_buckets).fill(0.0);
+    data.forEach(function (node, idx, arr) {
+      const nodePrefix = Number(BigInt(node.node_id) >> (64n - BigInt(bucket_bit_width)));
+      const radiusPrefix = node.radius_top;
+      for (let bucket = 0; bucket < num_buckets; bucket++) {
+        const distance = nodePrefix ^ bucket;
+        if (distance < radiusPrefix) {
+          full[bucket] += 1;
+        }
+        else if (distance == radiusPrefix) {
+          part[bucket] += node.radius_lower_fraction;
+        }
+        // else if distance > prefix, then it shouldn't show any bar, so take no action.
+      }
+    });
+    const compiledData = Array(bucket_bit_width * 2);
+    full.forEach((covers, prefix, arr) => compiledData[prefix] = {prefix: prefix, coverage: "full", fraction: covers});
+    part.forEach((covers, prefix, arr) => compiledData[num_buckets+prefix] = {prefix: prefix, coverage: "part", fraction: covers});
+    const indexedData = d3.index(compiledData, d => d.prefix, d => d.coverage);
+
+    stackedData = d3.stack()
+      .keys(["full", "part"])
+      .value(function ([, group], key) {
+        if (group.has(key)) {
+          return group.get(key).fraction;
+        } else {
+          return 0;
+        }
+      })
+      (indexedData);
+
+    const hover = d3.select("#hover");
+
+    function hoverAppear(event, d) {
+        let coverage = d[1]-d[0];
+        const coverageType = d3.select(this.parentNode).datum().key;
+        if (coverageType == "part") {
+          coverage = coverage.toFixed(2);
+        }
+        // try to ID bucket:
+        const barx = parseFloat(event.target.getAttribute("x"));
+        const bucketnum = Math.round(barx / (width/num_buckets));
+        const buckethex = bucketnum.toString(16).padStart(2, '0');
+        hover.html(`Data Prefix: 0x${buckethex}<br>Type: ${coverageType}<br>Coverage multiple: ${coverage}`);
+
+        hover
+            .style("opacity", 0.9)
+            .style("background-color", "#ccc")
+            .style("border-radius", "5px");
+    }
+
+    function hoverFollow(event, d) {
+        const hoverX = event.pageX + 10;
+        const hoverY = event.pageY - 10;
+        hover
+            .style("left", hoverX + "px")
+            .style("top", hoverY + "px");
+    }
+
+    function hoverGone() {
+        hover
+            .style("opacity", 0)
+            .style("background-color", "transparent")
+            .style("border-radius", "0px");
+    }
+
+
+    svg.append('g')
+        .selectAll("g")
+        .data(stackedData)
+        .join("g")
+          .attr("fill", function(d) {
+            let blue = '#3498DB'
+            let orange = '#E67E22'
+            if (d.key == "full") {
+              return blue;
+            } else if (d.key == "part") {
+              return orange;
+            }
+          })
+        .selectAll("rect")
+        .data(d => d)
+        .join("rect")
+          .attr("x", function (d) {
+            return x(d.data[0]); } )
+          .attr("y", function (d) {
+            return y(d[1]); } )
+          .attr("height", function (d) {
+            return y(d[0]) - y(d[1]);
+          })
+          .attr("width", width/num_buckets)
+          .style("opacity", 0.9)
+          .on("mouseover", hoverAppear)
+          .on("mousemove", hoverFollow)
+          .on("mouseout", hoverGone);
+}
+
 function radius_node_id_scatter_chart(data) {
     const margin = {top: 10, right: 2.5, bottom: 50, left: 25},
         width = 475 - margin.left - margin.right,
