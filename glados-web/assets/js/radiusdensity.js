@@ -1,4 +1,6 @@
 function radius_stacked_chart(data) {
+    // If a node has a larger radius fraction than this, ignore it in the coverage calculation
+    const maxRadiusFraction = 0.1;
     const bucket_bit_width = 8;
     const num_buckets = 2 ** bucket_bit_width;
     const margin = {top: 10, right: 15, bottom: 60, left: 65},
@@ -21,6 +23,10 @@ function radius_stacked_chart(data) {
     data.forEach(function (node, idx, arr) {
       const nodePrefix = Number(BigInt(node.node_id) >> (64n - BigInt(bucket_bit_width)));
       const radiusPrefix = node.radius_top;
+      if (radiusPrefix / 256 > maxRadiusFraction) {
+        // Ignore nodes with large radius. They are probably new nodes that are syncing
+        return ;
+      }
       for (let bucket = 0; bucket < num_buckets; bucket++) {
         const distance = nodePrefix ^ bucket;
         if (distance < radiusPrefix) {
