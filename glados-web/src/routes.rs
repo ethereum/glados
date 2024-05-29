@@ -107,7 +107,9 @@ impl Display for ClientDiversityResult {
     }
 }
 
-async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusChartData> {
+pub async fn generate_radius_graph_data(
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<CalculatedRadiusChartData>>, StatusCode> {
     let builder = state.database_connection.get_database_backend();
     let mut radius_density = Query::select();
     radius_density
@@ -206,7 +208,20 @@ async fn generate_radius_graph_data(state: &Arc<State>) -> Vec<CalculatedRadiusC
         });
     }
 
-    radius_percentages
+    Ok(Json(radius_percentages))
+}
+
+pub async fn get_radius_diversity_data(
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<ClientDiversityResult>>, StatusCode> {
+    let client_diversity_data = match get_max_census_id(&state).await {
+        None => vec![],
+        Some(max_census_id) => generate_client_diversity_data(&state, None, max_census_id)
+            .await
+            .unwrap(),
+    };
+
+    Ok(Json(client_diversity_data))
 }
 
 fn xor_distance_to_fraction(radius_high_bytes: [u8; 4]) -> f64 {
@@ -384,14 +399,6 @@ async fn generate_enr_list_from_census_id(
 }
 
 pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
-    let client_diversity_data = match get_max_census_id(&state).await {
-        None => vec![],
-        Some(max_census_id) => generate_client_diversity_data(&state, None, max_census_id)
-            .await
-            .unwrap(),
-    };
-
-    let radius_percentages = generate_radius_graph_data(&state).await;
     // Run queries for content dashboard data concurrently
     let (hour_stats, day_stats, week_stats) = tokio::join!(
         get_audit_stats(
@@ -429,8 +436,6 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
     let week_stats = week_stats.unwrap();
 
     let template = IndexTemplate {
-        client_diversity_data,
-        average_radius_chart: radius_percentages,
         stats: [hour_stats, day_stats, week_stats],
     };
     HtmlTemplate(template)
