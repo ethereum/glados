@@ -113,6 +113,9 @@
                                     // ASCII 'f'
                                     case 0x66:
                                         return 'fluffy';
+                                        // ASCII 's'
+                                    case 0x73:
+                                        return 'shisui';
                                     default:
                                         return undefined;
                                 }

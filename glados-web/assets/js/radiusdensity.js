@@ -234,6 +234,7 @@ function radius_node_id_scatter_chart(data) {
             let blue = '#3498DB'
             let purple = '#9B59B6'
             let orange = '#E67E22'
+            let red = '#DA251D'
             let grey = '#808080'
             const clientString = getClientStringFromDecodedEnr(d.raw_enr);
                 if (clientString[0] === "f") {
@@ -242,6 +243,8 @@ function radius_node_id_scatter_chart(data) {
                     return purple; 
                 } else if (clientString[0] === "u") {
                     return orange; 
+                } else if (clientString[0] === "s") {
+                  return red; 
                 } else {
                     return grey; 
                 }
