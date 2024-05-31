@@ -526,6 +526,306 @@ lazy_static! {
             "0x9bd5f31dcb19bac10077cc903b651d1885807907b256bb497e683715bac20a66".to_string(),
             "trin-nyc1-22".to_string(),
         );
+        nicknames.insert("0x00c9..98c1".to_string(), "trin-ams3-2".to_string());
+        nicknames.insert("0x556d..2c4f".to_string(), "trin-nyc1-2".to_string());
+        nicknames.insert("0xab0f..4408".to_string(), "trin-sgp1-2".to_string());
+        nicknames.insert("0x00ff..7965".to_string(), "trin-ams3-3".to_string());
+        nicknames.insert("0x55a7..d4bc".to_string(), "trin-nyc1-3".to_string());
+        nicknames.insert("0xab0e..2946".to_string(), "trin-sgp1-3".to_string());
+        nicknames.insert("0xe419..f32a".to_string(), "trin-ams3-31".to_string());
+        nicknames.insert("0xe95d..0c09".to_string(), "trin-ams3-32".to_string());
+        nicknames.insert("0xefd7..e619".to_string(), "trin-ams3-33".to_string());
+        nicknames.insert("0xf5c5..1da5".to_string(), "trin-ams3-34".to_string());
+        nicknames.insert("0xfae2..343a".to_string(), "trin-ams3-35".to_string());
+        nicknames.insert("0x93c0..9bd8".to_string(), "trin-ams3-36".to_string());
+        nicknames.insert("0xed31..c6f3".to_string(), "trin-ams3-37".to_string());
+        nicknames.insert("0x66df..f1cd".to_string(), "trin-ams3-38".to_string());
+        nicknames.insert("0xd7eb..bfbd".to_string(), "trin-ams3-39".to_string());
+        nicknames.insert("0xe557..8834".to_string(), "trin-ams3-40".to_string());
+        nicknames.insert("0xbdbb..3c8c".to_string(), "trin-ams3-41".to_string());
+        nicknames.insert("0x7a51..13e2".to_string(), "trin-ams3-42".to_string());
+        nicknames.insert("0x4aca..0305".to_string(), "trin-ams3-43".to_string());
+        nicknames.insert("0x996c..dd21".to_string(), "trin-ams3-44".to_string());
+        nicknames.insert("0xa7c9..ab0c".to_string(), "trin-ams3-45".to_string());
+        nicknames.insert("0xfd01..e7af".to_string(), "trin-nyc1-35".to_string());
+        nicknames.insert("0xd1b9..22a9".to_string(), "trin-nyc1-36".to_string());
+        nicknames.insert("0x0cbb..5e2d".to_string(), "trin-nyc1-37".to_string());
+        nicknames.insert("0xdf29..4c4e".to_string(), "trin-nyc1-38".to_string());
+        nicknames.insert("0x5b18..34b0".to_string(), "trin-nyc1-39".to_string());
+        nicknames.insert("0x1556..5049".to_string(), "trin-nyc1-40".to_string());
+        nicknames.insert("0x392e..47f6".to_string(), "trin-nyc1-41".to_string());
+        nicknames.insert("0xc37e..9314".to_string(), "trin-nyc1-42".to_string());
+        nicknames.insert("0xdc2c..3ab6".to_string(), "trin-nyc1-43".to_string());
+        nicknames.insert("0x2392..07dd".to_string(), "trin-nyc1-44".to_string());
+        nicknames.insert("0x126f..7243".to_string(), "trin-nyc1-45".to_string());
+        nicknames.insert("0x88dd..a5cb".to_string(), "trin-sgp1-31".to_string());
+        nicknames.insert("0x2889..9df1".to_string(), "trin-sgp1-32".to_string());
+        nicknames.insert("0xaf58..8f87".to_string(), "trin-sgp1-33".to_string());
+        nicknames.insert("0x1a8a..8b2a".to_string(), "trin-sgp1-34".to_string());
+        nicknames.insert("0x3c7e..e4ff".to_string(), "trin-sgp1-35".to_string());
+        nicknames.insert("0x2bd9..1403".to_string(), "trin-sgp1-36".to_string());
+        nicknames.insert("0xc6ea..e272".to_string(), "trin-sgp1-37".to_string());
+        nicknames.insert("0x6fdb..419e".to_string(), "trin-sgp1-38".to_string());
+        nicknames.insert("0x8526..2fe7".to_string(), "trin-sgp1-39".to_string());
+        nicknames.insert("0x8234..0ed8".to_string(), "trin-sgp1-40".to_string());
+
+        nicknames.insert(
+            "0x9e7dc510a091a46a07a9d337f4b451eee499503b194b80228a7b9715c579e865".to_string(),
+            "fluffy-ih-eu-mda-01-01".to_string(),
+        );
+        nicknames.insert(
+            "0xb46b09a36e2318900e142c36128b39651eb8ff908f1fe6830e7b3cd343f18ed3".to_string(),
+            "fluffy-ih-eu-mda-01-02".to_string(),
+        );
+        nicknames.insert(
+            "0x42b0e92b8f1337516004b45ede9dae49d693db1e2bf45fceb239763a053555a7".to_string(),
+            "fluffy-ih-eu-mda-01-03".to_string(),
+        );
+        nicknames.insert(
+            "0xd953f61d98db5e1b8cade59cf6916c11094029bb8269e5de7a47765c029e333b".to_string(),
+            "fluffy-ih-eu-mda-01-04".to_string(),
+        );
+        nicknames.insert(
+            "0x1b824647b496fb3395014404c871569394db958e90a94c91816e81ff599cb4ed".to_string(),
+            "fluffy-ih-eu-mda-01-05".to_string(),
+        );
+        nicknames.insert(
+            "0x53f08e3cf92b770155d107aec8e95a4e5f8ce18f651579adcf53732b03ee9bbe".to_string(),
+            "fluffy-ih-eu-mda-01-06".to_string(),
+        );
+        nicknames.insert(
+            "0x8946f27752e6f7d7e219db3c5fa101e51ddacc79a4e0eb45646971be524e67e6".to_string(),
+            "fluffy-ih-eu-mda-01-07".to_string(),
+        );
+        nicknames.insert(
+            "0x1ccc27db08975e0f9a0322831457010eb5df1405c12a0a0f79b114c5a17bb4d6".to_string(),
+            "fluffy-ih-eu-mda-01-08".to_string(),
+        );
+        nicknames.insert(
+            "0x8c2ec98eb39be82a017722e656c4a8500a74ea1524f8d41c71e308651cc8e6e4".to_string(),
+            "fluffy-ih-eu-mda-01-09".to_string(),
+        );
+        nicknames.insert(
+            "0x751ca67eb420f9554634e04949911776a92b21c9fe84826ac5db21089f3d0e2a".to_string(),
+            "fluffy-ih-eu-mda-01-10".to_string(),
+        );
+        nicknames.insert(
+            "0xdc93661de6e20e6175fed2bb6864653a9f4ead9867f5d271dcea0e3561a74156".to_string(),
+            "fluffy-ih-eu-mda-01-11".to_string(),
+        );
+        nicknames.insert(
+            "0xa28405b17e47b256a39413683211fbc349aa1973e4e1570b95f4b7e3a63ccf21".to_string(),
+            "fluffy-ih-eu-mda-01-12".to_string(),
+        );
+        nicknames.insert(
+            "0x0f6d4925f0b42aa994bba4a43b487659e9a9769b9369a39bccceed553efa451b".to_string(),
+            "fluffy-ih-eu-mda-01-13".to_string(),
+        );
+        nicknames.insert(
+            "0x3da2bfa42fb38f24957260a97ae870eea1d830fc98854190953ba2b43ef31ab9".to_string(),
+            "fluffy-ih-eu-mda-01-14".to_string(),
+        );
+        nicknames.insert(
+            "0xfcabaebcca08c22ac435dd2ce41c2b74cad53239b5a0b85d75d750bb72ca70a1".to_string(),
+            "fluffy-ih-eu-mda-01-15".to_string(),
+        );
+        nicknames.insert(
+            "0x2477ce0dbf5c88564707ac3ecc8240f947129ecdcb98ced0c62356903faffe04".to_string(),
+            "fluffy-ih-eu-mda-01-16".to_string(),
+        );
+        nicknames.insert(
+            "0xb66aa02e959ba7a24b3b24ba38df1b9a4e29a257f46f52e8510a0db1dbb19418".to_string(),
+            "fluffy-ih-eu-mda-01-17".to_string(),
+        );
+        nicknames.insert(
+            "0x73bd8a86fa27e9a5822a29370d84dd6432a67a72780f79f3e1ea796fd9e86d16".to_string(),
+            "fluffy-ih-eu-mda-01-18".to_string(),
+        );
+        nicknames.insert(
+            "0x515db84a043dd4380f8e9b83abc63e6de16988d219f9822f6d1077b504165d80".to_string(),
+            "fluffy-ih-eu-mda-01-19".to_string(),
+        );
+        nicknames.insert(
+            "0xa06e610b6c0f96edc41e1fe6baaa6c6b7cb6bc6133d21d49a43cd9d95b021ca8".to_string(),
+            "fluffy-ih-eu-mda-01-20".to_string(),
+        );
+        nicknames.insert(
+            "0x944ca5359881d5bd8ab044ea89517aaefc006b2ec2da406b14bb4eea780cb5e7".to_string(),
+            "fluffy-ih-eu-mda-01-21".to_string(),
+        );
+        nicknames.insert(
+            "0xeb5467e2f6e645622f199dfa8fcdac31d0f086a2a3bdabe510a18114332e4286".to_string(),
+            "fluffy-ih-eu-mda-01-22".to_string(),
+        );
+        nicknames.insert(
+            "0x852bba0e8799adbe325a59575047e52bb80c5ebcab2d21117c63dabdadcdbea7".to_string(),
+            "fluffy-ih-eu-mda-01-23".to_string(),
+        );
+        nicknames.insert(
+            "0x9a5f1d1ecee0904b287c0f97f52ffa21388a7d29bc99854d0cdfc86a0fe62e07".to_string(),
+            "fluffy-ih-eu-mda-01-24".to_string(),
+        );
+        nicknames.insert(
+            "0x1ae5b5e4de2be1f115b16666096e5b883c62c0f67b741a1692776b3fd5e3dff9".to_string(),
+            "fluffy-ih-eu-mda-01-25".to_string(),
+        );
+        nicknames.insert(
+            "0x3d59f8fc4fe8f1cd3ad8e719053a0a0ba097ac2769adf60ad0386bfce26d49fb".to_string(),
+            "fluffy-ih-eu-mda-01-26".to_string(),
+        );
+        nicknames.insert(
+            "0xce8111057ee4a18caef44cd0de13d888b41c82437dac165974c988bd355e7d8a".to_string(),
+            "fluffy-ih-eu-mda-01-27".to_string(),
+        );
+        nicknames.insert(
+            "0x7573ba07475e977cac943e799b6fbb1a3c6420adfe53e75cb48c053ddb883eaf".to_string(),
+            "fluffy-ih-eu-mda-01-28".to_string(),
+        );
+        nicknames.insert(
+            "0xf5e8e0a0c0c4054dfe6db426aa7320ba3ab8e8c411d72fb043b15000ecf656d5".to_string(),
+            "fluffy-ih-eu-mda-01-29".to_string(),
+        );
+        nicknames.insert(
+            "0xc20a831f5579cdd373f3ca948d4edf91f5a411154174f123e70be244f8fb62c4".to_string(),
+            "fluffy-ih-eu-mda-01-30".to_string(),
+        );
+        nicknames.insert(
+            "0xf1fecf5055a4bab819b5a69120a632582e86953ad20fe106bb70b61ed36879a4".to_string(),
+            "fluffy-ih-eu-mda-01-31".to_string(),
+        );
+        nicknames.insert(
+            "0x754397264925c1e57e812697b976f2432c9c55df9ca8c7a6c7bde41cb076d86c".to_string(),
+            "fluffy-ih-eu-mda-01-32".to_string(),
+        );
+        nicknames.insert(
+            "0x9891fe3fdfcec2707f877306fc6e5596b1405fedf70ad2911496c2ac40dfeda5".to_string(),
+            "fluffy-ih-eu-mda-02-01".to_string(),
+        );
+        nicknames.insert(
+            "0x122b3781acfd0145078e14ae9950c1a97004b481dc3c4ca00993f7d371f766cf".to_string(),
+            "fluffy-ih-eu-mda-02-02".to_string(),
+        );
+        nicknames.insert(
+            "0xff05c3b85e6f03af44ed0e2b65f8a8a637a83158e227bed58d026ca745044407".to_string(),
+            "fluffy-ih-eu-mda-02-03".to_string(),
+        );
+        nicknames.insert(
+            "0xf3bb9ef410314982c6ff4dd2150363a4030f0beb0598f75b1a511a2850cf615b".to_string(),
+            "fluffy-ih-eu-mda-02-04".to_string(),
+        );
+        nicknames.insert(
+            "0x44ab745e5d5f30e76cb3eb93fd00d526f03ab8d231b26ecf8440341ba7d8c596".to_string(),
+            "fluffy-ih-eu-mda-02-05".to_string(),
+        );
+        nicknames.insert(
+            "0x42211e720dd1f12b3609b562417de3993c0f7e2f7bab8f95f6b6e06fbc002ebf".to_string(),
+            "fluffy-ih-eu-mda-02-06".to_string(),
+        );
+        nicknames.insert(
+            "0x6f241796a833fee515193c182da1c34d02ca4723a2e89020e376659e065752a9".to_string(),
+            "fluffy-ih-eu-mda-02-07".to_string(),
+        );
+        nicknames.insert(
+            "0xdd5b300689eae907a151372abc7efcedc55cf9bd9e0255e19e53a102b1695aa5".to_string(),
+            "fluffy-ih-eu-mda-02-08".to_string(),
+        );
+        nicknames.insert(
+            "0x80716944892be659a08aaf3516b71992ba0cd93fa8d705f0f6cd1fbd6f4fceed".to_string(),
+            "fluffy-ih-eu-mda-02-09".to_string(),
+        );
+        nicknames.insert(
+            "0xd07753ecb594a78065cceb98201ac3b3cf0bc6587f291a45efc0fee235f3f553".to_string(),
+            "fluffy-ih-eu-mda-02-10".to_string(),
+        );
+        nicknames.insert(
+            "0xf9fbbc55a5005eb707c2e61b88ab8be6e89c9e48818d5929930e28539faef76f".to_string(),
+            "fluffy-ih-eu-mda-02-11".to_string(),
+        );
+        nicknames.insert(
+            "0x47c1289e2e16d18c880ad57e5aff2b9ff3c0e1261385078f1a7b835fed90c159".to_string(),
+            "fluffy-ih-eu-mda-02-12".to_string(),
+        );
+        nicknames.insert(
+            "0x5dd2fba6c174a74cd815a884a7c33d92d79e6379ae2ffaaee749cdda0e2c922d".to_string(),
+            "fluffy-ih-eu-mda-02-13".to_string(),
+        );
+        nicknames.insert(
+            "0xbefb246b22757267608a436d265018374592291f284c536f73c933b29a91e10a".to_string(),
+            "fluffy-ih-eu-mda-02-14".to_string(),
+        );
+        nicknames.insert(
+            "0xf6579f040293c8b50aac41d1e4fda466aee0d4333a665c1a7609ea849d24c2ed".to_string(),
+            "fluffy-ih-eu-mda-02-15".to_string(),
+        );
+        nicknames.insert(
+            "0xc39d4d7f6da13d5f09b8bdec80ac4a46c566363d97ec19c7e906f234f6201346".to_string(),
+            "fluffy-ih-eu-mda-02-16".to_string(),
+        );
+        nicknames.insert(
+            "0x2d9b215a58a1070785b80838e623ba2539dd2d11baf104cc3a70eedc3dbe08c4".to_string(),
+            "fluffy-ih-eu-mda-02-17".to_string(),
+        );
+        nicknames.insert(
+            "0xcedf1766a9d14bc943570d216648d3068b97e229841b53d7ad31ca4da05442d0".to_string(),
+            "fluffy-ih-eu-mda-02-18".to_string(),
+        );
+        nicknames.insert(
+            "0x7d7e394a5759f1aefab323c7f2b3bf1a395377c6b40ba8600d0b598d40402276".to_string(),
+            "fluffy-ih-eu-mda-02-19".to_string(),
+        );
+        nicknames.insert(
+            "0xfe75f07712d827c4a2ece430d438d2038bc601c6ca264f16346af9e75648a38b".to_string(),
+            "fluffy-ih-eu-mda-02-20".to_string(),
+        );
+        nicknames.insert(
+            "0x76bbf3fbe47abc63938f755731141f4366363048e6442f43ab94a78b7649b842".to_string(),
+            "fluffy-ih-eu-mda-02-21".to_string(),
+        );
+        nicknames.insert(
+            "0xc0a75a934a9c0a4f65265f6a9cb480d9d3e67f3c0c551c5e6ea9ee238385e3cd".to_string(),
+            "fluffy-ih-eu-mda-02-22".to_string(),
+        );
+        nicknames.insert(
+            "0xcb4bc943038033488c2ecc39c47b49f338d434defa6832f71f73760f085764fe".to_string(),
+            "fluffy-ih-eu-mda-02-23".to_string(),
+        );
+        nicknames.insert(
+            "0xb94599625525916e57cc354b77bb85ed48a5cb5a00617ba973c13507643de182".to_string(),
+            "fluffy-ih-eu-mda-02-24".to_string(),
+        );
+        nicknames.insert(
+            "0x096b4ecca95b7e97a5a864c9de84a144969c25e9e5dd1045df222244841c306b".to_string(),
+            "fluffy-ih-eu-mda-02-25".to_string(),
+        );
+        nicknames.insert(
+            "0xd48a2bc637251167e5a4b6e7f0fa04ac18dad38c034ce2b695135d86c01e7ec9".to_string(),
+            "fluffy-ih-eu-mda-02-26".to_string(),
+        );
+        nicknames.insert(
+            "0x149c178cd1839c0f0f80cea4c7d67e503924a54b9a5a339043256a8d52187110".to_string(),
+            "fluffy-ih-eu-mda-02-27".to_string(),
+        );
+        nicknames.insert(
+            "0x625326c16d08b47a6f51c09c6446265933c0d10cf9f38662468fac4658f8431b".to_string(),
+            "fluffy-ih-eu-mda-02-28".to_string(),
+        );
+        nicknames.insert(
+            "0xf3df94b51c551c08664be23d61df97f9cf3ae67b2b1a0dc9ca4b202b103aeed6".to_string(),
+            "fluffy-ih-eu-mda-02-29".to_string(),
+        );
+        nicknames.insert(
+            "0xbdb139d945d8ae846aff8017680a5257e84b75cb4fe35ed82a9c10cd0d518f79".to_string(),
+            "fluffy-ih-eu-mda-02-30".to_string(),
+        );
+        nicknames.insert(
+            "0xeb4e1d41d601da46e66323741f80cbad7cbeddc416e5becc3d570eec996598e6".to_string(),
+            "fluffy-ih-eu-mda-02-31".to_string(),
+        );
+        nicknames.insert(
+            "0xdcba4606925c9803b8fbfda1d6a354ad195ab801ce6706f3ffd2867d2937c02f".to_string(),
+            "fluffy-ih-eu-mda-02-32".to_string(),
+        );
+
         nicknames
     };
 }

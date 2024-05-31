@@ -1279,7 +1279,18 @@ pub async fn census_timeseries(
     let node_ids_with_nicknames: Vec<(String, Option<String>)> = node_ids
         .iter()
         .map(|id| {
-            let nickname = node::NODE_NICKNAME_MAP.get(id).cloned();
+            if id.len() != 66 {
+                return (id.clone(), None);
+            }
+            // Node nickname mappings including full node IDs and shortened node IDs
+            let short_id = format!("{}..{}", &id[..6], &id[id.len() - 4..]);
+            let nickname: Option<String> =
+                if let Some(nickname) = node::NODE_NICKNAME_MAP.get(&short_id) {
+                    Some(nickname.clone())
+                } else {
+                    node::NODE_NICKNAME_MAP.get(id).cloned()
+                };
+
             (id.clone(), nickname)
         })
         .collect();

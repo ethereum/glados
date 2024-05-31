@@ -389,45 +389,34 @@ async function censusTimeSeriesChart(daysAgo) {
         console.log('No data available to plot the census chart');
     }
 }
-
-// Sorts by latestClientString and secondarily by nodeId
-// Also sorts by nickname, such that nicknamed nodes (aka trin testnet nodes) 
-// come first amongst trin nodes, after fluffy nodes.
 function sortNodes(a, b) {
-    // Place empty at the end instead of front
-    if (a.latestClientString === null && b.latestClientString !== null) return 1;
-    if (a.latestClientString !== null && b.latestClientString === null) return -1;
+    // If both nodes have nicknames, sort by nickname
+    if (a.nodeNickName && b.nodeNickName) {
+        // Extract the prefix and number from the nickname
+        const [aPrefixA, aNumberA] = a.nodeNickName.split(/-(\d+)$/);
+        const [bPrefixB, bNumberB] = b.nodeNickName.split(/-(\d+)$/);
 
-    // Check if latestClientString starts with "f"
-    const aStartsWithF = a.latestClientString && a.latestClientString.startsWith("f");
-    const bStartsWithF = b.latestClientString && b.latestClientString.startsWith("f");
-
-    // If both start with "f" or both don't start with "f", compare nodeNickName
-    if (aStartsWithF === bStartsWithF) {
-        // If both have nodeNickName, sort by nodeNickName
-        if (a.nodeNickName && b.nodeNickName) {
-
-            // Extract the prefix and number from the nodeNickName
-            const [aPrefixA, aNumberA] = a.nodeNickName.split(/-(\d+)$/);
-            const [bPrefixB, bNumberB] = b.nodeNickName.split(/-(\d+)$/);
-
-            // If the prefixes are the same, sort by the number
-            if (aPrefixA === bPrefixB) {
-                return Number(aNumberA) - Number(bNumberB);
-            }
-
-            // If the prefixes are different, sort by the nodeNickName
-            return a.nodeNickName.localeCompare(b.nodeNickName);
+        // If the prefixes are different, sort by the prefix
+        if (aPrefixA !== bPrefixB) {
+            return aPrefixA.localeCompare(bPrefixB);
         }
-        // If only one has nodeNickName, prioritize it
-        if (a.nodeNickName) return -1;
-        if (b.nodeNickName) return 1;
+
+        // If the prefixes are the same, sort by the number
+        return Number(aNumberA) - Number(bNumberB);
     }
 
-    // If one starts with "f" and the other doesn't, prioritize the one starting with "f"
-    if (aStartsWithF && !bStartsWithF) return -1;
-    if (!aStartsWithF && bStartsWithF) return 1;
+    if (a.nodeNickName && !b.nodeNickName) return -1;
+    if (!a.nodeNickName && b.nodeNickName) return 1;
 
-    // If latestClientString is equal, then compare by nodeId
+    // Place nodes with latestClientString after nodes with nicknames
+    if (a.latestClientString && !b.latestClientString) return -1;
+    if (!a.latestClientString && b.latestClientString) return 1;
+
+    // If both nodes have latestClientString, sort by latestClientString
+    if (a.latestClientString && b.latestClientString) {
+        return a.latestClientString.localeCompare(b.latestClientString);
+    }
+
+    // Place nodes without nicknames or latestClientString at the end, sorted by nodeId
     return a.nodeId.localeCompare(b.nodeId);
 }
