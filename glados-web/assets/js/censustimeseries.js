@@ -64,13 +64,17 @@ function createSquareChart(width, data) {
         .attr("overflow", "visible")
         .attr("style", "max-width: 90%; height: 100%; height: intrinsic;");
 
+
+    let title = data.censuses.length > 0 ? `24 hour period beginning at ${data.censuses[0].time}`
+        : `No censuses found during this 24 hour period.`;
+    
     // Append the title
     svg.append("text")
         .attr("x", width / 2)
         .attr("y", 30)
         .attr("text-anchor", "middle")
         .style("font-size", "24px")
-        .text(`24 hour period beginning at ${data.censuses[0].time}`);
+        .text(title);
 
     // Append the previous button
     svg.append("a")
