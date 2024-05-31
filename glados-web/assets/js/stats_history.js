@@ -79,7 +79,7 @@ function createMultiLineChart(height, width, dataSets) {
         .data(dataSets)
         .enter().append("g")
         .attr("class", "legend")
-        .attr("transform", (d, i) => `translate(${width - marginRight + 100}, ${i * 20})`) // Position adjusted to the right
+        .attr("transform", (d, i) => `translate(${width - marginRight + 100}, ${(i * 20) + 30})`) // Position adjusted to the right
         .style("font", "10px sans-serif")
         .style("cursor", "pointer")
         .on("click", function (event, d) {
@@ -190,7 +190,7 @@ function createMultiLineChart(height, width, dataSets) {
     buttons.append("text")
         .attr("class", "previous-button")
         .attr("x", 0)
-        .attr("y", 0)
+        .attr("y", 30)
         .attr("font-size", "12px")
         .attr("text-anchor", "start")
         .text("< Previous")
@@ -205,7 +205,7 @@ function createMultiLineChart(height, width, dataSets) {
         buttons.append("text")
             .attr("class", "next-button")
             .attr("x", 15)
-            .attr("y", 20)
+            .attr("y", 50)
             .attr("font-size", "12px")
             .attr("text-anchor", "start")
             .text("Next >")
