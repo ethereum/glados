@@ -65,7 +65,7 @@ function createSquareChart(width, data) {
         .attr("style", "max-width: 90%; height: 100%; height: intrinsic;");
 
 
-    let title = data.censuses.length > 0 ? `24 hour period beginning at ${data.censuses[0].time}`
+    let title = data.censuses.length > 0 ? `${nodes.length} nodes found during 24 hour period beginning at ${data.censuses[0].time}`
         : `No censuses found during this 24 hour period.`;
     
     // Append the title
