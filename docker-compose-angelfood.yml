@@ -1,0 +1,83 @@
+version: '3'
+services:
+
+  glados_postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${GLADOS_POSTGRES_PASSWORD?Glados Postgres Password Required}
+      POSTGRES_DB: glados
+    volumes:
+      - ${GLADOS_POSTGRES_DATA_DIR?Glados Postgres Data Directory Required}:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - glados-net
+    restart: always
+
+  portal_client:
+    extends:
+      file: docker-compose-clients.yml
+      service: ${GLADOS_PORTAL_CLIENT?Glados portal client required}
+    hostname: portal-client
+    network_mode: "host"
+    restart: always
+
+  glados_audit:
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://host.docker.internal:8545 --concurrency 8 --history=false --state --provider-url ${GLADOS_PROVIDER_URL?Provider URL required}"
+    image: portalnetwork/glados-audit:latest
+    environment:
+      RUST_LOG: warn,glados_audit=info
+    depends_on:
+      - glados_postgres
+      - portal_client
+    networks:
+      - glados-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+
+  glados_monitor:
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados populate-state-roots-range --start-block-number 0 --end-block-number 11 --provider-url ${GLADOS_PROVIDER_URL?Glados monitor provider URL required}"
+    image: portalnetwork/glados-monitor:latest
+    environment:
+      RUST_LOG: warn,glados_monitor=info
+    depends_on:
+      - glados_audit
+      - glados_postgres
+    networks:
+      - glados-net
+    restart: always
+
+  glados_web:
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados"
+    image: portalnetwork/glados-web:latest
+    environment:
+      RUST_LOG: warn,glados_web=info
+    depends_on:
+      - glados_monitor
+      - glados_postgres
+    ports:
+      - "3001:3001"
+    networks:
+      - glados-net
+    restart: always
+
+  glados_cartographer:
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --transport http --http-url http://host.docker.internal:8545 --concurrency 10"
+    image: portalnetwork/glados-cartographer:latest
+    environment:
+      RUST_LOG: warn,glados_cartographer=info
+    depends_on:
+      - glados_web
+      - glados_postgres
+      - portal_client
+    networks:
+      - glados-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+
+networks:
+  glados-net:
+    driver: bridge
