@@ -42,15 +42,6 @@ pub struct SingleCensusViewTemplate {
 pub struct CensusExplorerTemplate {}
 
 #[derive(Template)]
-#[template(path = "network_dashboard.html")]
-pub struct NetworkDashboardTemplate {
-    pub total_node_count: u64,
-    pub total_enr_count: u64,
-    pub recent_node_list: Vec<node::Model>,
-    pub recent_enr_list: Vec<(record::Model, node::Model)>,
-}
-
-#[derive(Template)]
 #[template(path = "node_detail.html")]
 pub struct NodeDetailTemplate {
     pub node: node::Model,
@@ -69,17 +60,6 @@ pub struct EnrDetailTemplate {
 }
 
 pub type AuditTuple = (content_audit::Model, content::Model, client_info::Model);
-
-#[derive(Template)]
-#[template(path = "content_dashboard.html")]
-pub struct ContentDashboardTemplate {
-    pub stats: [AuditStats; 3],
-    pub contentid_list: Vec<content::Model>,
-    pub audits_of_recent_content: Vec<AuditTuple>,
-    pub recent_audits: Vec<AuditTuple>,
-    pub recent_audit_successes: Vec<AuditTuple>,
-    pub recent_audit_failures: Vec<AuditTuple>,
-}
 
 #[derive(Template)]
 #[template(path = "contentid_list.html")]

@@ -25,7 +25,7 @@ use sea_orm::sea_query::{Expr, Query, SeaRc};
 use sea_orm::{sea_query::SimpleExpr, Statement};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, DynIden, EntityTrait,
-    FromQueryResult, LoaderTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
+    FromQueryResult, LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
@@ -36,10 +36,9 @@ use tracing::{error, info, warn};
 
 use crate::templates::{
     AuditDashboardTemplate, AuditTableTemplate, CensusExplorerTemplate, ContentAuditDetailTemplate,
-    ContentDashboardTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
-    ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate, HtmlTemplate,
-    IndexTemplate, NetworkDashboardTemplate, NodeDetailTemplate, PaginatedCensusListTemplate,
-    SingleCensusViewTemplate,
+    ContentIdDetailTemplate, ContentIdListTemplate, ContentKeyDetailTemplate,
+    ContentKeyListTemplate, EnrDetailTemplate, HtmlTemplate, IndexTemplate, NodeDetailTemplate,
+    PaginatedCensusListTemplate, SingleCensusViewTemplate,
 };
 use crate::{state::State, templates::AuditTuple};
 
@@ -436,63 +435,6 @@ pub async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse 
     HtmlTemplate(template)
 }
 
-pub async fn network_dashboard(
-    Extension(state): Extension<Arc<State>>,
-) -> Result<HtmlTemplate<NetworkDashboardTemplate>, StatusCode> {
-    const KEY_COUNT: u64 = 20;
-
-    let recent_node_list = node::Entity::find()
-        .order_by_desc(node::Column::Id)
-        .limit(KEY_COUNT)
-        .all(&state.database_connection)
-        .await
-        .map_err(|e| {
-            error!(key.count=KEY_COUNT, err=?e, "Could not look up recent nodes");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-    let total_node_count = node::Entity::find()
-        .count(&state.database_connection)
-        .await
-        .map_err(|e| {
-            error!(err=?e, "Error looking up total Node count");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    let recent_enr_list: Vec<(record::Model, node::Model)> = record::Entity::find()
-        .order_by_desc(record::Column::Id)
-        .find_also_related(node::Entity)
-        .limit(KEY_COUNT)
-        .all(&state.database_connection)
-        .await
-        .map_err(|e| {
-            error!(key.count=KEY_COUNT, err=?e, "Could not look up recent ENR records");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })
-        .unwrap()
-        .iter()
-        .filter_map(|(r, n)| {
-            n.as_ref()
-                .map(|enr_node| (r.to_owned(), enr_node.to_owned()))
-        })
-        .collect();
-
-    let total_enr_count = record::Entity::find()
-        .count(&state.database_connection)
-        .await
-        .map_err(|e| {
-            error!(err=?e, "Error looking up total ENR count");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    let template = NetworkDashboardTemplate {
-        total_node_count,
-        total_enr_count,
-        recent_node_list,
-        recent_enr_list,
-    };
-    Ok(HtmlTemplate(template))
-}
-
 pub async fn node_detail(
     Path(node_id_hex): Path<String>,
     Extension(state): Extension<Arc<State>>,
@@ -592,77 +534,6 @@ pub async fn enr_detail(
         node: node_model,
         enr,
         key_value_list,
-    };
-    Ok(HtmlTemplate(template))
-}
-
-pub async fn content_dashboard(
-    Extension(state): Extension<Arc<State>>,
-) -> Result<HtmlTemplate<ContentDashboardTemplate>, StatusCode> {
-    const KEY_COUNT: u64 = 20;
-    let contentid_list = content::Entity::find()
-        .order_by_desc(content::Column::FirstAvailableAt)
-        .limit(KEY_COUNT)
-        .all(&state.database_connection)
-        .await
-        .map_err(|e| {
-            error!(key.count=KEY_COUNT, err=?e, "Could not look up latest keys");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    let open_filter = content_audit::Entity::find();
-    // Run queries for content dashboard data concurrently
-    let (
-        audits_of_recent_content,
-        recent_audits,
-        recent_audit_successes,
-        recent_audit_failures,
-        hour_stats,
-        day_stats,
-        week_stats,
-    ) = tokio::join!(
-        get_audits_for_recent_content(KEY_COUNT, &state.database_connection),
-        get_recent_audits(KEY_COUNT, &state.database_connection),
-        get_recent_audit_successes(KEY_COUNT, &state.database_connection),
-        get_recent_audit_failures(KEY_COUNT, &state.database_connection),
-        get_audit_stats(
-            open_filter.clone(),
-            Period::Hour,
-            &state.database_connection
-        ),
-        get_audit_stats(open_filter.clone(), Period::Day, &state.database_connection),
-        get_audit_stats(
-            open_filter.clone(),
-            Period::Week,
-            &state.database_connection
-        ),
-    );
-
-    // Get results from queries
-    let audits_of_recent_content: Vec<AuditTuple> = audits_of_recent_content?;
-    let recent_audits: Vec<AuditTuple> = recent_audits?;
-    let recent_audit_successes: Vec<AuditTuple> = recent_audit_successes?;
-    let recent_audit_failures: Vec<AuditTuple> = recent_audit_failures?;
-    let hour_stats = hour_stats.map_err(|e| {
-        error!(err=?e, "Could not look up recent audits");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-    let day_stats = day_stats.map_err(|e| {
-        error!(err=?e, "Could not look up recent audits");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-    let week_stats = week_stats.map_err(|e| {
-        error!(err=?e, "Could not look up recent audits");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
-    let template = ContentDashboardTemplate {
-        stats: [hour_stats, day_stats, week_stats],
-        contentid_list,
-        audits_of_recent_content,
-        recent_audits,
-        recent_audit_successes,
-        recent_audit_failures,
     };
     Ok(HtmlTemplate(template))
 }

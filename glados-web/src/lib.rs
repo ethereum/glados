@@ -66,13 +66,11 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
         .route("/census/census-list/", get(routes::census_explorer_list))
         .route("/census/", get(routes::single_census_view))
         .route("/census/explorer", get(routes::census_explorer))
-        .route("/network/", get(routes::network_dashboard))
         .route("/network/node/:node_id_hex/", get(routes::node_detail))
         .route(
             "/network/node/:node_id_hex/enr/:enr_seq/",
             get(routes::enr_detail),
         )
-        .route("/content/", get(routes::content_dashboard))
         .route("/content/id/", get(routes::contentid_list))
         .route(
             "/content/id/:content_id_hex/",
