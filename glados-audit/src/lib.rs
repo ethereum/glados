@@ -348,7 +348,7 @@ async fn perform_single_audit(
 
     debug!(
         content.key = hex_encode(&task.content.content_key),
-        client.url = client.api.client_url.clone(),
+        client.url =? client.api.client,
         "auditing content",
     );
     let (content_response, trace) = if client.supports_trace() {
