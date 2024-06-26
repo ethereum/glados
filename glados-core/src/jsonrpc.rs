@@ -173,44 +173,54 @@ impl PortalApi {
         content: &content::Model,
     ) -> Result<Option<Content>, JsonRpcError> {
         match content.protocol_id {
-            content::SubProtocol::History => {
-                let result = HistoryNetworkApiClient::recursive_find_content(
-                    &self.client,
-                    content.content_key.clone().try_into()?,
-                )
-                .await?;
-                let HistoryContentInfo::Content { content, .. } = result else {
-                    return Err(JsonRpcError::ContentNotFound { trace: None });
-                };
-                Ok(Some(Content {
+            content::SubProtocol::History => match HistoryNetworkApiClient::recursive_find_content(
+                &self.client,
+                content.content_key.clone().try_into()?,
+            )
+            .await
+            {
+                Ok(HistoryContentInfo::Content { content, .. }) => Ok(Some(Content {
                     raw: content.encode(),
-                }))
-            }
+                })),
+                Ok(_) => Ok(None),
+                Err(err) => match err.into() {
+                    JsonRpcError::ContentNotFound { trace: _ } => Ok(None),
+                    err => Err(err),
+                },
+            },
             content::SubProtocol::State => {
-                let result = StateNetworkApiClient::recursive_find_content(
+                match StateNetworkApiClient::recursive_find_content(
                     &self.client,
                     content.content_key.clone().try_into()?,
                 )
-                .await?;
-                let StateContentInfo::Content { content, .. } = result else {
-                    return Err(JsonRpcError::ContentNotFound { trace: None });
-                };
-                Ok(Some(Content {
-                    raw: content.encode(),
-                }))
+                .await
+                {
+                    Ok(StateContentInfo::Content { content, .. }) => Ok(Some(Content {
+                        raw: content.encode(),
+                    })),
+                    Ok(_) => Ok(None),
+                    Err(err) => match err.into() {
+                        JsonRpcError::ContentNotFound { trace: _ } => Ok(None),
+                        err => Err(err),
+                    },
+                }
             }
             content::SubProtocol::Beacon => {
-                let result = BeaconNetworkApiClient::recursive_find_content(
+                match BeaconNetworkApiClient::recursive_find_content(
                     &self.client,
                     content.content_key.clone().try_into()?,
                 )
-                .await?;
-                let BeaconContentInfo::Content { content, .. } = result else {
-                    return Err(JsonRpcError::ContentNotFound { trace: None });
-                };
-                Ok(Some(Content {
-                    raw: content.encode(),
-                }))
+                .await
+                {
+                    Ok(BeaconContentInfo::Content { content, .. }) => Ok(Some(Content {
+                        raw: content.encode(),
+                    })),
+                    Ok(_) => Ok(None),
+                    Err(err) => match err.into() {
+                        JsonRpcError::ContentNotFound { trace: _ } => Ok(None),
+                        err => Err(err),
+                    },
+                }
             }
         }
     }
