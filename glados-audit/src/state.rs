@@ -17,10 +17,7 @@ use ethportal_api::{
     },
     StateContentKey, StateContentValue, StateNetworkApiClient,
 };
-use glados_core::{
-    db::store_content_key,
-    jsonrpc::{PortalApi, PortalClient, Transport},
-};
+use glados_core::{db::store_content_key, jsonrpc::PortalClient};
 use rand::seq::IteratorRandom;
 use sea_orm::DatabaseConnection;
 use tokio::time::sleep;
@@ -257,12 +254,7 @@ pub async fn spawn_state_audit(conn: DatabaseConnection, config: AuditConfig) {
                 }
             };
 
-            let transport = PortalApi::parse_client_url(portal_client.api.client_url.clone())
-                .await
-                .expect("Failed to parse client url.");
-            let client = match transport {
-                Transport::HTTP(http) => http.client,
-            };
+            let client = portal_client.api.client.clone();
 
             let (state_audit_result, content_key) =
                 match random_state_walk(state_root, client).await {
