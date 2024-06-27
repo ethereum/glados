@@ -1,4 +1,4 @@
-use alloy_primitives::U256;
+use alloy_primitives::{B256, U256};
 use axum::{
     extract::{Extension, Path, Query as HttpQuery},
     http::StatusCode,
@@ -6,13 +6,17 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, Utc};
+use discv5::enr::NodeId;
 use entity::{audit_stats, census, census_node, client_info};
 use entity::{
     content,
     content_audit::{self, AuditResult},
     execution_metadata, key_value, node, record,
 };
-use ethportal_api::types::distance::{Distance, Metric, XorMetric};
+use ethportal_api::types::{
+    distance::{Distance, Metric, XorMetric},
+    query_trace::QueryTrace,
+};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{jsonrpsee::core::__reexports::serde_json, BeaconContentKey, StateContentKey};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
@@ -28,6 +32,7 @@ use sea_orm::{
     FromQueryResult, LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 use serde::Serialize;
+use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Formatter;
 use std::sync::Arc;
@@ -843,6 +848,36 @@ pub async fn contentaudit_detail(
         .await
         .unwrap()
         .expect("No audit found");
+
+    let trace = &audit.trace;
+    // Deserialize trace into QueryTrace object
+    let trace: QueryTrace = serde_json::from_value(json!(trace)).unwrap();
+    // Build a HashMap of (node ID, distance) for each node in the trace
+    let node_distances: HashMap<NodeId, B256> = trace
+        .metadata
+        .iter()
+        .map(|(node_id, node_info)| {
+            let node_id = node_id.clone();
+            let distance = node_info.distance;
+            (node_id, distance)
+        })
+        .collect();
+    // Do a query to get the most recent data_radius_high for each node, passing in all node IDs.
+    let node_ids: Vec<NodeId> = node_distances.keys().cloned().collect();
+    let node_data_radius_high: HashMap<NodeId, u8> = node::Entity::find()
+        .filter(node::Column::NodeId.eq_any(node_ids))
+        .order_by_desc(census_node::Column::SurveyedAt)
+        .group_by(census_node::Column::NodeId)
+        .select(census_node::Column::DataRadiusHigh)
+        .all(&state.database_connection)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|(node_id, data_radius_high)| (node_id, data_radius_high))
+        .collect();
+    // Create a map of (node ID, bool) for each node.
+
+    // Iterate through NodeInfo, setting within_radius boolean
 
     let content = audit
         .find_related(content::Entity)
