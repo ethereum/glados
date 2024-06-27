@@ -24,7 +24,7 @@ use pgtemp::PgTempDB;
 
 #[allow(dead_code)]
 // Temporary Postgres db will be deleted once PgTempDB goes out of scope, so keep it in scope.
-async fn setup_database() -> Result<(DbConn, PgTempDB), DbErr> {
+pub async fn setup_database() -> Result<(DbConn, PgTempDB), DbErr> {
     let db: PgTempDB = PgTempDB::async_new().await;
     let conn: DbConn = Database::connect(db.connection_uri()).await?;
     Migrator::up(&conn, None).await.unwrap();

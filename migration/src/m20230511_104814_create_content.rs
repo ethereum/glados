@@ -59,6 +59,16 @@ impl MigrationTrait for Migration {
                     .col(Content::ProtocolId)
                     .to_owned(),
             )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_content-id")
+                    .table(Content::Table)
+                    .col(Content::ContentId)
+                    .to_owned(),
+            )
             .await
     }
 
