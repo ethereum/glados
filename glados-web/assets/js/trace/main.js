@@ -1,7 +1,7 @@
 // Creates a graph from a trace object and returns an SVG.
 function createGraph(graphData) {
 
-    return ForceGraph(graphData, {
+    let graph = ForceGraph(graphData, {
         nodeId: d => d.id,
         nodeGroup: d => d.group,
         nodeGroups: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -11,6 +11,8 @@ function createGraph(graphData) {
         height: $('#graph').height(),
         invalidation: null,
     });
+
+    return graph;
 
 }
 
@@ -52,6 +54,7 @@ function createGraphData(trace) {
       let distance = BigInt(meta.distance);
       let distanceLog2 = bigLog2(distance);
       let client = decodedEnr.client;
+      let radius = meta.radius;
 
       metadata[nodeId] = {
         enr,
@@ -59,7 +62,8 @@ function createGraphData(trace) {
         port,
         distance,
         distanceLog2,
-        client
+        client,
+        radius
       }
     });
 
@@ -197,6 +201,12 @@ function generateNodeMetadata(node) {
     if (client !== undefined) {
         metadata += `${client}`;
     }
+    const radius_numerator = BigInt(node.radius);
+    const radius_denominator = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    const radius_percentage = (Number(radius_numerator.toString()) / Number(radius_denominator.toString())) * 100;
+    if (node.radius){
+        metadata += `\nRadius Percent: ${radius_percentage.toFixed(2)}%`;
+    }
     return metadata;
 
 }
@@ -204,7 +214,6 @@ function generateNodeMetadata(node) {
 function generateTable(nodes) {
     nodes.sort((a, b) => a.distance < b.distance ? -1 : (a.distance > b.distance) ? 1 : 0);
     nodes.forEach((node, index) => {
-
         let nodeIdString = node.id;
         nodeIdString = nodeIdString.substr(0, 6)
             + '...' + nodeIdString.substr(nodeIdString.length - 4, nodeIdString.length);
@@ -217,7 +226,8 @@ function generateTable(nodes) {
             <td>${nodeIdString}</td>
             <td>${node.distanceLog2}</td>
             <td>${node.ip}:${node.port}</td>
-            <td>${node.client === undefined ? "" : node.client}</td>`;
+            <td>${node.client === undefined ? "" : node.client}</td>
+            <td>${node.radius === null ? "unknown" : BigInt(node.distance) < BigInt(node.radius)}</td>`;
 
         tr.addEventListener('mouseenter', () => {
             tr.style.backgroundColor = 'lightgray';
@@ -256,7 +266,6 @@ function highlightNode(node) {
 }
 
 function unHighlight() {
-
     d3.selectAll("g").selectAll("circle")
         .attr("r", function (node) {
             return 5;

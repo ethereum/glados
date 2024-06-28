@@ -44,6 +44,8 @@
             <text>Content Found</text>
             <div class="legend-dot" id="cancelled"></div>
             <text>Request Cancelled</text>
+            <div class="should-store-legend-dot" id="should-store"></div>
+            <text>Should Store</text>
         </div>
 
     </div>
@@ -57,6 +59,7 @@
                     <th scope="col">Distance from Content</th>
                     <th scope="col">Address</th>
                     <th scope="col">Client</th>
+                    <th scope="col">Should Store</th>
                 </tr>
             </thead>
             <tbody id="enr-table">
@@ -82,6 +85,20 @@
         let graphSvg = createGraph(graphData);
         $('#graph').append(graphSvg);
 
+        // Highlight the nodes for whom the content is within radius.
+        d3.selectAll("g").selectAll("circle")
+            .filter(d => {
+                const node_id = d.id;
+                let metadata = trace.metadata[node_id];
+                if (metadata.radius !== null) {
+                    const distance = BigInt(metadata.distance);
+                    const radius = BigInt(metadata.radius);
+                    return distance < radius;
+                }
+                return false;
+            })
+            .attr("stroke", "lightgray")
+            .attr("stroke-width", 3);
         generateTable(graphData.nodes);
 
         $('#trin-button').on("mouseenter", function () {

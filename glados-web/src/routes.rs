@@ -1,18 +1,22 @@
-use alloy_primitives::U256;
+use alloy_primitives::{hex, B256, U256};
 use axum::{
     extract::{Extension, Path, Query as HttpQuery},
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
+use enr::NodeId;
 use entity::{audit_stats, census, census_node, client_info};
 use entity::{
     content,
     content_audit::{self, AuditResult},
     execution_metadata, key_value, node, record,
 };
-use ethportal_api::types::distance::{Distance, Metric, XorMetric};
+use ethportal_api::types::{
+    distance::{Distance, Metric, XorMetric},
+    query_trace::QueryTrace,
+};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{jsonrpsee::core::__reexports::serde_json, BeaconContentKey, StateContentKey};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
@@ -28,9 +32,12 @@ use sea_orm::{
     FromQueryResult, LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
 use std::fmt::Formatter;
 use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    time::UNIX_EPOCH,
+};
 use std::{fmt::Display, io};
 use tracing::{error, info, warn};
 
@@ -838,11 +845,89 @@ pub async fn contentaudit_detail(
 ) -> impl IntoResponse {
     let audit_id = audit_id.parse::<i32>().unwrap();
     info!("Audit ID: {}", audit_id);
-    let audit = content_audit::Entity::find_by_id(audit_id)
+    let mut audit = content_audit::Entity::find_by_id(audit_id)
         .one(&state.database_connection)
         .await
         .unwrap()
         .expect("No audit found");
+
+    let trace_string = &audit.trace;
+    let mut trace: QueryTrace =
+        serde_json::from_str(trace_string).expect("Failed to deserialize query trace.");
+
+    // Get the timestamp of the query
+    let query_timestamp = trace.started_at_ms;
+    let timestamp: DateTime<Utc> = {
+        let duration = query_timestamp.duration_since(UNIX_EPOCH).unwrap();
+        Utc.timestamp_opt(duration.as_secs() as i64, duration.subsec_nanos() as u32)
+            .single()
+            .expect("Failed to convert timestamp to DateTime")
+    };
+
+    // Do a query to get, for each node, the radius recorded closest to the time at which the trace took place.
+    let node_ids: Vec<Vec<u8>> = trace
+        .metadata
+        .keys()
+        .cloned()
+        .map(|x| x.raw().to_vec())
+        .collect();
+    let node_ids_str = format!(
+        "{{{}}}",
+        node_ids
+            .iter()
+            .map(|id| format!("\\\\x{}", hex::encode(id)))
+            .collect::<Vec<String>>()
+            .join(",")
+    );
+    let nodes_with_radius: HashMap<NodeId, B256> =
+        match NodeWithRadius::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "
+	        SELECT DISTINCT ON (n.node_id)
+                n.node_id,
+                cn.data_radius
+            FROM
+                node n
+                JOIN record r ON r.node_id = n.id
+                JOIN census_node cn ON cn.record_id = r.id
+            WHERE
+                n.node_id = ANY($1::bytea[])
+            ORDER BY
+                n.node_id,
+                ABS(EXTRACT(EPOCH FROM (cn.surveyed_at - $2::timestamp)))
+            ",
+            vec![node_ids_str.into(), timestamp.into()],
+        ))
+        .all(&state.database_connection)
+        .await
+        {
+            Ok(data) => data
+                .into_iter()
+                // Transform SQL result into a hashmap.
+                .map(|node_result| {
+                    let mut node_id = [0u8; 32];
+                    node_id.copy_from_slice(&node_result.node_id);
+                    let node_id = NodeId::new(&node_id);
+                    let mut radius = [0u8; 32];
+                    radius.copy_from_slice(&node_result.data_radius);
+                    let radius = B256::new(radius);
+                    (node_id, radius)
+                })
+                .collect(),
+            Err(err) => {
+                error!(err=?err, "Failed to lookup radius for traced nodes");
+                HashMap::new()
+            }
+        };
+
+    // Add radius info to node metadata.
+    trace.metadata.iter_mut().for_each(|(node_id, node_info)| {
+        if let Some(radius) = nodes_with_radius.get(node_id) {
+            node_info.radius = Some(*radius);
+        }
+    });
+    // Update the trace with radius metadata.
+    audit.trace = serde_json::to_string(&trace).expect("Failed to serialize updated query trace.");
 
     let content = audit
         .find_related(content::Entity)
@@ -864,6 +949,12 @@ pub async fn contentaudit_detail(
         execution_metadata,
     };
     HtmlTemplate(template)
+}
+
+#[derive(FromQueryResult, Debug)]
+pub struct NodeWithRadius {
+    pub node_id: Vec<u8>,
+    pub data_radius: Vec<u8>,
 }
 
 /// Takes an AuditFilter object generated from http query params
@@ -1134,7 +1225,7 @@ pub async fn census_timeseries(
                 ) AS c
             LEFT JOIN 
                 census_node AS cn ON c.id = cn.census_id
-            LEFT JOIN 
+            LEFT JOIN
                 record AS r ON r.id = cn.record_id
             LEFT JOIN 
                 node AS n ON n.id = r.node_id

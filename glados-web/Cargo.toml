@@ -18,6 +18,7 @@ clap = { version = "4.0.26", features = ["derive"] }
 entity = { path = "../entity" }
 env_logger = "0.9.3"
 ethportal-api = { git = "https://github.com/ethereum/trin" }
+enr = "0.10.0"
 glados-core = { path = "../glados-core" }
 migration = { path = "../migration" }
 itertools = "0.10.5"
