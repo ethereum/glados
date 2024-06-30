@@ -52,6 +52,7 @@ function createGraphData(trace) {
       let distance = BigInt(meta.distance);
       let distanceLog2 = bigLog2(distance);
       let client = decodedEnr.client;
+      console.log(`radius: ${meta.radius}`);
 
       metadata[nodeId] = {
         enr,

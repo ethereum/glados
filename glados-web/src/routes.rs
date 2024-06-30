@@ -5,7 +5,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use discv5::enr::NodeId;
 use entity::{audit_stats, census, census_node, client_info};
 use entity::{
@@ -25,17 +25,23 @@ use glados_core::stats::{
     SuccessFilter,
 };
 use migration::{Alias, JoinType, Order};
-use sea_orm::sea_query::{Expr, Query, SeaRc};
 use sea_orm::{sea_query::SimpleExpr, Statement};
+use sea_orm::{
+    sea_query::{Expr, Query, SeaRc},
+    Value,
+};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, DynIden, EntityTrait,
     FromQueryResult, LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 use serde::Serialize;
 use serde_json::json;
-use std::collections::{HashMap, HashSet};
 use std::fmt::Formatter;
 use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    time::UNIX_EPOCH,
+};
 use std::{fmt::Display, io};
 use tracing::{error, info, warn};
 
@@ -865,33 +871,40 @@ pub async fn contentaudit_detail(
         })
         .collect();
 
-    // Do a query to get the most recent radius for each node.
+    // Get the timestamp of the query
+    let query_timestamp = trace.started_at_ms;
+    let timestamp: DateTime<Utc> = {
+        let duration = query_timestamp.duration_since(UNIX_EPOCH).unwrap();
+        Utc.timestamp_opt(duration.as_secs() as i64, duration.as_nanos() as u32)
+            .single()
+            .unwrap()
+    };
+
+    // Do a query to get, for each node, the radius recorded closest to the time at which the trace took place.
     let node_ids: Vec<Vec<u8>> = nodes_with_distances
         .keys()
         .cloned()
         .map(|x| x.raw().to_vec())
         .collect();
-    let node_data_radius: HashMap<NodeId, B256> = node::Entity::find()
-        .filter(node::Column::NodeId.is_in(node_ids))
-        .join(record::Entity,)
-        .group_by(census_node::Column::)
-        .select_only()
-        .all(&state.database_connection)
-        .await
-        .unwrap()
-        .into_iter()
-        .map(|(node_id, data_radius_high)| (node_id, data_radius_high))
-        .collect();
+    let nodes_with_radius: HashMap<NodeId, B256> = match content::Model::find_by_statement(
+        Statement::from_sql_and_values(DbBackend::Postgres, "", vec![]),
+    )
+    .all(&state.database_connection)
+    .await
+    {
+        Ok(nodes_with_radius) => nodes_with_radius,
+        Err(err) => {
+            error!(audit.strategy="latest", err=?err, "Failed to lookup radius for traced nodes");
+            HashMap::new()
+        }
+    };
 
-    // Create a map of (node ID, bool) for each node.
-
-    // Iterate through NodeInfo, setting within_radius boolean
-    let content = audit
-        .find_related(content::Entity)
-        .one(&state.database_connection)
-        .await
-        .unwrap()
-        .expect("Failed to get audit content key");
+    // Add radius info to node metadata.
+    trace.metadata.iter_mut().for_each(|(node_id, node_info)| {
+        if let Some(radius) = nodes_with_distances.get(node_id) {
+            node_info.radius = Some(radius.clone());
+        }
+    });
 
     let execution_metadata = content
         .find_related(execution_metadata::Entity)
