@@ -1,18 +1,22 @@
-use alloy_primitives::U256;
+use alloy_primitives::{B256, U256};
 use axum::{
     extract::{Extension, Path, Query as HttpQuery},
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
+use discv5::enr::NodeId;
 use entity::{audit_stats, census, census_node, client_info};
 use entity::{
     content,
     content_audit::{self, AuditResult},
     execution_metadata, key_value, node, record,
 };
-use ethportal_api::types::distance::{Distance, Metric, XorMetric};
+use ethportal_api::types::{
+    distance::{Distance, Metric, XorMetric},
+    query_trace::QueryTrace,
+};
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{jsonrpsee::core::__reexports::serde_json, BeaconContentKey, StateContentKey};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
@@ -21,16 +25,23 @@ use glados_core::stats::{
     SuccessFilter,
 };
 use migration::{Alias, JoinType, Order};
-use sea_orm::sea_query::{Expr, Query, SeaRc};
 use sea_orm::{sea_query::SimpleExpr, Statement};
+use sea_orm::{
+    sea_query::{Expr, Query, SeaRc},
+    Value,
+};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, DynIden, EntityTrait,
     FromQueryResult, LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
+use serde_json::json;
 use std::fmt::Formatter;
 use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    time::UNIX_EPOCH,
+};
 use std::{fmt::Display, io};
 use tracing::{error, info, warn};
 
@@ -844,12 +855,56 @@ pub async fn contentaudit_detail(
         .unwrap()
         .expect("No audit found");
 
-    let content = audit
-        .find_related(content::Entity)
-        .one(&state.database_connection)
-        .await
-        .unwrap()
-        .expect("Failed to get audit content key");
+    let trace = &audit.trace;
+
+    // Deserialize trace into QueryTrace object
+    let trace: QueryTrace = serde_json::from_value(json!(trace)).unwrap();
+
+    // Build a HashMap of (node ID, distance) for each node in the trace
+    let nodes_with_distances: HashMap<NodeId, B256> = trace
+        .metadata
+        .iter()
+        .map(|(node_id, node_info)| {
+            let node_id = node_id.clone();
+            let distance = node_info.distance;
+            (node_id, distance)
+        })
+        .collect();
+
+    // Get the timestamp of the query
+    let query_timestamp = trace.started_at_ms;
+    let timestamp: DateTime<Utc> = {
+        let duration = query_timestamp.duration_since(UNIX_EPOCH).unwrap();
+        Utc.timestamp_opt(duration.as_secs() as i64, duration.as_nanos() as u32)
+            .single()
+            .unwrap()
+    };
+
+    // Do a query to get, for each node, the radius recorded closest to the time at which the trace took place.
+    let node_ids: Vec<Vec<u8>> = nodes_with_distances
+        .keys()
+        .cloned()
+        .map(|x| x.raw().to_vec())
+        .collect();
+    let nodes_with_radius: HashMap<NodeId, B256> = match content::Model::find_by_statement(
+        Statement::from_sql_and_values(DbBackend::Postgres, "", vec![]),
+    )
+    .all(&state.database_connection)
+    .await
+    {
+        Ok(nodes_with_radius) => nodes_with_radius,
+        Err(err) => {
+            error!(audit.strategy="latest", err=?err, "Failed to lookup radius for traced nodes");
+            HashMap::new()
+        }
+    };
+
+    // Add radius info to node metadata.
+    trace.metadata.iter_mut().for_each(|(node_id, node_info)| {
+        if let Some(radius) = nodes_with_distances.get(node_id) {
+            node_info.radius = Some(radius.clone());
+        }
+    });
 
     let execution_metadata = content
         .find_related(execution_metadata::Entity)
