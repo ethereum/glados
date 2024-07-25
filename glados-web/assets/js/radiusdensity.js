@@ -3,7 +3,7 @@ function radius_stacked_chart(data) {
     const maxRadiusFraction = 0.1;
     const bucket_bit_width = 8;
     const num_buckets = 2 ** bucket_bit_width;
-    const margin = {top: 10, right: 15, bottom: 60, left: 65},
+    const margin = {top: 40, right: 15, bottom: 60, left: 65},
         width = 1060 - margin.left - margin.right,
         height = 425 - margin.top - margin.bottom;
 
@@ -92,6 +92,14 @@ function radius_stacked_chart(data) {
         .attr("transform", "rotate(-90)")
         .text("# of nodes claiming to want content ->>");
 
+    // Add title
+    svg.append("text")
+        .attr("class", "graph-title")
+        .attr("text-anchor", "middle")
+        .attr("x", width / 2)
+        .attr("y", 0 - (margin.top / 2))
+        .text("Content Replication, by Content ID Prefix");
+
     const hover = d3.select("#hover");
 
     function hoverAppear(event, d) {
@@ -159,7 +167,7 @@ function radius_stacked_chart(data) {
 }
 
 function radius_node_id_scatter_chart(data) {
-    const margin = {top: 10, right: 2.5, bottom: 50, left: 25},
+    const margin = {top: 40, right: 2.5, bottom: 50, left: 25},
         width = 475 - margin.left - margin.right,
         height = 425 - margin.top - margin.bottom;
 
@@ -191,6 +199,14 @@ function radius_node_id_scatter_chart(data) {
         .range([ height, 0]);
     svg.append("g")
         .call(d3.axisLeft(y));
+
+    // Add title
+    svg.append("text")
+        .attr("class", "graph-title")
+        .attr("text-anchor", "middle")
+        .attr("x", width / 2)
+        .attr("y", 0 - (margin.top / 2))
+        .text("Radius as % of Keyspace, by Node ID");
 
     const hover = d3.select("#hover");
 

@@ -2,7 +2,7 @@ let weeksAgo = 0;
 
 function createMultiLineChart(height, width, dataSets) {
     // Declare the chart dimensions and margins.
-    const marginTop = 20;
+    const marginTop = 40;
     const marginRight = 50;
     const marginBottom = 20;
     const marginLeft = 40;
@@ -57,6 +57,14 @@ function createMultiLineChart(height, width, dataSets) {
             .attr("fill", "currentColor")
             .attr("text-anchor", "start")
             .text("↑ Success Rate"));
+
+    // Add title
+    svg.append("text")
+        .attr("class", "graph-title")
+        .attr("text-anchor", "middle")
+        .attr("x", width / 2)
+        .attr("y", marginTop / 2)
+        .text("Audit Success, by week");
 
     // Add lines to the graph.
     const lines = dataSets.map((dataSet, i) => {
