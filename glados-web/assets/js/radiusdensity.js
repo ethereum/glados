@@ -3,7 +3,7 @@ function radius_stacked_chart(data) {
     const maxRadiusFraction = 0.1;
     const bucket_bit_width = 8;
     const num_buckets = 2 ** bucket_bit_width;
-    const margin = {top: 10, right: 15, bottom: 60, left: 65},
+    const margin = {top: 40, right: 15, bottom: 60, left: 65},
         width = 1060 - margin.left - margin.right,
         height = 425 - margin.top - margin.bottom;
 
@@ -92,6 +92,14 @@ function radius_stacked_chart(data) {
         .attr("transform", "rotate(-90)")
         .text("# of nodes claiming to want content ->>");
 
+    // Add title
+    svg.append("text")
+        .attr("class", "graph-title")
+        .attr("text-anchor", "middle")
+        .attr("x", width / 2)
+        .attr("y", 0 - (margin.top / 2))
+        .text("Content Replication, by Content ID Prefix");
+
     const hover = d3.select("#hover");
 
     function hoverAppear(event, d) {
@@ -100,11 +108,20 @@ function radius_stacked_chart(data) {
         if (coverageType == "part") {
           coverage = coverage.toFixed(2);
         }
+        let coverageName;
+        if (coverageType == "full") {
+          coverageName = "exact";
+        } else if (coverageType == "part") {
+          coverageName = "statistical average";
+        }
+        else {
+          throw new Error("Unknown coverage type: " + coverageType);
+        }
         // try to ID bucket:
         const barx = parseFloat(event.target.getAttribute("x"));
         const bucketnum = Math.round(barx / (width/num_buckets));
         const buckethex = bucketnum.toString(16).padStart(2, '0');
-        hover.html(`Data Prefix: 0x${buckethex}<br>Type: ${coverageType}<br>Coverage multiple: ${coverage}`);
+        hover.html(`Data Prefix: 0x${buckethex}<br>Type: ${coverageName}<br>Coverage multiple: ${coverage}`);
 
         hover
             .style("opacity", 0.9)
@@ -133,12 +150,12 @@ function radius_stacked_chart(data) {
         .data(stackedData)
         .join("g")
           .attr("fill", function(d) {
-            let blue = '#3498DB'
-            let orange = '#E67E22'
+            let dark = '#175c50';
+            let light = '#31d4b7';
             if (d.key == "full") {
-              return blue;
+              return dark;
             } else if (d.key == "part") {
-              return orange;
+              return light;
             }
           })
         .selectAll("rect")
@@ -159,7 +176,7 @@ function radius_stacked_chart(data) {
 }
 
 function radius_node_id_scatter_chart(data) {
-    const margin = {top: 10, right: 2.5, bottom: 50, left: 25},
+    const margin = {top: 40, right: 2.5, bottom: 50, left: 37},
         width = 475 - margin.left - margin.right,
         height = 425 - margin.top - margin.bottom;
 
@@ -190,7 +207,15 @@ function radius_node_id_scatter_chart(data) {
         .domain([0, 100])
         .range([ height, 0]);
     svg.append("g")
-        .call(d3.axisLeft(y));
+        .call(d3.axisLeft(y).tickFormat(d => d + "%"));
+
+    // Add title
+    svg.append("text")
+        .attr("class", "graph-title")
+        .attr("text-anchor", "middle")
+        .attr("x", width / 2)
+        .attr("y", 0 - (margin.top / 2))
+        .text("Radius as % of Keyspace, by Node ID");
 
     const hover = d3.select("#hover");
 

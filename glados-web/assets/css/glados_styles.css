@@ -81,3 +81,7 @@ body {
 .question-mark.active + .explanation {
     display: block;
 }
+
+.graph-title {
+  font-size: 1.5em;
+}
