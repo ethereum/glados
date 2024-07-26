@@ -108,11 +108,20 @@ function radius_stacked_chart(data) {
         if (coverageType == "part") {
           coverage = coverage.toFixed(2);
         }
+        let coverageName;
+        if (coverageType == "full") {
+          coverageName = "exact";
+        } else if (coverageType == "part") {
+          coverageName = "statistical average";
+        }
+        else {
+          throw new Error("Unknown coverage type: " + coverageType);
+        }
         // try to ID bucket:
         const barx = parseFloat(event.target.getAttribute("x"));
         const bucketnum = Math.round(barx / (width/num_buckets));
         const buckethex = bucketnum.toString(16).padStart(2, '0');
-        hover.html(`Data Prefix: 0x${buckethex}<br>Type: ${coverageType}<br>Coverage multiple: ${coverage}`);
+        hover.html(`Data Prefix: 0x${buckethex}<br>Type: ${coverageName}<br>Coverage multiple: ${coverage}`);
 
         hover
             .style("opacity", 0.9)
@@ -141,12 +150,12 @@ function radius_stacked_chart(data) {
         .data(stackedData)
         .join("g")
           .attr("fill", function(d) {
-            let blue = '#3498DB'
-            let orange = '#E67E22'
+            let dark = '#175c50';
+            let light = '#31d4b7';
             if (d.key == "full") {
-              return blue;
+              return dark;
             } else if (d.key == "part") {
-              return orange;
+              return light;
             }
           })
         .selectAll("rect")
