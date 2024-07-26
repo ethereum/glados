@@ -176,7 +176,7 @@ function radius_stacked_chart(data) {
 }
 
 function radius_node_id_scatter_chart(data) {
-    const margin = {top: 40, right: 2.5, bottom: 50, left: 25},
+    const margin = {top: 40, right: 2.5, bottom: 50, left: 37},
         width = 475 - margin.left - margin.right,
         height = 425 - margin.top - margin.bottom;
 
@@ -207,7 +207,7 @@ function radius_node_id_scatter_chart(data) {
         .domain([0, 100])
         .range([ height, 0]);
     svg.append("g")
-        .call(d3.axisLeft(y));
+        .call(d3.axisLeft(y).tickFormat(d => d + "%"));
 
     // Add title
     svg.append("text")
