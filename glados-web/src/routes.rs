@@ -852,82 +852,91 @@ pub async fn contentaudit_detail(
         .expect("No audit found");
 
     let trace_string = &audit.trace;
-    let mut trace: QueryTrace =
-        serde_json::from_str(trace_string).expect("Failed to deserialize query trace.");
-
-    // Get the timestamp of the query
-    let query_timestamp = trace.started_at_ms;
-    let timestamp: DateTime<Utc> = {
-        let duration = query_timestamp.duration_since(UNIX_EPOCH).unwrap();
-        Utc.timestamp_opt(duration.as_secs() as i64, duration.subsec_nanos() as u32)
-            .single()
-            .expect("Failed to convert timestamp to DateTime")
+    let mut trace: Option<QueryTrace> = match serde_json::from_str(trace_string) {
+        Ok(trace) => Some(trace),
+        Err(err) => {
+            error!(trace=?trace_string, err=?err, "Failed to deserialize query trace.");
+            None
+        }
     };
 
-    // Do a query to get, for each node, the radius recorded closest to the time at which the trace took place.
-    let node_ids: Vec<Vec<u8>> = trace
-        .metadata
-        .keys()
-        .cloned()
-        .map(|x| x.raw().to_vec())
-        .collect();
-    let node_ids_str = format!(
-        "{{{}}}",
-        node_ids
-            .iter()
-            .map(|id| format!("\\\\x{}", hex::encode(id)))
-            .collect::<Vec<String>>()
-            .join(",")
-    );
-    let nodes_with_radius: HashMap<NodeId, B256> =
-        match NodeWithRadius::find_by_statement(Statement::from_sql_and_values(
-            DbBackend::Postgres,
-            "
-	        SELECT DISTINCT ON (n.node_id)
-                n.node_id,
-                cn.data_radius
-            FROM
-                node n
-                JOIN record r ON r.node_id = n.id
-                JOIN census_node cn ON cn.record_id = r.id
-            WHERE
-                n.node_id = ANY($1::bytea[])
-            ORDER BY
-                n.node_id,
-                ABS(EXTRACT(EPOCH FROM (cn.surveyed_at - $2::timestamp)))
-            ",
-            vec![node_ids_str.into(), timestamp.into()],
-        ))
-        .all(&state.database_connection)
-        .await
-        {
-            Ok(data) => data
-                .into_iter()
-                // Transform SQL result into a hashmap.
-                .map(|node_result| {
-                    let mut node_id = [0u8; 32];
-                    node_id.copy_from_slice(&node_result.node_id);
-                    let node_id = NodeId::new(&node_id);
-                    let mut radius = [0u8; 32];
-                    radius.copy_from_slice(&node_result.data_radius);
-                    let radius = B256::new(radius);
-                    (node_id, radius)
-                })
-                .collect(),
-            Err(err) => {
-                error!(err=?err, "Failed to lookup radius for traced nodes");
-                HashMap::new()
-            }
+    // If we were able to deserialize the trace, we can look up & interpolate the radius for the nodes in the trace.
+    if let Some(trace) = &mut trace {
+        // Get the timestamp of the query
+        let query_timestamp = trace.started_at_ms;
+        let timestamp: DateTime<Utc> = {
+            let duration = query_timestamp.duration_since(UNIX_EPOCH).unwrap();
+            Utc.timestamp_opt(duration.as_secs() as i64, duration.subsec_nanos())
+                .single()
+                .expect("Failed to convert timestamp to DateTime")
         };
 
-    // Add radius info to node metadata.
-    trace.metadata.iter_mut().for_each(|(node_id, node_info)| {
-        if let Some(radius) = nodes_with_radius.get(node_id) {
-            node_info.radius = Some(*radius);
-        }
-    });
-    // Update the trace with radius metadata.
-    audit.trace = serde_json::to_string(&trace).expect("Failed to serialize updated query trace.");
+        // Do a query to get, for each node, the radius recorded closest to the time at which the trace took place.
+        let node_ids: Vec<Vec<u8>> = trace
+            .metadata
+            .keys()
+            .cloned()
+            .map(|x| x.raw().to_vec())
+            .collect();
+        let node_ids_str = format!(
+            "{{{}}}",
+            node_ids
+                .iter()
+                .map(|id| format!("\\\\x{}", hex::encode(id)))
+                .collect::<Vec<String>>()
+                .join(",")
+        );
+        let nodes_with_radius: HashMap<NodeId, B256> =
+            match NodeWithRadius::find_by_statement(Statement::from_sql_and_values(
+                DbBackend::Postgres,
+                "
+                SELECT DISTINCT ON (n.node_id)
+                    n.node_id,
+                    cn.data_radius
+                FROM
+                    node n
+                    JOIN record r ON r.node_id = n.id
+                    JOIN census_node cn ON cn.record_id = r.id
+                WHERE
+                    n.node_id = ANY($1::bytea[])
+                ORDER BY
+                    n.node_id,
+                    ABS(EXTRACT(EPOCH FROM (cn.surveyed_at - $2::timestamp)))
+                ",
+                vec![node_ids_str.into(), timestamp.into()],
+            ))
+            .all(&state.database_connection)
+            .await
+            {
+                Ok(data) => data
+                    .into_iter()
+                    // Transform SQL result into a hashmap.
+                    .map(|node_result| {
+                        let mut node_id = [0u8; 32];
+                        node_id.copy_from_slice(&node_result.node_id);
+                        let node_id = NodeId::new(&node_id);
+                        let mut radius = [0u8; 32];
+                        radius.copy_from_slice(&node_result.data_radius);
+                        let radius = B256::new(radius);
+                        (node_id, radius)
+                    })
+                    .collect(),
+                Err(err) => {
+                    error!(err=?err, "Failed to lookup radius for traced nodes");
+                    HashMap::new()
+                }
+            };
+
+        // Add radius info to node metadata.
+        trace.metadata.iter_mut().for_each(|(node_id, node_info)| {
+            if let Some(radius) = nodes_with_radius.get(node_id) {
+                node_info.radius = Some(*radius);
+            }
+        });
+        // Update the trace with radius metadata.
+        audit.trace =
+            serde_json::to_string(&trace).expect("Failed to serialize updated query trace.");
+    }
 
     let content = audit
         .find_related(content::Entity)
