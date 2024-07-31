@@ -201,10 +201,10 @@ function generateNodeMetadata(node) {
     if (client !== undefined) {
         metadata += `${client}`;
     }
-    const radius_numerator = BigInt(node.radius);
-    const radius_denominator = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    const radius_percentage = (Number(radius_numerator.toString()) / Number(radius_denominator.toString())) * 100;
     if (node.radius){
+        const radius_numerator = BigInt(node.radius);
+        const radius_denominator = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        const radius_percentage = (Number(radius_numerator.toString()) / Number(radius_denominator.toString())) * 100;
         metadata += `\nRadius Percent: ${radius_percentage.toFixed(2)}%`;
     }
     return metadata;
