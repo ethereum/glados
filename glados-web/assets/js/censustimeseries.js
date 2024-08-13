@@ -394,6 +394,15 @@ async function censusTimeSeriesChart(daysAgo) {
     }
 }
 function sortNodes(a, b) {
+
+    // Check for "bootnode" in nodeNickName
+    const aIsBootnode = a.nodeNickName && a.nodeNickName.includes("bootnode");
+    const bIsBootnode = b.nodeNickName && b.nodeNickName.includes("bootnode");
+
+    // If one is a bootnode and the other isn't, prioritize the bootnode
+    if (aIsBootnode && !bIsBootnode) return -1;
+    if (!aIsBootnode && bIsBootnode) return 1;
+
     // If both nodes have nicknames, sort by nickname
     if (a.nodeNickName && b.nodeNickName) {
         // Extract the prefix and number from the nickname
