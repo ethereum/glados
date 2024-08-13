@@ -23,9 +23,10 @@ function ForceGraph({
     linkStrokeLinecap = "round", // link stroke linecap
     linkStrength,
     colors = d3.schemeTableau10, // an array of color strings, for the node groups
-    width = 640, // outer width, in pixels
+    width = 640, // outer width,m in pixels
     height = 400, // outer height, in pixels
-    invalidation // when this promise resolves, stop the simulation
+    invalidation, // when this promise resolves, stop the simulation
+    contentId, // the content ID to highlight
 } = {}) {
     // Compute values.
     const N = d3.map(nodes, nodeId).map(intern);
@@ -38,8 +39,16 @@ function ForceGraph({
     const L = typeof linkStroke !== "function" ? null : d3.map(links, linkStroke);
 
     // Replace the input nodes and links with mutable objects for the simulation.
-    nodes = d3.map(nodes, (_, i) => ({ id: N[i] }));
+    const trimmedWidth = width;
+    nodes = d3.map(nodes, (node, i) => ({ id: N[i], fixedX: (calculateNodeIdX(node.id) * trimmedWidth) - (trimmedWidth / 2), ...node}));
     links = d3.map(links, (_, i) => ({ source: LS[i], target: LT[i] }));
+
+    const contentIdMarkerX = calculateNodeIdX(contentId) * trimmedWidth;
+    console.log(contentId);
+    console.log(contentIdMarkerX);
+    console.log(width);
+    const domainBeginMarkerX = 100;
+    const domainEndMarkerX = domainBeginMarkerX + width;
 
     // Compute default domains.
     if (G && nodeGroups === undefined) nodeGroups = d3.sort(G);
@@ -48,15 +57,19 @@ function ForceGraph({
     const color = nodeGroup == null ? null : d3.scaleOrdinal(nodeGroups, colors);
 
     // Construct the forces.
-    const forceNode = d3.forceManyBody();
+    const forceNode = d3.forceManyBody().strength(-100);
     const forceLink = d3.forceLink(links).id(({ index: i }) => N[i]);
     if (nodeStrength !== undefined) forceNode.strength(nodeStrength);
     if (linkStrength !== undefined) forceLink.strength(linkStrength);
 
+    const paddingY = 50;
+    const xPadding = 0;
     const simulation = d3.forceSimulation(nodes)
         .force("link", forceLink)
-        .force("charge", forceNode)
-        .force("center", d3.forceCenter())
+        .force("charge", forceNode.strength(-300)) // Reduce the strength of repulsion
+        .force("x", d3.forceX(d => d.fixedX).strength(1))
+        .force("collide", d3.forceCollide(nodeRadius * 1.2))
+        .force("boundary", forceBoundary(width, height, paddingY, 1)) // Add the boundary force
         .on("tick", ticked);
 
     const svg = d3.create("svg")
@@ -64,6 +77,34 @@ function ForceGraph({
         .attr("height", height)
         .attr("viewBox", [-width / 2, -height / 2, width, height])
         .attr("style", "max-width: 100%; height: auto; height: intrinsic;");
+
+    // Add the vertical dotted line
+    svg.append("line")
+        .attr("x1", contentIdMarkerX - (width / 2))
+        .attr("y1", -height / 2)
+        .attr("x2", contentIdMarkerX - (width / 2))
+        .attr("y2", height / 2)
+        .attr("stroke", "black")  
+        .attr("stroke-width", 1)  
+        .attr("stroke-dasharray", "5,5");
+    
+    svg.append("line")
+        .attr("x1",  -(width / 2) + xPadding)
+        .attr("y1", -height / 2)
+        .attr("x2", -(width / 2) + xPadding)
+        .attr("y2", height / 2)
+        .attr("stroke", "black")  
+        .attr("stroke-width", 1)  
+        .attr("stroke-dasharray", "5,5");
+
+    svg.append("line")
+        .attr("x1",  (width / 2) - xPadding)
+        .attr("y1", -height / 2)
+        .attr("x2", (width / 2) - xPadding)
+        .attr("y2", height / 2)
+        .attr("stroke", "black")  
+        .attr("stroke-width", 1)  
+        .attr("stroke-dasharray", "5,5");
 
     const link = svg.append("g")
         .attr("stroke", typeof linkStroke !== "function" ? linkStroke : null)
@@ -98,36 +139,26 @@ function ForceGraph({
     }
 
     function ticked() {
-        const width = $('#graph').width();
-        const height = $('#graph').height();
         link
-            .attr("x1", d => enforceBorder(d.source.x, -width / 2, width / 2))
-            .attr("y1", d => enforceBorder(d.source.y, -height / 2, (height / 2) - 24))
-            .attr("x2", d => enforceBorder(d.target.x, -width / 2, width / 2))
-            .attr("y2", d => enforceBorder(d.target.y, -height / 2, (height / 2) - 24));
+            .attr("x1", d => d.source.fixedX)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.fixedX)
+            .attr("y2", d => d.target.y);
 
         node
-            .attr("cx", d => enforceBorder(d.x, -width / 2, width / 2))
-            .attr("cy", d => enforceBorder(d.y, -height / 2, (height / 2) - 24));
-    }
-
-    function enforceBorder(position, lowerLimit, upperLimit) {
-        lowerLimit += 20;
-        upperLimit -= 20;
-        if (position < lowerLimit) position = lowerLimit;
-        if (position > upperLimit) position = upperLimit;
-        return position;
+            .attr("cx", d => d.fixedX)
+            .attr("cy", d => d.y);
     }
 
     function drag(simulation) {
         function dragstarted(event) {
             if (!event.active) simulation.alphaTarget(0.3).restart();
-            event.subject.fx = event.subject.x;
+            event.subject.fx = event.subject.fixedX;
             event.subject.fy = event.subject.y;
         }
 
         function dragged(event) {
-            event.subject.fx = event.x;
+            event.subject.fx = event.subject.fixedX;
             event.subject.fy = event.y;
         }
 
@@ -144,4 +175,30 @@ function ForceGraph({
     }
 
     return Object.assign(svg.node(), { scales: { color } });
+}
+
+function forceBoundary(width, height, padding, strength = 0.05) {
+    let nodes;
+    function force(alpha) {
+        const adjustedStrength = strength * alpha;
+        for (const node of nodes) {
+            if (node.x < -width/2 + padding) node.vx += ((-width/2 + padding) - node.x) * adjustedStrength;
+            if (node.x > width/2 - padding) node.vx += ((width/2 - padding) - node.x) * adjustedStrength;
+            if (node.y < -height/2 + padding) node.vy += ((-height/2 + padding) - node.y) * adjustedStrength;
+            if (node.y > height/2 - padding) node.vy += ((height/2 - padding) - node.y) * adjustedStrength;
+        }
+    }
+
+    force.initialize = (_) => nodes = _;
+
+    return force;
+}
+
+function calculateNodeIdX(nodeId) {
+
+    const nodeIdInt = BigInt(nodeId);
+    const maxNodeId = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    const nodeIdRatio = (Number(nodeIdInt.toString()) / Number(maxNodeId.toString()));
+    return nodeIdRatio;
+    
 }

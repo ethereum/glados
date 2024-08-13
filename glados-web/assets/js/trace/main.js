@@ -7,9 +7,10 @@ function createGraph(graphData) {
         nodeGroups: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
         nodeTitle: d => generateNodeMetadata(d),
         linkStrokeWidth: l => Math.sqrt(l.value),
-        width: $('#graph').width(),
+        width: $('#graph').width() - 1500,
         height: $('#graph').height(),
         invalidation: null,
+        contentId: graphData.contentId
     });
 
     return graph;
@@ -30,7 +31,6 @@ const colors = {
 // { nodes: [{ id, group }], links: [{ source_id, target_id, group }] }
 // Group of nodes determines color, group of links determines thickness.
 function createGraphData(trace) {
-
     if (Object.keys(trace).length === 0) {
         return {
             nodes: [{ id: "local", group: colors.orange, durationMs: 0 }],
@@ -146,8 +146,10 @@ function createGraphData(trace) {
         metadata: {
             nodesContacted: nodes.length - 1,
             nodesResponded: Object.keys(responses).length - 1
-        }
+        },
+        contentId: '0x' + trace.targetId.map(byte => byte.toString(16).padStart(2, '0')).join(''),
     }
+    console.log(graph);
     return graph;
 
 }
