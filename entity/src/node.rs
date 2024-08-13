@@ -212,7 +212,7 @@ lazy_static! {
         );
         nicknames.insert(
             "0x00aaad5ba24375811f58cd56d04050a1b5238cea340005e6a207ea3653ee9d61".to_string(),
-            "trin-ams3-1".to_string(),
+            "trin-ams3-1 (bootnode)".to_string(),
         );
         nicknames.insert(
             "0x2dce06489dcb5d604984e9eaa6ab3296b0e3a8c2da612d150ecf0cd736040b2b".to_string(),
@@ -328,7 +328,7 @@ lazy_static! {
         );
         nicknames.insert(
             "0x556d556773b369686055b1a79b52e0629f3cd4369a0ba505c3eae3c4b97fb0c7".to_string(),
-            "trin-nyc1-1".to_string(),
+            "trin-nyc1-1 (bootnode)".to_string(),
         );
         nicknames.insert(
             "0xf8368f60ee86532cd3990806a356468fc12139791ebf1e6b29d30eedab89f841".to_string(),
@@ -448,7 +448,7 @@ lazy_static! {
         );
         nicknames.insert(
             "0xab4ad0cb9fefd03da68bef18ae96e932eebcdb4bb1b4a763e89c5b2bc4212198".to_string(),
-            "trin-sgp1-1".to_string(),
+            "trin-sgp1-1 (bootnode)".to_string(),
         );
         nicknames.insert(
             "0x95f8b17e1700b74f4ebad4bb5de0564673aeb10b199bd19e65426f7642e9fd3c".to_string(),
@@ -571,11 +571,11 @@ lazy_static! {
 
         nicknames.insert(
             "0x9e7dc510a091a46a07a9d337f4b451eee499503b194b80228a7b9715c579e865".to_string(),
-            "fluffy-ih-eu-mda-01-01".to_string(),
+            "fluffy-ih-eu-mda-01-01 (bootnode)".to_string(),
         );
         nicknames.insert(
             "0xb46b09a36e2318900e142c36128b39651eb8ff908f1fe6830e7b3cd343f18ed3".to_string(),
-            "fluffy-ih-eu-mda-01-02".to_string(),
+            "fluffy-ih-eu-mda-01-02 (bootnode)".to_string(),
         );
         nicknames.insert(
             "0x42b0e92b8f1337516004b45ede9dae49d693db1e2bf45fceb239763a053555a7".to_string(),
@@ -699,11 +699,11 @@ lazy_static! {
         );
         nicknames.insert(
             "0x9891fe3fdfcec2707f877306fc6e5596b1405fedf70ad2911496c2ac40dfeda5".to_string(),
-            "fluffy-ih-eu-mda-02-01".to_string(),
+            "fluffy-ih-eu-mda-02-01 (bootnode)".to_string(),
         );
         nicknames.insert(
             "0x122b3781acfd0145078e14ae9950c1a97004b481dc3c4ca00993f7d371f766cf".to_string(),
-            "fluffy-ih-eu-mda-02-02".to_string(),
+            "fluffy-ih-eu-mda-02-02 (bootnode)".to_string(),
         );
         nicknames.insert(
             "0xff05c3b85e6f03af44ed0e2b65f8a8a637a83158e227bed58d026ca745044407".to_string(),
@@ -824,6 +824,22 @@ lazy_static! {
         nicknames.insert(
             "0xdcba4606925c9803b8fbfda1d6a354ad195ab801ce6706f3ffd2867d2937c02f".to_string(),
             "fluffy-ih-eu-mda-02-32".to_string(),
+        );
+        nicknames.insert(
+            "0xef75a4aecf52f34f90f14042bbc002075c3fe323eb24803629953083053c0320".to_string(),
+            "ultralight bootnode 1".to_string(),
+        );
+        nicknames.insert(
+            "0xb11a574cb4eef79fea7b15ffecdff26638592fbf9fec235172b23fd9ef4305d8".to_string(),
+            "ultralight bootnode 2".to_string(),
+        );
+        nicknames.insert(
+            "0x8148d0278d49015995847572da4fa8f0a981b7fb57774a7d3d40c985529f3237".to_string(),
+            "ultralight bootnode 3".to_string(),
+        );
+        nicknames.insert(
+            "0x95c8df0a57c901c5d4561403a77067996b03b64e7beb1bdee662fae236d2188c".to_string(),
+            "ultralight bootnode 4".to_string(),
         );
 
         nicknames
