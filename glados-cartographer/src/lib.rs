@@ -4,10 +4,11 @@ use anyhow::{bail, Result};
 use chrono::{DateTime, Duration, Utc};
 use clap::Parser;
 use cli::Args;
+use cli::PortalSubnet;
 use enr::NodeId;
 use ethportal_api::Enr;
-use ethportal_api::HistoryNetworkApiClient;
 use ethportal_api::{generate_random_remote_enr, jsonrpsee::http_client::HttpClientBuilder};
+use ethportal_api::{BeaconNetworkApiClient, HistoryNetworkApiClient, StateNetworkApiClient};
 use sea_orm::DatabaseConnection;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -39,6 +40,8 @@ pub struct CartographerConfig {
     pub census_interval: u64,
     /// Total number of concurrent requests to portal client
     pub concurrency: usize,
+    /// Which portal subnetwork to target
+    pub subnetwork: PortalSubnet,
 }
 
 impl CartographerConfig {
@@ -63,6 +66,7 @@ impl CartographerConfig {
             transport,
             census_interval: args.census_interval,
             concurrency: args.concurrency,
+            subnetwork: args.subnetwork,
         })
     }
 }
@@ -247,7 +251,13 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
     );
 
     // Initialize our search with a random-ish set of ENRs
-    let initial_enrs = match client.recursive_find_nodes(target).await {
+    let find_nodes = match config.subnetwork {
+        PortalSubnet::Beacon => BeaconNetworkApiClient::recursive_find_nodes(&client, target),
+        PortalSubnet::State => StateNetworkApiClient::recursive_find_nodes(&client, target),
+        PortalSubnet::History => HistoryNetworkApiClient::recursive_find_nodes(&client, target),
+    };
+
+    let initial_enrs = match find_nodes.await {
         Ok(initial_enrs) => initial_enrs,
         Err(err) => {
             error!(target.node_id=?B256::from(target.raw()), err=?err, "Error during census initialization");
@@ -335,13 +345,14 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
 
     let duration: u32 = census.duration().num_seconds().try_into().unwrap();
 
-    let census_model = match census::create(census.started_at, duration, &conn).await {
-        Ok(census_model) => census_model,
-        Err(err) => {
-            error!(err=?err, "Error saving census model to database");
-            return;
-        }
-    };
+    let census_model =
+        match census::create(census.started_at, duration, config.subnetwork.into(), &conn).await {
+            Ok(census_model) => census_model,
+            Err(err) => {
+                error!(err=?err, "Error saving census model to database");
+                return;
+            }
+        };
 
     for (_, census_record) in census.alive.read().await.iter() {
         match census_node::create(
@@ -349,6 +360,7 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
             census_record.record_id,
             census_record.data_radius,
             census_record.surveyed_at,
+            config.subnetwork.into(),
             &conn,
         )
         .await
@@ -439,10 +451,15 @@ async fn do_liveliness_check(
         }
     };
 
-    // Perform liviliness check
+    // Perform liveliness check
     debug!(node_id=?B256::from(enr.node_id().raw()), "Liveliness check");
 
-    match client.ping(enr.to_owned()).await {
+    let ping = match config.subnetwork {
+        PortalSubnet::History => HistoryNetworkApiClient::ping(&client, enr.to_owned()),
+        PortalSubnet::Beacon => BeaconNetworkApiClient::ping(&client, enr.to_owned()),
+        PortalSubnet::State => StateNetworkApiClient::ping(&client, enr.to_owned()),
+    };
+    match ping.await {
         Ok(pong_info) => {
             debug!(node_id=?B256::from(enr.node_id().raw()), "Liveliness passed");
 
@@ -517,7 +534,18 @@ async fn do_routing_table_enumeration(
     debug!(enr.node_id=?B256::from(enr.node_id().raw()), "Enumerating Routing Table");
 
     for distance in 245..257 {
-        let enrs_at_distance = match client.find_nodes(enr.to_owned(), vec![distance]).await {
+        let find_nodes = match config.subnetwork {
+            PortalSubnet::History => {
+                HistoryNetworkApiClient::find_nodes(&client, enr.to_owned(), vec![distance])
+            }
+            PortalSubnet::Beacon => {
+                BeaconNetworkApiClient::find_nodes(&client, enr.to_owned(), vec![distance])
+            }
+            PortalSubnet::State => {
+                StateNetworkApiClient::find_nodes(&client, enr.to_owned(), vec![distance])
+            }
+        };
+        let enrs_at_distance = match find_nodes.await {
             Ok(result) => result,
             Err(msg) => {
                 warn!(enr.node_id=?B256::from(enr.node_id().raw()), distance=?distance, msg=?msg, "Error fetching routing table info");

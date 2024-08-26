@@ -4,6 +4,8 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
 
+use crate::content::SubProtocol;
+
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "census_node")]
 pub struct Model {
@@ -14,6 +16,7 @@ pub struct Model {
     pub surveyed_at: DateTime<Utc>,
     pub data_radius: Vec<u8>,
     pub data_radius_high: i64,
+    pub sub_network: SubProtocol,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -49,6 +52,7 @@ pub async fn create(
     record_id: i32,
     data_radius: U256,
     surveyed_at: DateTime<Utc>,
+    network: SubProtocol,
     conn: &DatabaseConnection,
 ) -> Result<Model> {
     let data_radius_high: i64 = data_radius.wrapping_shr(193).to::<i64>();
@@ -61,6 +65,7 @@ pub async fn create(
         surveyed_at: Set(surveyed_at),
         data_radius: Set(data_radius_raw.into()),
         data_radius_high: Set(data_radius_high),
+        sub_network: Set(network),
     };
 
     Ok(census.insert(conn).await?)
