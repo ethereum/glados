@@ -1,4 +1,5 @@
 use clap::{Parser, ValueEnum};
+use entity::content::SubProtocol;
 use std::path::PathBuf;
 use url::Url;
 
@@ -23,6 +24,8 @@ pub struct Args {
     pub census_interval: u64,
     #[arg(short, long, default_value = DEFAULT_CONCURRENCY)]
     pub concurrency: usize,
+    #[arg(short, long)]
+    pub subnetwork: PortalSubnet,
 }
 
 /// Used by a user to specify the intended form of transport
@@ -32,4 +35,22 @@ pub struct Args {
 pub enum TransportType {
     IPC,
     HTTP,
+}
+
+#[derive(Copy, Debug, Clone, Eq, PartialEq, ValueEnum)]
+#[clap(rename_all = "snake_case")]
+pub enum PortalSubnet {
+    History,
+    Beacon,
+    State,
+}
+
+impl From<PortalSubnet> for SubProtocol {
+    fn from(value: PortalSubnet) -> Self {
+        match value {
+            PortalSubnet::History => SubProtocol::History,
+            PortalSubnet::Beacon => SubProtocol::Beacon,
+            PortalSubnet::State => SubProtocol::State,
+        }
+    }
 }
