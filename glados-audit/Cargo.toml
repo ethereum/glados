@@ -9,22 +9,22 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-alloy-primitives = "0.7.0"
-anyhow = "1.0.68"
-chrono = "0.4.23"
-clap = { version = "4.0.24", features = ["derive"] }
-entity = { path = "../entity" }
-env_logger = "0.9.3"
-pgtemp = "0.2.1"
-enr = "0.10.0"
+alloy-primitives.workspace = true
+anyhow.workspace = true
+chrono.workspace= true
+clap.workspace = true
+entity.workspace = true
+env_logger.workspace= true
+pgtemp.workspace = true
+enr.workspace = true
 eth_trie = { git = "https://github.com/kolbyml/eth-trie.rs.git", rev = "7e57d3dfadee126cc9fda2696fb039bf7b6ed688" }
-web3 = "0.18.0"
-ethportal-api = { git = "https://github.com/ethereum/trin" }
-glados-core = { path = "../glados-core" }
-migration = { path = "../migration" }
-rand = "0.8.5"
-sea-orm = "0.11.3"
-serde_json = "1.0.95"
-tokio = "1.21.2"
-tracing = "0.1.37"
-url = "2.3.1"
+web3.workspace= true
+ethportal-api.workspace = true
+glados-core.workspace = true
+migration.workspace = true
+rand.workspace = true
+sea-orm.workspace = true
+serde_json.workspace= true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
