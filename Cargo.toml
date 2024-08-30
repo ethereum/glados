@@ -11,10 +11,19 @@ members = [".", "glados-cartographer", "glados-core", "glados-web", "glados-moni
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+entity.workspace = true
+glados-core.workspace = true
+glados-monitor.workspace = true
+glados-audit.workspace = true
+glados-web.workspace = true
+migration.workspace = true
+tokio = { workspace = true, features = ["full"] }
+
+[workspace.dependencies]
 entity = { path = "entity" }
 glados-core = { path = "glados-core" }
 glados-monitor = { path = "glados-monitor" }
 glados-audit = { path = "glados-audit" }
 glados-web = { path = "glados-web" }
 migration = { path = "migration" }
-tokio = { version = "1", features = ["full"] }
+tokio = "1.21.2"
