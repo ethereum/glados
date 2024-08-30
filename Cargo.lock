@@ -2412,7 +2412,7 @@ dependencies = [
  "chrono",
  "clap 4.5.4",
  "entity",
- "env_logger 0.9.3",
+ "env_logger 0.10.2",
  "ethportal-api",
  "futures",
  "glados-core",

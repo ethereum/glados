@@ -20,10 +20,21 @@ migration.workspace = true
 tokio = { workspace = true, features = ["full"] }
 
 [workspace.dependencies]
+alloy-primitives = "0.7.0"
+anyhow = "1.0.68"
+chrono = "0.4.23"
+clap = { version = "4.0.26", features = ["derive"] }
 entity = { path = "entity" }
+env_logger = "0.10.0"
+ethportal-api = { git = "https://github.com/ethereum/trin" }
 glados-core = { path = "glados-core" }
 glados-monitor = { path = "glados-monitor" }
 glados-audit = { path = "glados-audit" }
 glados-web = { path = "glados-web" }
 migration = { path = "migration" }
+sea-orm = "0.11.3"
+serde_json = "1.0.95"
 tokio = "1.21.2"
+tracing = "0.1.37"
+url = "2.3.1"
+web3 = "0.18.0"
