@@ -1725,7 +1725,7 @@ dependencies = [
  "migration",
  "pgtemp",
  "rand",
- "rstest 0.16.0",
+ "rstest",
  "sea-orm",
  "sea-query",
  "serde",
@@ -1740,19 +1740,6 @@ checksum = "a19187fea3ac7e84da7dacf48de0c45d63c6a76f9490dae389aead16c243fce3"
 dependencies = [
  "log",
  "regex",
-]
-
-[[package]]
-name = "env_logger"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a12e6657c4c97ebab115a42dcee77225f7f482cdd841cf7088c657a42e9e00e7"
-dependencies = [
- "atty",
- "humantime",
- "log",
- "regex",
- "termcolor",
 ]
 
 [[package]]
@@ -2390,10 +2377,10 @@ dependencies = [
  "anyhow",
  "chrono",
  "entity",
- "env_logger 0.9.3",
+ "env_logger 0.10.2",
  "ethportal-api",
  "jsonrpsee",
- "rstest 0.11.0",
+ "rstest",
  "sea-orm",
  "serde",
  "serde_json",
@@ -4301,19 +4288,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b241d2e59b74ef9e98d94c78c47623d04c8392abaf82014dfd372a16041128f"
 dependencies = [
  "sha2",
-]
-
-[[package]]
-name = "rstest"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2288c66aeafe3b2ed227c981f364f9968fa952ef0b30e84ada4486e7ee24d00a"
-dependencies = [
- "cfg-if",
- "proc-macro2",
- "quote",
- "rustc_version 0.4.0",
- "syn 1.0.109",
 ]
 
 [[package]]

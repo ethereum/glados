@@ -9,20 +9,20 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-alloy-primitives = "0.7.0"
-anyhow = "1.0.68"
-chrono = "0.4.22"
-entity = { path = "../entity" }
-sea-orm = "0.11.3"
-serde = "1.0.147"
-serde_json = "1.0.87"
+alloy-primitives.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+entity.workspace = true
+env_logger.workspace = true
+ethportal-api.workspace = true
+jsonrpsee = { version = "0.20.0", features = ["async-client", "client"] }
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 sha2 = "0.10.6"
 thiserror = "1.0.37"
-env_logger = "0.9.3"
-tracing = "0.1.37"
-ethportal-api = { git = "https://github.com/ethereum/trin" }
-url = "2.3.1"
-jsonrpsee = { version = "0.20.0", features = ["async-client", "client"] }
+tracing.workspace = true
+url.workspace = true
 
 [dev-dependencies]
-rstest = "0.11.0"
+rstest.workspace = true
