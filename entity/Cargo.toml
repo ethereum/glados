@@ -9,23 +9,22 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-alloy-primitives = "0.7.0"
-anyhow = "1.0.68"
-chrono = "0.4.22"
-clap = { version = "4.0.24", features = ["derive"] }
-enr = "0.10.0"
-ethportal-api = { git = "https://github.com/ethereum/trin" }
+alloy-primitives.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+clap.workspace = true
 discv5 = "0.4.1"
+enr.workspace = true
+env_logger.workspace = true
+ethportal-api.workspace = true
 lazy_static = "1.4.0"
-migration = { path = "../migration" }
-pgtemp = "0.2.1"
-sea-orm = { version = "0.11.3", features = ["sqlx-postgres", "macros", "runtime-tokio-native-tls"] }
+migration.workspace = true
+pgtemp.workspace = true
+rand.workspace = true
+sea-orm = { workspace = true, features = ["sqlx-postgres", "macros", "runtime-tokio-native-tls"] }
 sea-query = "0.28.4"
-tokio = { version = "1.21.2", features = ["macros"] }
-env_logger = "0.10.0"
-rand = "0.8.5"
-rstest = "0.16.0"
-serde = "1.0.167"
+serde.workspace = true
+tokio = { workspace = true, features = ["macros"] }
 
-
-
+[dev-dependencies]
+rstest.workspace = true
