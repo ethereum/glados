@@ -89,6 +89,14 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
             get(routes::hourly_success_rate),
         )
         .route(
+            "/api/latest-census-node-diversiity-data",
+            get(routes::get_radius_diversity_data),
+        )
+        .route(
+            "/api/latest-census-node-radius-data",
+            get(routes::generate_radius_graph_data),
+        )
+        .route(
             "/api/is-content-in-deadzone/:content_key",
             get(routes::is_content_in_deadzone),
         )
