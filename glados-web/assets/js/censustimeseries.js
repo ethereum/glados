@@ -65,8 +65,10 @@ function createSquareChart(width, data) {
         .attr("style", "max-width: 90%; height: 100%; height: intrinsic;");
 
 
-    let title = data.censuses.length > 0 ? `${nodes.length} nodes found during 24 hour period beginning at ${data.censuses[0].time}`
-        : `No censuses found during this 24 hour period.`;
+    const url = new URL(window.location);
+    const subprotocol = url.searchParams.get('network');
+    let title = data.censuses.length > 0 ? `${nodes.length} ${subprotocol} nodes found during 24 hour period beginning at ${data.censuses[0].time}`
+        : `No ${subprotocol} censuses found during this 24 hour period.`;
     
     // Append the title
     svg.append("text")
@@ -360,9 +362,9 @@ function getClientStringFromDecodedEnr(decodedEnr) {
 }
 
 // Fetch the census node records from the API.
-async function getCensusTimeSeriesData(numDaysAgo) {
+async function getCensusTimeSeriesData(numDaysAgo, subprotocol) {
 
-    const baseUrl = `census-node-timeseries-data/?days-ago=${numDaysAgo}`;
+    const baseUrl = `census-node-timeseries-data/?days-ago=${numDaysAgo}&network=${subprotocol}`;
     return fetch(`${baseUrl}`)
         .then(response => {
             if (!response.ok) {
@@ -381,18 +383,20 @@ async function censusTimeSeriesChart(daysAgo) {
         svgElement.remove();
     });
 
-    const data = await getCensusTimeSeriesData(daysAgo);
+    const url = new URL(window.location);
+    subprotocol = url.searchParams.get('network');
+
+    const data = await getCensusTimeSeriesData(daysAgo, subprotocol);
     console.log('Census data from glados API:');
     console.log(data);
     if (data) {
         document.getElementById('census-timeseries-graph').appendChild(createSquareChart(1700, data));
-        if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1) {
-            alert('This page does not display well on Firefox, Chrome or Safari are recommended.');
-        }
     } else {
         console.log('No data available to plot the census chart');
     }
 }
+
+// Sort nodes by nickname, latestClientString, and nodeId
 function sortNodes(a, b) {
 
     // Check for "bootnode" in nodeNickName
