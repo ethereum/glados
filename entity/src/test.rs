@@ -277,7 +277,7 @@ async fn test_content_table_unique_constraints() {
         id: NotSet,
         content_id: Set(id_a.clone()),
         content_key: Set(key_a.clone()),
-        protocol_id: Set(protocol_a.clone()),
+        protocol_id: Set(protocol_a),
         first_available_at: Set(Utc::now()),
     };
     action_a.clone().insert(&conn).await.unwrap();
@@ -318,7 +318,7 @@ async fn test_content_table_unique_constraints() {
         id: NotSet,
         content_id: Set(id_b),
         content_key: Set(key_a),
-        protocol_id: Set(protocol_a.clone()),
+        protocol_id: Set(protocol_a),
         first_available_at: Set(Utc::now()),
     };
     assert!(action_c

@@ -62,7 +62,7 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
 
     // setup router
     let app = Router::new()
-        .route("/", get(routes::root))
+        .route("/", get(routes::network_overview))
         .route("/census/census-list/", get(routes::census_explorer_list))
         .route("/census/", get(routes::single_census_view))
         .route("/census/explorer", get(routes::census_explorer))

@@ -8,7 +8,7 @@ use ethportal_api::OverlayContentKey;
 use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
 
 /// Portal network sub-protocol. History, state, transactions etc.
-#[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum SubProtocol {
     History = 0,
@@ -22,6 +22,22 @@ impl SubProtocol {
             SubProtocol::History => "History".to_string(),
             SubProtocol::State => "State".to_string(),
             SubProtocol::Beacon => "Beacon".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct InvalidSubProtocolError;
+
+impl TryFrom<&String> for SubProtocol {
+    type Error = InvalidSubProtocolError;
+
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
+        match value.to_lowercase().as_str() {
+            "history" => Ok(SubProtocol::History),
+            "state" => Ok(SubProtocol::State),
+            "beacon" => Ok(SubProtocol::Beacon),
+            _ => Err(InvalidSubProtocolError),
         }
     }
 }
@@ -70,7 +86,7 @@ pub async fn get_or_create<T: OverlayContentKey>(
 ) -> Result<Model> {
     // First try to lookup an existing entry.
     if let Some(content_key_model) = Entity::find()
-        .filter(Column::ProtocolId.eq(sub_protocol.clone()))
+        .filter(Column::ProtocolId.eq(sub_protocol))
         .filter(Column::ContentKey.eq(content_key.to_bytes()))
         .one(conn)
         .await?

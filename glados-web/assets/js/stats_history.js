@@ -274,10 +274,8 @@ function getStatsRecords(weeksAgo) {
 
 async function updateChart(weeksAgo) {
     const data = await getStatsRecords(weeksAgo);
-    console.log(data);
 
     let dataSets = convertDataForChart(data);
-    console.log(dataSets);
 
     // Clear the existing chart
     d3.select("#stats-history-graph").html("");
