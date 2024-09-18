@@ -3,6 +3,9 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
+const INDEX_CENSUS_SUBNET_INDEX: &str = "idx_census_subnet";
+const INDEX_CENSUS_NODE_SUBNET_INDEX: &str = "idx_census_node_subnet";
+
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -16,13 +19,31 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await;
-        manager
+        let _ = manager
+            .create_index(
+                Index::create()
+                    .name(INDEX_CENSUS_SUBNET_INDEX)
+                    .table(Census::Table)
+                    .col(Census::SubNetwork)
+                    .to_owned(),
+            )
+            .await;
+        let _ = manager
             .alter_table(
                 Table::alter()
                     .table(CensusNode::Table)
                     .add_column_if_not_exists(
                         ColumnDef::new(CensusNode::SubNetwork).unsigned().default(0),
                     )
+                    .to_owned(),
+            )
+            .await;
+        manager
+            .create_index(
+                Index::create()
+                    .name(INDEX_CENSUS_NODE_SUBNET_INDEX)
+                    .table(CensusNode::Table)
+                    .col(CensusNode::SubNetwork)
                     .to_owned(),
             )
             .await
