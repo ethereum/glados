@@ -3,7 +3,7 @@ services:
     image: portalnetwork/trin:latest
     environment:
       RUST_LOG: info
-    command: "--web3-transport http --web3-http-address http://0.0.0.0:8545/ --mb 0 --no-upnp --disable-poke ${GLADOS_CLIENT_ARGUMENTS:-}"
+    command: "--web3-transport http --web3-http-address http://0.0.0.0:8545/ --mb 0 --portal-subnetworks history,state,beacon --no-upnp --disable-poke ${GLADOS_CLIENT_ARGUMENTS:-}"
   fluffy:
     image: statusim/nimbus-fluffy:amd64-master-latest
     command: "--rpc --rpc-address=0.0.0.0 --storage-capacity=0 --disable-poke ${GLADOS_CLIENT_ARGUMENTS:-}"
