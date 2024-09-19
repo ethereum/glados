@@ -27,6 +27,7 @@ function ForceGraph({
     height = 400, // outer height, in pixels
     invalidation, // when this promise resolves, stop the simulation
     contentId, // the content ID to highlight
+    sortByNodeId = true,
 } = {}) {
     // Compute values.
     const N = d3.map(nodes, nodeId).map(intern);
@@ -39,16 +40,12 @@ function ForceGraph({
     const L = typeof linkStroke !== "function" ? null : d3.map(links, linkStroke);
 
     // Replace the input nodes and links with mutable objects for the simulation.
-    const trimmedWidth = width;
-    nodes = d3.map(nodes, (node, i) => ({ id: N[i], fixedX: (calculateNodeIdX(node.id) * trimmedWidth) - (trimmedWidth / 2), ...node}));
+    if (sortByNodeId) {
+        nodes = d3.map(nodes, (node, i) => ({ id: N[i], fixedX: (calculateNodeIdX(node.id) * width) - (width / 2), ...node}));
+    } else {
+        nodes = d3.map(nodes, (_, i) => ({ id: N[i] }));
+    }
     links = d3.map(links, (_, i) => ({ source: LS[i], target: LT[i] }));
-
-    const contentIdMarkerX = calculateNodeIdX(contentId) * trimmedWidth;
-    console.log(contentId);
-    console.log(contentIdMarkerX);
-    console.log(width);
-    const domainBeginMarkerX = 100;
-    const domainEndMarkerX = domainBeginMarkerX + width;
 
     // Compute default domains.
     if (G && nodeGroups === undefined) nodeGroups = d3.sort(G);
@@ -57,20 +54,30 @@ function ForceGraph({
     const color = nodeGroup == null ? null : d3.scaleOrdinal(nodeGroups, colors);
 
     // Construct the forces.
-    const forceNode = d3.forceManyBody().strength(-100);
+    const forceNode = d3.forceManyBody();
     const forceLink = d3.forceLink(links).id(({ index: i }) => N[i]);
     if (nodeStrength !== undefined) forceNode.strength(nodeStrength);
     if (linkStrength !== undefined) forceLink.strength(linkStrength);
 
     const paddingY = 50;
     const xPadding = 0;
-    const simulation = d3.forceSimulation(nodes)
-        .force("link", forceLink)
-        .force("charge", forceNode.strength(-300)) // Reduce the strength of repulsion
-        .force("x", d3.forceX(d => d.fixedX).strength(1))
-        .force("collide", d3.forceCollide(nodeRadius * 1.2))
-        .force("boundary", forceBoundary(width, height, paddingY, 1)) // Add the boundary force
-        .on("tick", ticked);
+    let simulation;
+
+    if (sortByNodeId) {
+        simulation = d3.forceSimulation(nodes)
+            .force("link", forceLink)
+            .force("charge", forceNode.strength(-300)) // Reduce the strength of repulsion
+            .force("x", d3.forceX(d => d.fixedX).strength(1))
+            .force("collide", d3.forceCollide(nodeRadius * 1.2))
+            .force("boundary", forceBoundary(width, height, paddingY, 1)) // Add the boundary force
+            .on("tick", ticked);
+    } else {
+        simulation = d3.forceSimulation(nodes)
+            .force("link", forceLink)
+            .force("charge", forceNode)
+            .force("center", d3.forceCenter())
+            .on("tick", ticked);
+    }
 
     const svg = d3.create("svg")
         .attr("width", width)
@@ -78,15 +85,19 @@ function ForceGraph({
         .attr("viewBox", [-width / 2, -height / 2, width, height])
         .attr("style", "max-width: 100%; height: auto; height: intrinsic;");
 
-    // Add the vertical dotted line
-    svg.append("line")
-        .attr("x1", contentIdMarkerX - (width / 2))
-        .attr("y1", -height / 2)
-        .attr("x2", contentIdMarkerX - (width / 2))
-        .attr("y2", height / 2)
-        .attr("stroke", "black")  
-        .attr("stroke-width", 1)  
-        .attr("stroke-dasharray", "5,5");
+    if (sortByNodeId) {
+        // Add the vertical dotted line
+        const contentIdMarkerX = calculateNodeIdX(contentId) * width;
+        console.log(contentIdMarkerX);
+        svg.append("line")
+            .attr("x1", contentIdMarkerX - (width / 2))
+            .attr("y1", -height / 2)
+            .attr("x2", contentIdMarkerX - (width / 2))
+            .attr("y2", height / 2)
+            .attr("stroke", "black")  
+            .attr("stroke-width", 1)  
+            .attr("stroke-dasharray", "5,5");
+    }
     
     svg.append("line")
         .attr("x1",  -(width / 2) + xPadding)
@@ -139,28 +150,42 @@ function ForceGraph({
     }
 
     function ticked() {
-        link
-            .attr("x1", d => d.source.fixedX)
-            .attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.fixedX)
-            .attr("y2", d => d.target.y);
+        if (sortByNodeId) {
+            link
+                .attr("x1", d => d.source.fixedX)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.fixedX)
+                .attr("y2", d => d.target.y);
 
-        node
-            .attr("cx", d => d.fixedX)
-            .attr("cy", d => d.y);
+            node
+                .attr("cx", d => d.fixedX)
+                .attr("cy", d => d.y);
+        } else {
+            const width = $('#graph').width();
+            const height = $('#graph').height();
+            link
+                .attr("x1", d => enforceBorder(d.source.x, -width / 2, width / 2))
+                .attr("y1", d => enforceBorder(d.source.y, -height / 2, (height / 2) - 24))
+                .attr("x2", d => enforceBorder(d.target.x, -width / 2, width / 2))
+                .attr("y2", d => enforceBorder(d.target.y, -height / 2, (height / 2) - 24));
+
+            node
+                .attr("cx", d => enforceBorder(d.x, -width / 2, width / 2))
+                .attr("cy", d => enforceBorder(d.y, -height / 2, (height / 2) - 24));
+        }
     }
 
     function drag(simulation) {
-        function dragstarted(event) {
+        const dragstarted = event => {
             if (!event.active) simulation.alphaTarget(0.3).restart();
-            event.subject.fx = event.subject.fixedX;
-            event.subject.fy = event.subject.y;
-        }
-
-        function dragged(event) {
-            event.subject.fx = event.subject.fixedX;
+            event.subject.fx = sortByNodeId ? event.subject.fixedX : event.x;
             event.subject.fy = event.y;
-        }
+        };
+
+        const dragged = event => {
+            event.subject.fx = sortByNodeId ? event.subject.fixedX : event.x;
+            event.subject.fy = event.y;
+        };
 
         function dragended(event) {
             if (!event.active) simulation.alphaTarget(0);
@@ -192,6 +217,14 @@ function forceBoundary(width, height, padding, strength = 0.05) {
     force.initialize = (_) => nodes = _;
 
     return force;
+}
+
+function enforceBorder(position, lowerLimit, upperLimit) {
+    lowerLimit += 20;
+    upperLimit -= 20;
+    if (position < lowerLimit) position = lowerLimit;
+    if (position > upperLimit) position = upperLimit;
+    return position;
 }
 
 function calculateNodeIdX(nodeId) {
