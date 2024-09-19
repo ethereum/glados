@@ -1049,32 +1049,32 @@ pub async fn single_census_view(
         Some(max_census_id) => max_census_id,
     };
 
-    let census_id: Option<i32> = match params.get("census-id") {
+    let census_id: i32 = match params.get("census-id") {
         None => return Err(StatusCode::from_u16(404).unwrap()),
         Some(census_id) => match census_id.parse::<i32>() {
-            Ok(census_id) => Some(census_id),
-            Err(_) => Some(max_census_id.id),
+            Ok(census_id) => census_id,
+            Err(_) => max_census_id.id,
         },
     };
 
-    let client_diversity_data = match generate_client_diversity_data(&state, max_census_id.id).await
-    {
+    let client_diversity_data = match generate_client_diversity_data(&state, census_id).await {
         None => return Err(StatusCode::from_u16(404).unwrap()),
         Some(client_diversity_data) => client_diversity_data,
     };
 
-    let enr_list = match generate_enr_list_from_census_id(&state, census_id, max_census_id).await {
-        None => return Err(StatusCode::from_u16(404).unwrap()),
-        Some(enr_list) => enr_list,
-    };
+    let enr_list =
+        match generate_enr_list_from_census_id(&state, Some(census_id), max_census_id).await {
+            None => return Err(StatusCode::from_u16(404).unwrap()),
+            Some(enr_list) => enr_list,
+        };
 
     let template = SingleCensusViewTemplate {
         client_diversity_data,
         node_count: enr_list.len() as i32,
         enr_list,
-        census_id: census_id.unwrap(),
+        census_id,
         max_census_id: max_census_id.id,
-        created_at: get_created_data_from_census_id(&state, census_id.unwrap())
+        created_at: get_created_data_from_census_id(&state, census_id)
             .await
             .format("%Y-%m-%d %H:%M:%S UTC")
             .to_string(),
