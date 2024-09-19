@@ -3,27 +3,27 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
+const INDEX_CENSUS_SUBNET_INDEX: &str = "idx_census_subnet";
+const INDEX_CENSUS_NODE_SUBNET_INDEX: &str = "idx_census_node_subnet";
+
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let _ = manager
-            .alter_table(
-                Table::alter()
+            .create_index(
+                Index::create()
+                    .name(INDEX_CENSUS_SUBNET_INDEX)
                     .table(Census::Table)
-                    .add_column_if_not_exists(
-                        ColumnDef::new(Census::SubNetwork).unsigned().default(0),
-                    )
+                    .col(Census::SubNetwork)
                     .to_owned(),
             )
             .await;
-
         manager
-            .alter_table(
-                Table::alter()
+            .create_index(
+                Index::create()
+                    .name(INDEX_CENSUS_NODE_SUBNET_INDEX)
                     .table(CensusNode::Table)
-                    .add_column_if_not_exists(
-                        ColumnDef::new(CensusNode::SubNetwork).unsigned().default(0),
-                    )
+                    .col(CensusNode::SubNetwork)
                     .to_owned(),
             )
             .await
@@ -31,18 +31,12 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let _ = manager
-            .alter_table(
-                Table::alter()
-                    .table(Census::Table)
-                    .drop_column(Census::SubNetwork)
-                    .to_owned(),
-            )
+            .drop_index(Index::drop().name(INDEX_CENSUS_SUBNET_INDEX).to_owned())
             .await;
         manager
-            .alter_table(
-                Table::alter()
-                    .table(Census::Table)
-                    .drop_column(Census::SubNetwork)
+            .drop_index(
+                Index::drop()
+                    .name(INDEX_CENSUS_NODE_SUBNET_INDEX)
                     .to_owned(),
             )
             .await
