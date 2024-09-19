@@ -14,6 +14,7 @@ mod m20240322_205213_add_content_audit_index;
 mod m20240515_064320_state_roots;
 mod m20240720_111606_create_census_index;
 mod m20240814_121507_census_subnetwork;
+mod m20240919_121611_census_subnetwork_index;
 
 pub struct Migrator;
 
@@ -35,6 +36,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20240515_064320_state_roots::Migration),
             Box::new(m20240720_111606_create_census_index::Migration),
             Box::new(m20240814_121507_census_subnetwork::Migration),
+            Box::new(m20240919_121611_census_subnetwork_index::Migration),
         ]
     }
 }
