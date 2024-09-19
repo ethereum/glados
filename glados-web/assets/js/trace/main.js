@@ -1,5 +1,5 @@
 // Creates a graph from a trace object and returns an SVG.
-function createGraph(graphData) {
+function createGraph(graphData, sortByNodeId = false) {
 
     let graph = ForceGraph(graphData, {
         nodeId: d => d.id,
@@ -7,10 +7,11 @@ function createGraph(graphData) {
         nodeGroups: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
         nodeTitle: d => generateNodeMetadata(d),
         linkStrokeWidth: l => Math.sqrt(l.value),
-        width: $('#graph').width() - 1500,
+        width: $('#graph').width(),
         height: $('#graph').height(),
         invalidation: null,
-        contentId: graphData.contentId
+        contentId: graphData.contentId,
+        sortByNodeId: sortByNodeId,
     });
 
     return graph;
@@ -214,6 +215,7 @@ function generateNodeMetadata(node) {
 }
 
 function generateTable(nodes) {
+    $('#enr-table').empty();
     nodes.sort((a, b) => a.distance < b.distance ? -1 : (a.distance > b.distance) ? 1 : 0);
     nodes.forEach((node, index) => {
         let nodeIdString = node.id;

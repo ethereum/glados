@@ -30,21 +30,27 @@
 
 <div id="trace" class="row">
     <div id="graph" class="w-66">
-        <div id="legend">
-            <div class="legend-dot" id="origin"></div>
-            <text>Origin</text>
-            <div class="legend-dot" id="responded"></div>
-            <text>Responded</text>
-            <div class="legend-dot" id="no-response"></div>
-            <text>No Response</text>
-            <div class="legend-dot" id="no-progress"></div>
-            <text>No Progress</text>
-            <div class="legend-dot" id="found-content"></div>
-            <text>Content Found</text>
-            <div class="legend-dot" id="cancelled"></div>
-            <text>Request Cancelled</text>
-            <div class="should-store-legend-dot" id="should-store"></div>
-            <text>Should Store</text>
+        <div id="legend-container">
+            <div id="legend">
+                <div class="legend-dot" id="origin"></div>
+                <text>Origin</text>
+                <div class="legend-dot" id="responded"></div>
+                <text>Responded</text>
+                <div class="legend-dot" id="no-response"></div>
+                <text>No Response</text>
+                <div class="legend-dot" id="no-progress"></div>
+                <text>No Progress</text>
+                <div class="legend-dot" id="found-content"></div>
+                <text>Content Found</text>
+                <div class="legend-dot" id="cancelled"></div>
+                <text>Request Cancelled</text>
+                <div class="should-store-legend-dot" id="should-store"></div>
+                <text>Should Store</text>
+            </div>
+            <div id="sort-toggle" class="btn-group" role="group" aria-label="Sort options">
+                <button type="button" class="btn btn-sm btn-outline-secondary active" id="sort-unsorted">Unsorted</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="sort-by-id">Sort by ID</button>
+            </div>
         </div>
 
     </div>
@@ -67,21 +73,35 @@
         </table>
     </div>
 
-
 </div>
-
+<style>
+    #sort-toggle {
+        text-align: left;  /* Align with the legend */
+        margin-left: 10px;  /* Match left margin of legend items if needed */
+    }
+    #sort-toggle .btn {
+        font-size: 0.8rem;  /* Adjust font size as needed */
+        padding: 0.25rem 0.5rem;  /* Reduce padding to make buttons smaller */
+        line-height: 1;  /* Adjust line height to reduce button height */
+    }
+</style>
 <script>
-    $(document).ready(function () {
+$(document).ready(function () {
+   let trace_string = "{{ audit.trace }}".replace(/&quot;/g, '"');
+    let trace = JSON.parse(trace_string);
+    let graphData, graphSvg;
+    
+    // Retrieve sortByNodeId from localStorage, defaulting to false if not set
+    let sortByNodeId = localStorage.getItem('sortByNodeId') === 'true';
 
-        let trace_string = "{{ audit.trace }}".replace(/&quot;/g, '"');
-        let trace = JSON.parse(trace_string);
-
+    function initializeGraph() {
         let heightTaken = $('#top-of-audit-detail').height();
         let heightAvailable = Math.floor($(window).height() - heightTaken);
         $('#trace').css('height', `${heightAvailable}px`);
 
-        let graphData = createGraphData(trace);
-        let graphSvg = createGraph(graphData);
+        graphData = createGraphData(trace);
+        graphSvg = createGraph(graphData, sortByNodeId);
+        $('#graph').find('svg').remove();  // Remove existing graph
         $('#graph').append(graphSvg);
 
         // Highlight the nodes for whom the content is within radius.
@@ -98,16 +118,29 @@
             })
             .attr("stroke", "lightgray")
             .attr("stroke-width", 3);
+        
         generateTable(graphData.nodes);
 
-        $('#trin-button').on("mouseenter", function () {
-            $('#trin-button').css('background-color', 'lightgray');
-            highlightTrinNodes();
-        }).on('mouseleave', function () {
-            $('#trin-button').css('background-color', 'white');
-            unHighlight();
-        });
+        // Update button states based on sortByNodeId
+        if (sortByNodeId) {
+            $('#sort-by-id').addClass('active');
+            $('#sort-unsorted').removeClass('active');
+        } else {
+            $('#sort-unsorted').addClass('active');
+            $('#sort-by-id').removeClass('active');
+        }
+    }
+
+    initializeGraph();
+
+    $('#sort-unsorted, #sort-by-id').click(function() {
+        sortByNodeId = $(this).attr('id') === 'sort-by-id';
+        // Store the new value in localStorage
+        localStorage.setItem('sortByNodeId', sortByNodeId);
+        initializeGraph();
     });
+
+});
 </script>
 
 {% endblock %}
