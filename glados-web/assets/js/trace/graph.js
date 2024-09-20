@@ -88,7 +88,6 @@ function ForceGraph({
     if (sortByNodeId) {
         // Add the vertical dotted line
         const contentIdMarkerX = calculateNodeIdX(contentId) * width;
-        console.log(contentIdMarkerX);
         svg.append("line")
             .attr("x1", contentIdMarkerX - (width / 2))
             .attr("y1", -height / 2)
@@ -98,24 +97,6 @@ function ForceGraph({
             .attr("stroke-width", 1)  
             .attr("stroke-dasharray", "5,5");
     }
-    
-    svg.append("line")
-        .attr("x1",  -(width / 2) + xPadding)
-        .attr("y1", -height / 2)
-        .attr("x2", -(width / 2) + xPadding)
-        .attr("y2", height / 2)
-        .attr("stroke", "black")  
-        .attr("stroke-width", 1)  
-        .attr("stroke-dasharray", "5,5");
-
-    svg.append("line")
-        .attr("x1",  (width / 2) - xPadding)
-        .attr("y1", -height / 2)
-        .attr("x2", (width / 2) - xPadding)
-        .attr("y2", height / 2)
-        .attr("stroke", "black")  
-        .attr("stroke-width", 1)  
-        .attr("stroke-dasharray", "5,5");
 
     const link = svg.append("g")
         .attr("stroke", typeof linkStroke !== "function" ? linkStroke : null)
