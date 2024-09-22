@@ -525,14 +525,20 @@ pub async fn contentkey_detail(
 pub async fn contentaudit_detail(
     Path(audit_id): Path<String>,
     Extension(state): Extension<Arc<State>>,
-) -> impl IntoResponse {
+) -> Result<HtmlTemplate<ContentAuditDetailTemplate>, StatusCode> {
     let audit_id = audit_id.parse::<i32>().unwrap();
     info!("Audit ID: {}", audit_id);
-    let mut audit = content_audit::Entity::find_by_id(audit_id)
+    let mut audit = match content_audit::Entity::find_by_id(audit_id)
         .one(&state.database_connection)
         .await
-        .unwrap()
-        .expect("No audit found");
+    {
+        Ok(Some(audit)) => audit,
+        Ok(None) => return Err(StatusCode::from_u16(404).unwrap()),
+        Err(err) => {
+            error!(err=?err, "Failed to lookup audit");
+            return Err(StatusCode::from_u16(404).unwrap());
+        }
+    };
 
     let trace_string = &audit.trace;
     let mut trace: Option<QueryTrace> = match serde_json::from_str(trace_string) {
@@ -640,7 +646,7 @@ pub async fn contentaudit_detail(
         content,
         execution_metadata,
     };
-    HtmlTemplate(template)
+    Ok(HtmlTemplate(template))
 }
 
 #[derive(FromQueryResult, Debug)]
