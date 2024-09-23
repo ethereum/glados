@@ -144,8 +144,10 @@ impl DHTCensus {
         let finished = self.finished.read().await.len();
         let errored = self.errored.read().await.len();
 
-        if known == 0 {
+        if known == 0 && self.duration().num_seconds() < 60 {
             false
+        } else if known == 0 {
+            true
         } else {
             errored + finished == known
         }
