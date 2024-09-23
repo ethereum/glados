@@ -1080,10 +1080,7 @@ pub async fn single_census_view(
         enr_list,
         census_id,
         max_census_id: max_census_id.id,
-        created_at: get_created_data_from_census_id(&state, census_id)
-            .await
-            .format("%Y-%m-%d %H:%M:%S UTC")
-            .to_string(),
+        created_at: get_created_data_from_census_id(&state, census_id).await,
     };
 
     Ok(HtmlTemplate(template))
@@ -1141,7 +1138,7 @@ async fn generate_enr_list_from_census_id(
     )
 }
 
-async fn get_created_data_from_census_id(state: &Arc<State>, census_id: i32) -> DateTime<Utc> {
+async fn get_created_data_from_census_id(state: &Arc<State>, census_id: i32) -> String {
     let builder = state.database_connection.get_database_backend();
     // we need to bounds check the requested census_id and return None if it doesn't exist
     let created_data = Query::select()
@@ -1152,11 +1149,18 @@ async fn get_created_data_from_census_id(state: &Arc<State>, census_id: i32) -> 
         )
         .and_where(Expr::col(census::Column::Id).eq(census_id))
         .take();
-    let created_data = CensusCreatedAt::find_by_statement(builder.build(&created_data))
+    let created_data = match CensusCreatedAt::find_by_statement(builder.build(&created_data))
         .one(&state.database_connection)
         .await
-        .unwrap();
-    created_data.unwrap().created_at
+    {
+        Ok(Some(data)) => data.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+        Ok(None) => "".to_string(),
+        Err(err) => {
+            error!(err=?err, "Failed to lookup census creation time");
+            "".to_string()
+        }
+    };
+    created_data
 }
 
 #[derive(FromQueryResult, Debug, Clone, Copy)]
