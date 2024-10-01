@@ -3,7 +3,11 @@ use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Response},
 };
-use entity::{client_info, content, content_audit, execution_metadata, key_value, node, record};
+use entity::{
+    client_info,
+    content::{self, SubProtocol},
+    content_audit, execution_metadata, key_value, node, record,
+};
 
 use crate::routes::{
     CalculatedRadiusChartData, ClientDiversityResult, PaginatedCensusListResult, RawEnr,
@@ -90,7 +94,9 @@ pub struct ContentKeyListTemplate {
 
 #[derive(Template)]
 #[template(path = "audit_dashboard.html")]
-pub struct AuditDashboardTemplate {}
+pub struct AuditDashboardTemplate {
+    pub subprotocol: SubProtocol,
+}
 
 #[derive(Template)]
 #[template(path = "audit_table.html")]

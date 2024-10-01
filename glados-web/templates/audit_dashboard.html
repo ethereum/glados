@@ -10,28 +10,50 @@
         <br />
         <h1 class="header text-center">Audit Dashboard</h1>
         <div class="d-flex justify-content-center flex-wrap">
-            <div id="content-buttons" class="btn-group mx-1" role="group">
-                <button id="all-content-button" filter="All" class="btn btn-outline-secondary"
-                    type="button">All</button>
-                <button id="headers-button" filter="Headers" class="btn btn-outline-secondary"
-                    type="button">Headers</button>
-                <button id="bodies-button" filter="Bodies" class="btn btn-outline-secondary"
-                    type="button">Bodies</button>
-                <button id="receipts-button" filter="Receipts" class="btn btn-outline-secondary"
-                    type="button">Receipts</button>
-            </div>
-            <div id="strategy-buttons" class="btn-group mx-1" role="group">
-                <button id="all-strategy-button" filter="All" class="btn btn-outline-secondary"
-                    type="button">All</button>
-                <button id="latest-button" filter="Latest" class="btn btn-outline-secondary"
-                    type="button">Latest</button>
-                <button id="random-button" filter="Random" class="btn btn-outline-secondary"
-                    type="button">Random</button>
-                <button id="oldest-button" filter="Oldest" class="btn btn-outline-secondary" type="button">Oldest
-                    Unaudited</button>
-                <button id="fourfours-button" filter="FourFours" class="btn btn-outline-secondary"
-                    type="button">4444s</button>
-            </div>
+            {% if subprotocol == SubProtocol::History %}
+
+                <div id="content-buttons" class="btn-group mx-1" role="group">
+                    <button id="all-content-button" filter="All" class="btn btn-outline-secondary"
+                        type="button">All</button>
+                    <button id="headers-button" filter="Headers" class="btn btn-outline-secondary"
+                        type="button">Headers</button>
+                    <button id="bodies-button" filter="Bodies" class="btn btn-outline-secondary"
+                        type="button">Bodies</button>
+                    <button id="receipts-button" filter="Receipts" class="btn btn-outline-secondary"
+                        type="button">Receipts</button>
+                </div>
+                <div id="strategy-buttons" class="btn-group mx-1" role="group">
+                    <button id="all-strategy-button" filter="All" class="btn btn-outline-secondary"
+                        type="button">All</button>
+                    <button id="latest-button" filter="Latest" class="btn btn-outline-secondary"
+                        type="button">Latest</button>
+                    <button id="random-button" filter="Random" class="btn btn-outline-secondary"
+                        type="button">Random</button>
+                    <button id="oldest-button" filter="Oldest" class="btn btn-outline-secondary" type="button">Oldest
+                        Unaudited</button>
+                    <button id="fourfours-button" filter="FourFours" class="btn btn-outline-secondary"
+                        type="button">4444s</button>
+                </div>
+
+            {% elseif subprotocol == SubProtocol::State %} 
+
+                <div id="content-buttons" class="btn-group mx-1" role="group">
+                    <button id="all-content-button" filter="All" class="btn btn-outline-secondary"
+                        type="button">All</button>
+                    <button id="random-button" filter="Random" class="btn btn-outline-secondary"
+                        type="button">Random</button>
+                </div>
+
+                <div id="strategy-buttons" class="btn-group mx-1" role="group">
+                    <button id="all-strategy-button" filter="All" class="btn btn-outline-secondary"
+                        type="button">All</button>
+                    <button id="account-trie-button" filter="AccountTrieNodes" class="btn btn-outline-secondary"
+                        type="button">Account Trie Nodes</button>
+                </div>
+
+            {% elseif subprotocol == SubProtocol::Beacon %}
+
+            {% endif %}
             <div id="success-buttons" class="btn-group mx-1 " role="group">
                 <button id="all-success-button" filter="All" class="btn btn-outline-secondary"
                     type="button">All</button>
@@ -123,7 +145,10 @@
     function updateDashboard(strategy, content_type, success) {
 
         const baseUrl = "filter/";
+        const url = new URL(window.location);
+        subprotocol = url.searchParams.get('network');
         const params = {
+            network: subprotocol,
             strategy: strategy,
             content_type: content_type,
             success: success,

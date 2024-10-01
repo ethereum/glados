@@ -1,5 +1,5 @@
 use chrono::Utc;
-use entity::audit_stats;
+use entity::{audit_stats, content::SubProtocol};
 use glados_core::stats::{
     filter_audits, get_audit_stats, AuditFilters, ContentTypeFilter, Period, StrategyFilter,
     SuccessFilter,
@@ -47,8 +47,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::All,
                 content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -56,8 +57,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::Latest,
                 content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -65,8 +67,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::Random,
                 content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -74,8 +77,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::FourFours,
                 content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -83,8 +87,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::All,
                 content_type: ContentTypeFilter::Headers,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -92,8 +97,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::All,
                 content_type: ContentTypeFilter::Bodies,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -101,8 +107,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::All,
                 content_type: ContentTypeFilter::Receipts,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -110,8 +117,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::Latest,
                 content_type: ContentTypeFilter::Headers,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -119,8 +127,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::Latest,
                 content_type: ContentTypeFilter::Bodies,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -128,8 +137,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::Latest,
                 content_type: ContentTypeFilter::Receipts,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -137,8 +147,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::Random,
                 content_type: ContentTypeFilter::Headers,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -146,8 +157,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::Random,
                 content_type: ContentTypeFilter::Bodies,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -155,8 +167,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::Random,
                 content_type: ContentTypeFilter::Receipts,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -164,8 +177,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::FourFours,
                 content_type: ContentTypeFilter::Headers,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -173,8 +187,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::FourFours,
                 content_type: ContentTypeFilter::Bodies,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         ),
@@ -182,8 +197,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::FourFours,
                 content_type: ContentTypeFilter::Receipts,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
             Period::Hour,
             conn
         )
