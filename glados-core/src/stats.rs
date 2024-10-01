@@ -4,7 +4,9 @@ use chrono::{DateTime, Utc};
 
 use entity::{
     content::{self, SubProtocol},
-    content_audit::{self, AuditResult, HistorySelectionStrategy, SelectionStrategy},
+    content_audit::{
+        self, AuditResult, HistorySelectionStrategy, SelectionStrategy, StateSelectionStrategy,
+    },
 };
 use sea_orm::{
     sea_query::{Expr, IntoCondition},
@@ -19,6 +21,9 @@ use serde::Deserialize;
 pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
     // This base query will have filters added to it
     let audits = content_audit::Entity::find();
+    let audits = audits
+        .join(JoinType::InnerJoin, content_audit::Relation::Content.def())
+        .filter(content::Column::ProtocolId.eq(filters.network));
     // Strategy filters
     let audits = match filters.strategy {
         StrategyFilter::All => audits,
@@ -36,6 +41,10 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
         StrategyFilter::FourFours => audits.filter(content_audit::Column::StrategyUsed.eq(
             SelectionStrategy::History(HistorySelectionStrategy::FourFours),
         )),
+        StrategyFilter::StateRoots => audits.filter(
+            content_audit::Column::StrategyUsed
+                .eq(SelectionStrategy::State(StateSelectionStrategy::StateRoots)),
+        ),
     };
     // Success filters
     let audits = match filters.success {
@@ -50,45 +59,18 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
     // Content type filters
     match filters.content_type {
         ContentTypeFilter::All => audits,
-        ContentTypeFilter::Headers => audits.join(
-            JoinType::InnerJoin,
-            content_audit::Relation::Content
-                .def()
-                .on_condition(|_left, right| {
-                    Expr::cust("get_byte(content.content_key, 0) = 0x00")
-                        .and(
-                            Expr::col((right, content::Column::ProtocolId))
-                                .eq(SubProtocol::History),
-                        )
-                        .into_condition()
-                }),
-        ),
-        ContentTypeFilter::Bodies => audits.join(
-            JoinType::InnerJoin,
-            content_audit::Relation::Content
-                .def()
-                .on_condition(|_left, right| {
-                    Expr::cust("get_byte(content.content_key, 0) = 0x01")
-                        .and(
-                            Expr::col((right, content::Column::ProtocolId))
-                                .eq(SubProtocol::History),
-                        )
-                        .into_condition()
-                }),
-        ),
-        ContentTypeFilter::Receipts => audits.join(
-            JoinType::InnerJoin,
-            content_audit::Relation::Content
-                .def()
-                .on_condition(|_left, right| {
-                    Expr::cust("get_byte(content.content_key, 0) = 0x02")
-                        .and(
-                            Expr::col((right, content::Column::ProtocolId))
-                                .eq(SubProtocol::History),
-                        )
-                        .into_condition()
-                }),
-        ),
+        ContentTypeFilter::Headers => {
+            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x00").into_condition())
+        }
+        ContentTypeFilter::Bodies => {
+            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x01").into_condition())
+        }
+        ContentTypeFilter::Receipts => {
+            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x02").into_condition())
+        }
+        ContentTypeFilter::AccountTrieNodes => {
+            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x20").into_condition())
+        }
     }
 }
 
@@ -192,33 +174,36 @@ impl Period {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Copy, Clone)]
 pub struct AuditFilters {
     pub strategy: StrategyFilter,
     pub content_type: ContentTypeFilter,
     pub success: SuccessFilter,
+    pub network: SubProtocol,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Copy, Clone)]
 pub enum StrategyFilter {
     All,
     Random,
     Latest,
     Oldest,
     FourFours,
+    StateRoots,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Copy, Clone)]
 pub enum SuccessFilter {
     All,
     Success,
     Failure,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Copy, Clone)]
 pub enum ContentTypeFilter {
     All,
     Headers,
     Bodies,
     Receipts,
+    AccountTrieNodes,
 }

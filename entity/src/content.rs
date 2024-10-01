@@ -6,9 +6,10 @@ use chrono::{DateTime, Utc};
 use ethportal_api::utils::bytes::{hex_encode, hex_encode_compact};
 use ethportal_api::OverlayContentKey;
 use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
+use serde::Deserialize;
 
 /// Portal network sub-protocol. History, state, transactions etc.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumIter, DeriveActiveEnum, Deserialize)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum SubProtocol {
     History = 0,

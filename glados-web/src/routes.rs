@@ -87,31 +87,33 @@ pub async fn network_overview(
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::FourFours,
                 content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: subprotocol,
+            },),
             Period::Hour,
-            &state.database_connection
+            &state.database_connection,
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::FourFours,
                 content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: subprotocol,
+            },),
             Period::Day,
-            &state.database_connection
+            &state.database_connection,
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::FourFours,
                 content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All
-            }),
+                success: SuccessFilter::All,
+                network: subprotocol,
+            },),
             Period::Week,
-            &state.database_connection
+            &state.database_connection,
         ),
     );
-
     // Get results from queries
     let hour_stats = hour_stats.unwrap();
     let day_stats = day_stats.unwrap();
@@ -424,8 +426,11 @@ pub async fn contentkey_list(
     Ok(HtmlTemplate(template))
 }
 
-pub async fn contentaudit_dashboard() -> Result<HtmlTemplate<AuditDashboardTemplate>, StatusCode> {
-    let template = AuditDashboardTemplate {};
+pub async fn contentaudit_dashboard(
+    params: HttpQuery<HashMap<String, String>>,
+) -> Result<HtmlTemplate<AuditDashboardTemplate>, StatusCode> {
+    let subprotocol = get_subprotocol_from_params(&params);
+    let template = AuditDashboardTemplate { subprotocol };
     Ok(HtmlTemplate(template))
 }
 
