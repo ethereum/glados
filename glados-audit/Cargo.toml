@@ -17,7 +17,7 @@ entity.workspace = true
 env_logger.workspace= true
 pgtemp.workspace = true
 enr.workspace = true
-eth_trie = { git = "https://github.com/kolbyml/eth-trie.rs.git", rev = "7e57d3dfadee126cc9fda2696fb039bf7b6ed688" }
+eth_trie = { tag = "v0.1.0-alpha.2", git = "https://github.com/ethereum/eth-trie.rs" }
 web3.workspace= true
 ethportal-api.workspace = true
 glados-core.workspace = true
