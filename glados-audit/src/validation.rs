@@ -1,6 +1,6 @@
 use entity::content;
 use ethportal_api::utils::bytes::hex_encode;
-use ethportal_api::{BeaconContentKey, BlockHeaderKey, HistoryContentKey, OverlayContentKey};
+use ethportal_api::{BeaconContentKey, HistoryContentKey, OverlayContentKey};
 use ethportal_api::{BeaconContentValue, ContentValue, HistoryContentValue};
 use tracing::warn;
 
@@ -87,9 +87,7 @@ fn validate_history(content_key: &HistoryContentKey, content_bytes: &[u8]) -> bo
         HistoryContentValue::BlockHeaderWithProof(h) => {
             // Reconstruct the key using the block header contents (RLP then hash).
             let computed_hash = h.header.hash();
-            let computed_key = HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey {
-                block_hash: computed_hash.into(),
-            });
+            let computed_key = HistoryContentKey::new_block_header_by_hash(computed_hash);
             match content_key == &computed_key {
                 true => true,
                 false => {

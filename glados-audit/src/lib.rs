@@ -1,10 +1,7 @@
 use anyhow::Result;
 use chrono::Utc;
 use cli::Args;
-use ethportal_api::{
-    utils::bytes::{hex_decode, hex_encode},
-    HistoryContentKey,
-};
+use ethportal_api::{utils::bytes::hex_encode, HistoryContentKey, OverlayContentKey};
 use sea_orm::DatabaseConnection;
 use std::{
     collections::HashMap,
@@ -165,8 +162,8 @@ pub async fn run_glados_command(conn: DatabaseConnection, command: cli::Command)
             ..
         } => (content_key, portal_client),
     };
-    let content_key = hex_decode(&content_key).unwrap();
-    let content_key = HistoryContentKey::try_from(content_key).unwrap();
+    let content_key =
+        HistoryContentKey::from_hex(&content_key).expect("needs valid hex-encoded history key");
 
     let task = AuditTask {
         strategy: SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey),
