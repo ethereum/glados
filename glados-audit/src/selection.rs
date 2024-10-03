@@ -468,7 +468,7 @@ mod tests {
             let content_key_active_model = content::ActiveModel {
                 id: NotSet,
                 content_id: Set(content_key.content_id().to_vec()),
-                content_key: Set(content_key.to_bytes()),
+                content_key: Set(content_key.to_bytes().to_vec()),
                 first_available_at: Set(available_at),
                 protocol_id: Set(SubProtocol::History),
             };
