@@ -13,9 +13,10 @@ use eth_trie::node::Node;
 use ethportal_api::{
     jsonrpsee::http_client::HttpClient,
     types::{
-        content_key::state::AccountTrieNodeKey, state::ContentInfo, state_trie::nibbles::Nibbles,
+        content_key::state::AccountTrieNodeKey, portal::ContentInfo, state_trie::nibbles::Nibbles,
+        state_trie::EncodedTrieNode,
     },
-    StateContentKey, StateContentValue, StateNetworkApiClient,
+    StateContentKey, StateNetworkApiClient,
 };
 use glados_core::{db::store_content_key, jsonrpc::PortalClient};
 use rand::seq::IteratorRandom;
@@ -190,26 +191,9 @@ async fn random_state_walk(
             }
         };
 
-        let encoded_trie_node = match content_value {
-            StateContentValue::TrieNode(encoded_trie_node) => encoded_trie_node,
-            other_state_content_value => {
-                return Err((anyhow!(
-                        "State random walk audit recevied unexpected content type: {other_state_content_value:?}"
-                    ), current_content_key));
-            }
-        };
-
-        if encoded_trie_node.node.node_hash() != current_content_key.node_hash {
-            return Err((
-                anyhow!(
-                    "State random walk audit recevied unexpected node hash: {current_content_key:?} {encoded_trie_node:?}"
-                ),
-                current_content_key,
-            ));
-        }
+        let encoded_trie_node: EncodedTrieNode = content_value.to_vec().into();
 
         let trie_node = encoded_trie_node
-            .node
             .as_trie_node()
             .expect("Trie node received from the portal network should be decoded as a trie node");
         match process_trie_node(current_content_key, trie_node).await? {
