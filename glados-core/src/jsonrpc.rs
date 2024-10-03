@@ -3,15 +3,11 @@ use std::{path::PathBuf, time::Duration};
 use alloy_primitives::hex::FromHexError;
 use entity::content;
 use ethportal_api::types::enr::Enr;
-use ethportal_api::types::{
-    beacon::{ContentInfo as BeaconContentInfo, TraceContentInfo as BeaconTraceContentInfo},
-    history::{ContentInfo as HistoryContentInfo, TraceContentInfo as HistoryTraceContentInfo},
-    state::{ContentInfo as StateContentInfo, TraceContentInfo as StateTraceContentInfo},
-};
+use ethportal_api::types::portal::{ContentInfo, TraceContentInfo};
 use ethportal_api::utils::bytes::ByteUtilsError;
 use ethportal_api::{
-    BeaconNetworkApiClient, ContentKeyError, ContentValue, Discv5ApiClient,
-    HistoryNetworkApiClient, NodeInfo, RoutingTableInfo, StateNetworkApiClient, Web3ApiClient,
+    BeaconNetworkApiClient, ContentKeyError, Discv5ApiClient, HistoryNetworkApiClient, NodeInfo,
+    RoutingTableInfo, StateNetworkApiClient, Web3ApiClient,
 };
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use serde_json::json;
@@ -179,8 +175,8 @@ impl PortalApi {
             )
             .await
             {
-                Ok(HistoryContentInfo::Content { content, .. }) => Ok(Some(Content {
-                    raw: content.encode(),
+                Ok(ContentInfo::Content { content, .. }) => Ok(Some(Content {
+                    raw: content.into(),
                 })),
                 Ok(_) => Ok(None),
                 Err(err) => match err.into() {
@@ -195,8 +191,8 @@ impl PortalApi {
                 )
                 .await
                 {
-                    Ok(StateContentInfo::Content { content, .. }) => Ok(Some(Content {
-                        raw: content.encode(),
+                    Ok(ContentInfo::Content { content, .. }) => Ok(Some(Content {
+                        raw: content.into(),
                     })),
                     Ok(_) => Ok(None),
                     Err(err) => match err.into() {
@@ -212,8 +208,8 @@ impl PortalApi {
                 )
                 .await
                 {
-                    Ok(BeaconContentInfo::Content { content, .. }) => Ok(Some(Content {
-                        raw: content.encode(),
+                    Ok(ContentInfo::Content { content, .. }) => Ok(Some(Content {
+                        raw: content.into(),
                     })),
                     Ok(_) => Ok(None),
                     Err(err) => match err.into() {
@@ -237,9 +233,9 @@ impl PortalApi {
                 )
                 .await
                 {
-                    Ok(HistoryTraceContentInfo { content, trace, .. }) => Ok((
+                    Ok(TraceContentInfo { content, trace, .. }) => Ok((
                         Some(Content {
-                            raw: content.encode(),
+                            raw: content.into(),
                         }),
                         json!(trace).to_string(),
                     )),
@@ -258,9 +254,9 @@ impl PortalApi {
                 )
                 .await
                 {
-                    Ok(StateTraceContentInfo { content, trace, .. }) => Ok((
+                    Ok(TraceContentInfo { content, trace, .. }) => Ok((
                         Some(Content {
-                            raw: content.encode(),
+                            raw: content.into(),
                         }),
                         json!(trace).to_string(),
                     )),
@@ -279,9 +275,9 @@ impl PortalApi {
                 )
                 .await
                 {
-                    Ok(BeaconTraceContentInfo { content, trace, .. }) => Ok((
+                    Ok(TraceContentInfo { content, trace, .. }) => Ok((
                         Some(Content {
-                            raw: content.encode(),
+                            raw: content.into(),
                         }),
                         json!(trace).to_string(),
                     )),
