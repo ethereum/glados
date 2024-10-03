@@ -199,7 +199,7 @@ async fn test_audit_crud() -> Result<(), DbErr> {
     let content_key_active_model = content::ActiveModel {
         id: NotSet,
         content_id: Set(key.content_id().to_vec()),
-        content_key: Set(key.to_bytes()),
+        content_key: Set(key.to_bytes().into()),
         protocol_id: Set(SubProtocol::History),
         first_available_at: Set(Utc::now()),
     };

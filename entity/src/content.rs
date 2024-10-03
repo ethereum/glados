@@ -88,7 +88,7 @@ pub async fn get_or_create<T: OverlayContentKey>(
     // First try to lookup an existing entry.
     if let Some(content_key_model) = Entity::find()
         .filter(Column::ProtocolId.eq(sub_protocol))
-        .filter(Column::ContentKey.eq(content_key.to_bytes()))
+        .filter(Column::ContentKey.eq(content_key.to_bytes().as_ref()))
         .one(conn)
         .await?
     {
@@ -100,7 +100,7 @@ pub async fn get_or_create<T: OverlayContentKey>(
     let content_key = ActiveModel {
         id: NotSet,
         content_id: Set(content_key.content_id().to_vec()),
-        content_key: Set(content_key.to_bytes()),
+        content_key: Set(content_key.to_bytes().to_vec()),
         first_available_at: Set(available_at),
         protocol_id: Set(sub_protocol),
     };
@@ -112,7 +112,7 @@ pub async fn get<T: OverlayContentKey>(
     conn: &DatabaseConnection,
 ) -> Result<Option<Model>> {
     Ok(Entity::find()
-        .filter(Column::ContentKey.eq(content_key.to_bytes()))
+        .filter(Column::ContentKey.eq(content_key.to_bytes().as_ref()))
         .one(conn)
         .await?)
 }
