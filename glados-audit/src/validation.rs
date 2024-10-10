@@ -115,9 +115,5 @@ fn validate_history(content_key: &HistoryContentKey, content_bytes: &[u8]) -> bo
             warn!("Need to call trusted provider to check receipts correctness.");
             true
         }
-        HistoryContentValue::EpochAccumulator(_e) => {
-            warn!("Need to check epoch master accumulator for correctness.");
-            true
-        }
     }
 }
