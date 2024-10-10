@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
@@ -31,13 +29,6 @@ pub enum Commands {
     },
 
     FollowBeaconPandaops {},
-
-    /// does testing things
-    ImportPreMergeAccumulators {
-        /// lists test values
-        #[arg(short, long)]
-        path: PathBuf,
-    },
 
     /// Imports blocks from a remote provider
     BulkDownloadBlockData {

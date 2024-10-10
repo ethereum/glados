@@ -64,15 +64,6 @@ For example, if an Ethereum execution client is running on localhost port 8545:
 ```
 $ cargo run -p glados-monitor -- --database-url  follow-head --provider-url http://127.0.0.1:8545
 ```
-#### Importing the pre-merge accumulators
-
-The pre-merge epoch accumulators can be found here: https://github.com/njgheorghita/portal-accumulators
-
-They can be imported with this command
-
-```
-$ cargo run -p glados-monitor -- --database-url <DATABASE_URL> import-pre-merge-accumulators --path /path/to/portal-accumulators/bridge_content
-```
 
 ### Running `glados-web`
 
