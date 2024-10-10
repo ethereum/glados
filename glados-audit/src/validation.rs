@@ -37,7 +37,7 @@ pub fn content_is_valid(content: &content::Model, content_bytes: &[u8]) -> bool 
 }
 
 fn validate_beacon(content_key: &BeaconContentKey, content_bytes: &[u8]) -> bool {
-    let content: BeaconContentValue = match BeaconContentValue::decode(content_bytes) {
+    let content: BeaconContentValue = match BeaconContentValue::decode(content_key, content_bytes) {
         Ok(c) => c,
         Err(e) => {
             warn!(content.key=hex_encode(content_key.to_bytes()), err=?e, "could not deserialize beacon content bytes");
@@ -75,7 +75,8 @@ fn validate_beacon(content_key: &BeaconContentKey, content_bytes: &[u8]) -> bool
 
 fn validate_history(content_key: &HistoryContentKey, content_bytes: &[u8]) -> bool {
     // check deserialization is valid
-    let content: HistoryContentValue = match HistoryContentValue::decode(content_bytes) {
+    let content: HistoryContentValue = match HistoryContentValue::decode(content_key, content_bytes)
+    {
         Ok(c) => c,
         Err(e) => {
             warn!(content.key=hex_encode(content_key.to_bytes()), err=?e, "could not deserialize history content bytes");
