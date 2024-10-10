@@ -99,9 +99,9 @@ pub enum JsonRpcError {
     ContentNotFound { trace: Option<String> },
 }
 
-impl From<jsonrpsee::core::error::Error> for JsonRpcError {
-    fn from(e: jsonrpsee::core::error::Error) -> Self {
-        if let jsonrpsee::core::error::Error::Call(ref error) = e {
+impl From<jsonrpsee::core::client::Error> for JsonRpcError {
+    fn from(e: jsonrpsee::core::client::Error) -> Self {
+        if let jsonrpsee::core::client::Error::Call(ref error) = e {
             if error.code() == CONTENT_NOT_FOUND_ERROR_CODE {
                 return JsonRpcError::ContentNotFound {
                     trace: error.data().map(|data| data.to_string()),
