@@ -1,12 +1,8 @@
-use std::path::PathBuf;
 use std::time::Duration;
 
 use alloy_primitives::B256;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, TimeZone, Utc};
-use entity::content::SubProtocol;
-use ethportal_api::utils::bytes::hex_decode;
-use ethportal_api::{EpochAccumulatorKey, HistoryContentKey};
 use futures::future::join_all;
 use glados_core::db::store_block_keys;
 use reqwest::header;
@@ -15,7 +11,7 @@ use std::env;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
-use tokio::{fs::read_dir, sync::mpsc, time::sleep};
+use tokio::{sync::mpsc, time::sleep};
 use tracing::{debug, error, info, warn};
 use web3::transports::Http;
 use web3::types::BlockId;
@@ -24,8 +20,6 @@ use web3::Web3;
 use crate::beacon::follow_beacon_head;
 use reqwest::Client as HttpClient;
 use url::Url;
-
-use entity::content;
 
 pub mod beacon;
 pub mod cli;
@@ -167,66 +161,6 @@ async fn fetch_block_info(
     };
 
     Ok((B256::from_slice(block_hash_bytes), block_timestamp))
-}
-
-pub async fn import_pre_merge_accumulators(
-    conn: DatabaseConnection,
-    base_path: PathBuf,
-) -> Result<()> {
-    info!(base_path = %base_path.as_path().display(), "Starting import of pre-merge accumulators");
-
-    let mut entries = read_dir(base_path).await?;
-
-    while let Some(entry) = entries.next_entry().await? {
-        let path = entry.path();
-
-        debug!(path = path.as_path().to_str(), "Processing path");
-
-        if path.is_file() {
-            if let Some(file_stem) = path.file_stem() {
-                if let Some(file_stem_str) = file_stem.to_str() {
-                    if file_stem_str.len() != 68 {
-                        error!(file_stem = file_stem.to_str(), "Filename wrong length");
-                        continue;
-                    }
-                    match &file_stem_str[..2] {
-                        "0x" => match hex_decode(file_stem_str) {
-                            Ok(content_key_raw) => {
-                                let content_key =
-                                    HistoryContentKey::EpochAccumulator(EpochAccumulatorKey {
-                                        epoch_hash: B256::from_slice(&content_key_raw[1..]),
-                                    });
-                                debug!(content_key = %content_key, "Importing");
-                                let content_key_db = content::get_or_create(
-                                    SubProtocol::History,
-                                    &content_key,
-                                    Utc::now(),
-                                    &conn,
-                                )
-                                .await?;
-                                info!(content_key = %content_key, database_id = content_key_db.id, "Imported");
-                            }
-                            Err(_) => info!(
-                                path = %path.as_path().display(),
-                                file_stem = file_stem_str,
-                                "Hex decoding error on file"
-                            ),
-                        },
-                        _ => info!(
-                            path = %path.as_path().display(),
-                            "File name is not 0x prefixed"
-                        ),
-                    }
-                }
-            }
-        } else {
-            info!(
-                path = %path.as_path().display(),
-                "Skipping non-file path"
-            );
-        }
-    }
-    Ok(())
 }
 
 /// Bulk download block data from a remote provider.

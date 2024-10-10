@@ -3,7 +3,7 @@ use chrono::Utc;
 use cli::Args;
 use ethportal_api::{
     utils::bytes::{hex_decode, hex_encode},
-    HistoryContentKey,
+    HistoryContentKey, RawContentKey,
 };
 use sea_orm::DatabaseConnection;
 use std::{
@@ -165,7 +165,7 @@ pub async fn run_glados_command(conn: DatabaseConnection, command: cli::Command)
             ..
         } => (content_key, portal_client),
     };
-    let content_key = hex_decode(&content_key).unwrap();
+    let content_key: RawContentKey = hex_decode(&content_key).unwrap().into();
     let content_key = HistoryContentKey::try_from(content_key).unwrap();
 
     let task = AuditTask {

@@ -1,10 +1,10 @@
 version: 2.1
 orbs:
-  rust: circleci/rust@1.6.0
+  rust: circleci/rust@1.6.1
 executors:
   docker-publisher:
     docker:
-      - image: cimg/rust:1.76.0
+      - image: cimg/rust:1.81.0
 jobs:
   docker-build-glados-web-and-publish:
     resource_class: xlarge
@@ -72,7 +72,7 @@ jobs:
         resource_class: large
         executor:
             name: rust/default
-            tag: 1.76.0
+            tag: 1.81.0
         environment:
             RUSTFLAGS: '-D warnings'
             RUST_LOG: 'debug'

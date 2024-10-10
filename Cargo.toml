@@ -2,7 +2,7 @@
 name = "glados"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.76.0"
+rust-version = "1.81.0"
 authors = ["Piper Merriam <piper@pipermerriam.com>"]
 
 [workspace]
@@ -20,14 +20,14 @@ migration.workspace = true
 tokio = { workspace = true, features = ["full"] }
 
 [workspace.dependencies]
-alloy-primitives = "0.7.0"
+alloy-primitives = "0.8.5"
 anyhow = "1.0.70"
 chrono = "0.4.24"
 clap = { version = "4.0.26", features = ["derive"] }
 enr = "0.10.0"
 entity = { path = "entity" }
 env_logger = "0.10.0"
-ethportal-api = { git = "https://github.com/ethereum/trin" }
+ethportal-api = { git = "https://github.com/ethereum/trin", rev = "bf54a8aea934d29dc8fdca60f2d463190a1e9c98" }
 glados-core = { path = "glados-core" }
 glados-monitor = { path = "glados-monitor" }
 glados-audit = { path = "glados-audit" }

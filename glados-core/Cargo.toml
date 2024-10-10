@@ -15,7 +15,7 @@ chrono.workspace = true
 entity.workspace = true
 env_logger.workspace = true
 ethportal-api.workspace = true
-jsonrpsee = { version = "0.20.0", features = ["async-client", "client"] }
+jsonrpsee = { version = "0.24.4", features = ["async-client", "client"] }
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
