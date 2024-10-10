@@ -7,7 +7,7 @@ use ethportal_api::types::portal::{ContentInfo, TraceContentInfo};
 use ethportal_api::utils::bytes::ByteUtilsError;
 use ethportal_api::{
     BeaconNetworkApiClient, ContentKeyError, Discv5ApiClient, HistoryNetworkApiClient, NodeInfo,
-    RoutingTableInfo, StateNetworkApiClient, Web3ApiClient,
+    RawContentKey, RoutingTableInfo, StateNetworkApiClient, Web3ApiClient,
 };
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use serde_json::json;
@@ -168,10 +168,11 @@ impl PortalApi {
         self,
         content: &content::Model,
     ) -> Result<Option<Content>, JsonRpcError> {
+        let raw_key = RawContentKey::from_iter(&content.content_key);
         match content.protocol_id {
             content::SubProtocol::History => match HistoryNetworkApiClient::recursive_find_content(
                 &self.client,
-                content.content_key.clone().try_into()?,
+                raw_key.try_into()?,
             )
             .await
             {
@@ -187,7 +188,7 @@ impl PortalApi {
             content::SubProtocol::State => {
                 match StateNetworkApiClient::recursive_find_content(
                     &self.client,
-                    content.content_key.clone().try_into()?,
+                    raw_key.try_into()?,
                 )
                 .await
                 {
@@ -204,7 +205,7 @@ impl PortalApi {
             content::SubProtocol::Beacon => {
                 match BeaconNetworkApiClient::recursive_find_content(
                     &self.client,
-                    content.content_key.clone().try_into()?,
+                    raw_key.try_into()?,
                 )
                 .await
                 {
@@ -225,11 +226,12 @@ impl PortalApi {
         self,
         content: &content::Model,
     ) -> Result<(Option<Content>, String), JsonRpcError> {
+        let raw_key = RawContentKey::from_iter(&content.content_key);
         match content.protocol_id {
             content::SubProtocol::History => {
                 match HistoryNetworkApiClient::trace_recursive_find_content(
                     &self.client,
-                    content.content_key.clone().try_into()?,
+                    raw_key.try_into()?,
                 )
                 .await
                 {
@@ -250,7 +252,7 @@ impl PortalApi {
             content::SubProtocol::State => {
                 match StateNetworkApiClient::trace_recursive_find_content(
                     &self.client,
-                    content.content_key.clone().try_into()?,
+                    raw_key.try_into()?,
                 )
                 .await
                 {
@@ -271,7 +273,7 @@ impl PortalApi {
             content::SubProtocol::Beacon => {
                 match BeaconNetworkApiClient::trace_recursive_find_content(
                     &self.client,
-                    content.content_key.clone().try_into()?,
+                    raw_key.try_into()?,
                 )
                 .await
                 {

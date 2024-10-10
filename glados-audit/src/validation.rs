@@ -1,15 +1,16 @@
 use entity::content;
 use ethportal_api::utils::bytes::hex_encode;
-use ethportal_api::{BeaconContentKey, HistoryContentKey, OverlayContentKey};
+use ethportal_api::{BeaconContentKey, HistoryContentKey, OverlayContentKey, RawContentKey};
 use ethportal_api::{BeaconContentValue, ContentValue, HistoryContentValue};
 use tracing::warn;
 
 /// Checks that content bytes correspond to a correctly formatted
 /// content value.
 pub fn content_is_valid(content: &content::Model, content_bytes: &[u8]) -> bool {
+    let raw_key = RawContentKey::from_iter(&content.content_key);
     match content.protocol_id {
         content::SubProtocol::History => {
-            let content_key = match HistoryContentKey::try_from(content.content_key.clone()) {
+            let content_key = match HistoryContentKey::try_from(raw_key) {
                 Ok(key) => key,
                 Err(err) => {
                     warn!(err=?err, content.content_key=?content.content_key, "Failed to decode history content key.");
@@ -23,7 +24,7 @@ pub fn content_is_valid(content: &content::Model, content_bytes: &[u8]) -> bool 
             true
         }
         content::SubProtocol::Beacon => {
-            let content_key = match BeaconContentKey::try_from(content.content_key.clone()) {
+            let content_key = match BeaconContentKey::try_from(raw_key) {
                 Ok(key) => key,
                 Err(err) => {
                     warn!(err=?err, content.content_key=?content.content_key, "Failed to decode beacon content key.");

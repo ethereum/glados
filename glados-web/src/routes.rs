@@ -464,8 +464,9 @@ pub async fn contentkey_detail(
         error!(content.key=content_key_hex, err=?e, "Could not decode up key bytes");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
+
     let content_key_model = content::Entity::find()
-        .filter(content::Column::ContentKey.eq(content_key_raw.clone()))
+        .filter(content::Column::ContentKey.eq(content_key_raw))
         .one(&state.database_connection)
         .await
         .map_err(|e| {
@@ -487,15 +488,15 @@ pub async fn contentkey_detail(
         })?;
 
     let (content_id, content_kind) =
-        if let Ok(content_key) = HistoryContentKey::try_from(content_key_raw.clone()) {
+        if let Ok(content_key) = HistoryContentKey::from_hex(&content_key_hex) {
             let content_id = hex_encode(content_key.content_id());
             let content_kind = content_key.to_string();
             (content_id, content_kind)
-        } else if let Ok(content_key) = StateContentKey::try_from(content_key_raw.clone()) {
+        } else if let Ok(content_key) = StateContentKey::from_hex(&content_key_hex) {
             let content_id = hex_encode(content_key.content_id());
             let content_kind = content_key.to_string();
             (content_id, content_kind)
-        } else if let Ok(content_key) = BeaconContentKey::try_from(content_key_raw.clone()) {
+        } else if let Ok(content_key) = BeaconContentKey::from_hex(&content_key_hex) {
             let content_id = hex_encode(content_key.content_id());
             let content_kind = content_key.to_string();
             (content_id, content_kind)
