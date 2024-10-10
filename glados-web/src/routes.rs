@@ -19,7 +19,7 @@ use ethportal_api::types::{
 };
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{jsonrpsee::core::__reexports::serde_json, BeaconContentKey, StateContentKey};
-use ethportal_api::{HistoryContentKey, OverlayContentKey};
+use ethportal_api::{HistoryContentKey, OverlayContentKey, RawContentKey};
 use glados_core::stats::{
     filter_audits, get_audit_stats, AuditFilters, ContentTypeFilter, Period, StrategyFilter,
     SuccessFilter,
@@ -486,6 +486,7 @@ pub async fn contentkey_detail(
             StatusCode::NOT_FOUND
         })?;
 
+    let content_key_raw: RawContentKey = content_key_raw.into();
     let (content_id, content_kind) =
         if let Ok(content_key) = HistoryContentKey::try_from(content_key_raw.clone()) {
             let content_id = hex_encode(content_key.content_id());
@@ -495,7 +496,7 @@ pub async fn contentkey_detail(
             let content_id = hex_encode(content_key.content_id());
             let content_kind = content_key.to_string();
             (content_id, content_kind)
-        } else if let Ok(content_key) = BeaconContentKey::try_from(content_key_raw.clone()) {
+        } else if let Ok(content_key) = BeaconContentKey::try_from(content_key_raw) {
             let content_id = hex_encode(content_key.content_id());
             let content_kind = content_key.to_string();
             (content_id, content_kind)
