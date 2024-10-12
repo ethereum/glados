@@ -762,9 +762,21 @@ pub async fn is_content_in_deadzone(
         .await
         .unwrap();
 
-    let content_key: ethportal_api::HistoryContentKey =
-        serde_json::from_value(serde_json::json!(content_key)).unwrap();
-    let content_id = content_key.content_id();
+    let content_id = if let Ok(content_key) =
+        serde_json::from_value::<HistoryContentKey>(serde_json::json!(content_key))
+    {
+        content_key.content_id()
+    } else if let Ok(content_key) =
+        serde_json::from_value::<StateContentKey>(serde_json::json!(content_key))
+    {
+        content_key.content_id()
+    } else if let Ok(content_key) =
+        serde_json::from_value::<BeaconContentKey>(serde_json::json!(content_key))
+    {
+        content_key.content_id()
+    } else {
+        return Err(StatusCode::BAD_REQUEST);
+    };
 
     let mut enrs: Vec<String> = vec![];
     for dead_zone_data in dead_zone_data_vec {
