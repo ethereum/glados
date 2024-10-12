@@ -7,7 +7,7 @@ use chrono::prelude::*;
 use enr::NodeId;
 #[cfg(test)]
 use ethportal_api::types::node_id::generate_random_node_id;
-use ethportal_api::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
+use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use sea_orm::entity::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Database, DbConn, DbErr, EntityTrait, NotSet, PaginatorTrait,
@@ -115,7 +115,7 @@ fn sample_history_key() -> HistoryContentKey {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
         25, 26, 27, 28, 29, 30, 31,
     ];
-    HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey { block_hash })
+    HistoryContentKey::new_block_header_by_hash(block_hash)
 }
 
 /// Tests that the database helper method id_as_hash() works.
@@ -199,7 +199,7 @@ async fn test_audit_crud() -> Result<(), DbErr> {
     let content_key_active_model = content::ActiveModel {
         id: NotSet,
         content_id: Set(key.content_id().to_vec()),
-        content_key: Set(key.to_bytes()),
+        content_key: Set(key.to_bytes().into()),
         protocol_id: Set(SubProtocol::History),
         first_available_at: Set(Utc::now()),
     };

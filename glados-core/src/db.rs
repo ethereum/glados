@@ -5,8 +5,7 @@ use entity::{
     execution_metadata, state_roots,
 };
 use ethportal_api::{
-    utils::bytes::hex_encode, BlockBodyKey, BlockHeaderKey, BlockReceiptsKey, HistoryContentKey,
-    OverlayContentKey,
+    utils::bytes::hex_encode, BlockBodyKey, BlockReceiptsKey, HistoryContentKey, OverlayContentKey,
 };
 use sea_orm::DatabaseConnection;
 use tracing::{debug, error};
@@ -33,9 +32,7 @@ pub async fn store_block_keys(
     available_at: DateTime<Utc>,
     conn: &DatabaseConnection,
 ) -> Vec<content::Model> {
-    let header = HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey {
-        block_hash: *block_hash,
-    });
+    let header = HistoryContentKey::new_block_header_by_hash(*block_hash);
     let body = HistoryContentKey::BlockBody(BlockBodyKey {
         block_hash: *block_hash,
     });

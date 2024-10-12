@@ -3,15 +3,11 @@ use std::{path::PathBuf, time::Duration};
 use alloy_primitives::hex::FromHexError;
 use entity::content;
 use ethportal_api::types::enr::Enr;
-use ethportal_api::types::{
-    beacon::{ContentInfo as BeaconContentInfo, TraceContentInfo as BeaconTraceContentInfo},
-    history::{ContentInfo as HistoryContentInfo, TraceContentInfo as HistoryTraceContentInfo},
-    state::{ContentInfo as StateContentInfo, TraceContentInfo as StateTraceContentInfo},
-};
+use ethportal_api::types::portal::{ContentInfo, TraceContentInfo};
 use ethportal_api::utils::bytes::ByteUtilsError;
 use ethportal_api::{
-    BeaconNetworkApiClient, ContentKeyError, ContentValue, Discv5ApiClient,
-    HistoryNetworkApiClient, NodeInfo, RoutingTableInfo, StateNetworkApiClient, Web3ApiClient,
+    BeaconNetworkApiClient, ContentKeyError, Discv5ApiClient, HistoryNetworkApiClient, NodeInfo,
+    RawContentKey, RoutingTableInfo, StateNetworkApiClient, Web3ApiClient,
 };
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use serde_json::json;
@@ -103,9 +99,9 @@ pub enum JsonRpcError {
     ContentNotFound { trace: Option<String> },
 }
 
-impl From<jsonrpsee::core::error::Error> for JsonRpcError {
-    fn from(e: jsonrpsee::core::error::Error) -> Self {
-        if let jsonrpsee::core::error::Error::Call(ref error) = e {
+impl From<jsonrpsee::core::client::Error> for JsonRpcError {
+    fn from(e: jsonrpsee::core::client::Error) -> Self {
+        if let jsonrpsee::core::client::Error::Call(ref error) = e {
             if error.code() == CONTENT_NOT_FOUND_ERROR_CODE {
                 return JsonRpcError::ContentNotFound {
                     trace: error.data().map(|data| data.to_string()),
@@ -172,15 +168,16 @@ impl PortalApi {
         self,
         content: &content::Model,
     ) -> Result<Option<Content>, JsonRpcError> {
+        let raw_key = RawContentKey::from_iter(&content.content_key);
         match content.protocol_id {
             content::SubProtocol::History => match HistoryNetworkApiClient::recursive_find_content(
                 &self.client,
-                content.content_key.clone().try_into()?,
+                raw_key.try_into()?,
             )
             .await
             {
-                Ok(HistoryContentInfo::Content { content, .. }) => Ok(Some(Content {
-                    raw: content.encode(),
+                Ok(ContentInfo::Content { content, .. }) => Ok(Some(Content {
+                    raw: content.into(),
                 })),
                 Ok(_) => Ok(None),
                 Err(err) => match err.into() {
@@ -191,12 +188,12 @@ impl PortalApi {
             content::SubProtocol::State => {
                 match StateNetworkApiClient::recursive_find_content(
                     &self.client,
-                    content.content_key.clone().try_into()?,
+                    raw_key.try_into()?,
                 )
                 .await
                 {
-                    Ok(StateContentInfo::Content { content, .. }) => Ok(Some(Content {
-                        raw: content.encode(),
+                    Ok(ContentInfo::Content { content, .. }) => Ok(Some(Content {
+                        raw: content.into(),
                     })),
                     Ok(_) => Ok(None),
                     Err(err) => match err.into() {
@@ -208,12 +205,12 @@ impl PortalApi {
             content::SubProtocol::Beacon => {
                 match BeaconNetworkApiClient::recursive_find_content(
                     &self.client,
-                    content.content_key.clone().try_into()?,
+                    raw_key.try_into()?,
                 )
                 .await
                 {
-                    Ok(BeaconContentInfo::Content { content, .. }) => Ok(Some(Content {
-                        raw: content.encode(),
+                    Ok(ContentInfo::Content { content, .. }) => Ok(Some(Content {
+                        raw: content.into(),
                     })),
                     Ok(_) => Ok(None),
                     Err(err) => match err.into() {
@@ -229,17 +226,18 @@ impl PortalApi {
         self,
         content: &content::Model,
     ) -> Result<(Option<Content>, String), JsonRpcError> {
+        let raw_key = RawContentKey::from_iter(&content.content_key);
         match content.protocol_id {
             content::SubProtocol::History => {
                 match HistoryNetworkApiClient::trace_recursive_find_content(
                     &self.client,
-                    content.content_key.clone().try_into()?,
+                    raw_key.try_into()?,
                 )
                 .await
                 {
-                    Ok(HistoryTraceContentInfo { content, trace, .. }) => Ok((
+                    Ok(TraceContentInfo { content, trace, .. }) => Ok((
                         Some(Content {
-                            raw: content.encode(),
+                            raw: content.into(),
                         }),
                         json!(trace).to_string(),
                     )),
@@ -254,13 +252,13 @@ impl PortalApi {
             content::SubProtocol::State => {
                 match StateNetworkApiClient::trace_recursive_find_content(
                     &self.client,
-                    content.content_key.clone().try_into()?,
+                    raw_key.try_into()?,
                 )
                 .await
                 {
-                    Ok(StateTraceContentInfo { content, trace, .. }) => Ok((
+                    Ok(TraceContentInfo { content, trace, .. }) => Ok((
                         Some(Content {
-                            raw: content.encode(),
+                            raw: content.into(),
                         }),
                         json!(trace).to_string(),
                     )),
@@ -275,13 +273,13 @@ impl PortalApi {
             content::SubProtocol::Beacon => {
                 match BeaconNetworkApiClient::trace_recursive_find_content(
                     &self.client,
-                    content.content_key.clone().try_into()?,
+                    raw_key.try_into()?,
                 )
                 .await
                 {
-                    Ok(BeaconTraceContentInfo { content, trace, .. }) => Ok((
+                    Ok(TraceContentInfo { content, trace, .. }) => Ok((
                         Some(Content {
-                            raw: content.encode(),
+                            raw: content.into(),
                         }),
                         json!(trace).to_string(),
                     )),

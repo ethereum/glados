@@ -4,7 +4,7 @@ use glados_monitor::{
     beacon::panda_ops_http,
     bulk_download_block_data,
     cli::{Cli, Commands},
-    import_pre_merge_accumulators, panda_ops_web3, run_glados_monitor, run_glados_monitor_beacon,
+    panda_ops_web3, run_glados_monitor, run_glados_monitor_beacon,
     state::{follow_head_state_command, populate_state_roots_range_command},
 };
 use migration::{Migrator, MigratorTrait};
@@ -54,10 +54,6 @@ async fn main() -> Result<()> {
         Some(Commands::FollowHeadPandaops { provider_url }) => {
             info!("Running follow head beacon");
             task::spawn(follow_head_command_pandaops(conn, provider_url.to_string()))
-        }
-        Some(Commands::ImportPreMergeAccumulators { path }) => {
-            info!("Importing pre-merge accumulators");
-            task::spawn(import_pre_merge_accumulators(conn, path.to_path_buf()))
         }
         Some(Commands::FollowBeaconPandaops {}) => {
             task::spawn(follow_beacon_command_pandaops(conn))

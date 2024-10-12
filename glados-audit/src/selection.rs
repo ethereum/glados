@@ -407,7 +407,7 @@ mod tests {
         content_audit::{self, AuditResult},
         node,
     };
-    use ethportal_api::{BlockHeaderKey, HistoryContentKey, OverlayContentKey};
+    use ethportal_api::{HistoryContentKey, OverlayContentKey};
     use migration::{DbErr, Migrator, MigratorTrait};
     use sea_orm::{
         ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, Database, DbConn, EntityTrait,
@@ -453,8 +453,7 @@ mod tests {
         let (conn, temp_db) = setup_database().await?;
         for num in 1..=45 {
             let block_hash = [num; 32];
-            let content_key =
-                HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey { block_hash });
+            let content_key = HistoryContentKey::new_block_header_by_hash(block_hash);
             // Content table test data initialization
             // Check whether row should be new or old data
             let available_at = match (2..=15).contains(&num) {
@@ -468,7 +467,7 @@ mod tests {
             let content_key_active_model = content::ActiveModel {
                 id: NotSet,
                 content_id: Set(content_key.content_id().to_vec()),
-                content_key: Set(content_key.to_bytes()),
+                content_key: Set(content_key.to_bytes().to_vec()),
                 first_available_at: Set(available_at),
                 protocol_id: Set(SubProtocol::History),
             };

@@ -1,15 +1,16 @@
 use entity::content;
 use ethportal_api::utils::bytes::hex_encode;
-use ethportal_api::{BeaconContentKey, BlockHeaderKey, HistoryContentKey, OverlayContentKey};
+use ethportal_api::{BeaconContentKey, HistoryContentKey, OverlayContentKey, RawContentKey};
 use ethportal_api::{BeaconContentValue, ContentValue, HistoryContentValue};
 use tracing::warn;
 
 /// Checks that content bytes correspond to a correctly formatted
 /// content value.
 pub fn content_is_valid(content: &content::Model, content_bytes: &[u8]) -> bool {
+    let raw_key = RawContentKey::from_iter(&content.content_key);
     match content.protocol_id {
         content::SubProtocol::History => {
-            let content_key = match HistoryContentKey::try_from(content.content_key.clone()) {
+            let content_key = match HistoryContentKey::try_from(raw_key) {
                 Ok(key) => key,
                 Err(err) => {
                     warn!(err=?err, content.content_key=?content.content_key, "Failed to decode history content key.");
@@ -23,7 +24,7 @@ pub fn content_is_valid(content: &content::Model, content_bytes: &[u8]) -> bool 
             true
         }
         content::SubProtocol::Beacon => {
-            let content_key = match BeaconContentKey::try_from(content.content_key.clone()) {
+            let content_key = match BeaconContentKey::try_from(raw_key) {
                 Ok(key) => key,
                 Err(err) => {
                     warn!(err=?err, content.content_key=?content.content_key, "Failed to decode beacon content key.");
@@ -36,7 +37,7 @@ pub fn content_is_valid(content: &content::Model, content_bytes: &[u8]) -> bool 
 }
 
 fn validate_beacon(content_key: &BeaconContentKey, content_bytes: &[u8]) -> bool {
-    let content: BeaconContentValue = match BeaconContentValue::decode(content_bytes) {
+    let content: BeaconContentValue = match BeaconContentValue::decode(content_key, content_bytes) {
         Ok(c) => c,
         Err(e) => {
             warn!(content.key=hex_encode(content_key.to_bytes()), err=?e, "could not deserialize beacon content bytes");
@@ -74,7 +75,8 @@ fn validate_beacon(content_key: &BeaconContentKey, content_bytes: &[u8]) -> bool
 
 fn validate_history(content_key: &HistoryContentKey, content_bytes: &[u8]) -> bool {
     // check deserialization is valid
-    let content: HistoryContentValue = match HistoryContentValue::decode(content_bytes) {
+    let content: HistoryContentValue = match HistoryContentValue::decode(content_key, content_bytes)
+    {
         Ok(c) => c,
         Err(e) => {
             warn!(content.key=hex_encode(content_key.to_bytes()), err=?e, "could not deserialize history content bytes");
@@ -87,9 +89,7 @@ fn validate_history(content_key: &HistoryContentKey, content_bytes: &[u8]) -> bo
         HistoryContentValue::BlockHeaderWithProof(h) => {
             // Reconstruct the key using the block header contents (RLP then hash).
             let computed_hash = h.header.hash();
-            let computed_key = HistoryContentKey::BlockHeaderWithProof(BlockHeaderKey {
-                block_hash: computed_hash.into(),
-            });
+            let computed_key = HistoryContentKey::new_block_header_by_hash(computed_hash);
             match content_key == &computed_key {
                 true => true,
                 false => {
@@ -113,10 +113,6 @@ fn validate_history(content_key: &HistoryContentKey, content_bytes: &[u8]) -> bo
             // Reconstruct the key using the block body contents.
             let _computed_receipts_root = r.root();
             warn!("Need to call trusted provider to check receipts correctness.");
-            true
-        }
-        HistoryContentValue::EpochAccumulator(_e) => {
-            warn!("Need to check epoch master accumulator for correctness.");
             true
         }
     }
