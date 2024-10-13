@@ -96,6 +96,10 @@
     background: #956955;
 }
 
+#transfer-failure {
+  background: #e15759;
+}
+
 #cancelled {
   background: #edc949;
 }

@@ -87,6 +87,8 @@ function createGraphData(trace) {
             } else {
                 if ('receivedFrom' in trace && trace.receivedFrom == nodeId) {
                     group = colors.green;
+                } else if (nodeId in trace.failures) {
+                    group = colors.red;
                 } else if (respondedWith.length == 0) {
                     group = colors.brown;
                 } else if (trace.cancelled.includes(nodeId)) {
@@ -118,8 +120,10 @@ function createGraphData(trace) {
             if (!nodesSeen.includes(nodeIdTarget)) {
                 let group = colors.gray;
 
-                if (trace.cancelled.includes(nodeIdTarget)) {
-                  group = colors.yellow
+                if (nodeIdTarget in trace.failures) {
+                    group = colors.red;
+                } else if (trace.cancelled.includes(nodeIdTarget)) {
+                    group = colors.yellow
                 }
 
                 nodes.push({
