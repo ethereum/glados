@@ -170,27 +170,8 @@ impl PortalApi {
     ) -> Result<Option<Content>, JsonRpcError> {
         let raw_key = RawContentKey::from_iter(&content.content_key);
         match content.protocol_id {
-            content::SubProtocol::History => match HistoryNetworkApiClient::recursive_find_content(
-                &self.client,
-                raw_key.try_into()?,
-            )
-            .await
-            {
-                Ok(ContentInfo::Content { content, .. }) => Ok(Some(Content {
-                    raw: content.into(),
-                })),
-                Ok(_) => Ok(None),
-                Err(err) => match err.into() {
-                    JsonRpcError::ContentNotFound { trace: _ } => Ok(None),
-                    err => Err(err),
-                },
-            },
-            content::SubProtocol::State => {
-                match StateNetworkApiClient::recursive_find_content(
-                    &self.client,
-                    raw_key.try_into()?,
-                )
-                .await
+            content::SubProtocol::History => {
+                match HistoryNetworkApiClient::get_content(&self.client, raw_key.try_into()?).await
                 {
                     Ok(ContentInfo::Content { content, .. }) => Ok(Some(Content {
                         raw: content.into(),
@@ -202,13 +183,20 @@ impl PortalApi {
                     },
                 }
             }
+            content::SubProtocol::State => {
+                match StateNetworkApiClient::get_content(&self.client, raw_key.try_into()?).await {
+                    Ok(ContentInfo::Content { content, .. }) => Ok(Some(Content {
+                        raw: content.into(),
+                    })),
+                    Ok(_) => Ok(None),
+                    Err(err) => match err.into() {
+                        JsonRpcError::ContentNotFound { trace: _ } => Ok(None),
+                        err => Err(err),
+                    },
+                }
+            }
             content::SubProtocol::Beacon => {
-                match BeaconNetworkApiClient::recursive_find_content(
-                    &self.client,
-                    raw_key.try_into()?,
-                )
-                .await
-                {
+                match BeaconNetworkApiClient::get_content(&self.client, raw_key.try_into()?).await {
                     Ok(ContentInfo::Content { content, .. }) => Ok(Some(Content {
                         raw: content.into(),
                     })),
@@ -229,11 +217,8 @@ impl PortalApi {
         let raw_key = RawContentKey::from_iter(&content.content_key);
         match content.protocol_id {
             content::SubProtocol::History => {
-                match HistoryNetworkApiClient::trace_recursive_find_content(
-                    &self.client,
-                    raw_key.try_into()?,
-                )
-                .await
+                match HistoryNetworkApiClient::trace_get_content(&self.client, raw_key.try_into()?)
+                    .await
                 {
                     Ok(TraceContentInfo { content, trace, .. }) => Ok((
                         Some(Content {
@@ -250,11 +235,8 @@ impl PortalApi {
                 }
             }
             content::SubProtocol::State => {
-                match StateNetworkApiClient::trace_recursive_find_content(
-                    &self.client,
-                    raw_key.try_into()?,
-                )
-                .await
+                match StateNetworkApiClient::trace_get_content(&self.client, raw_key.try_into()?)
+                    .await
                 {
                     Ok(TraceContentInfo { content, trace, .. }) => Ok((
                         Some(Content {
@@ -271,11 +253,8 @@ impl PortalApi {
                 }
             }
             content::SubProtocol::Beacon => {
-                match BeaconNetworkApiClient::trace_recursive_find_content(
-                    &self.client,
-                    raw_key.try_into()?,
-                )
-                .await
+                match BeaconNetworkApiClient::trace_get_content(&self.client, raw_key.try_into()?)
+                    .await
                 {
                     Ok(TraceContentInfo { content, trace, .. }) => Ok((
                         Some(Content {

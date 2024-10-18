@@ -161,7 +161,7 @@ async fn random_state_walk(
     };
     let mut current_content_key = root_content_key.clone();
     loop {
-        let response = match StateNetworkApiClient::recursive_find_content(
+        let response = match StateNetworkApiClient::get_content(
             &client,
             StateContentKey::AccountTrieNode(current_content_key.clone()),
         )
@@ -170,7 +170,7 @@ async fn random_state_walk(
             Ok(response) => response,
             Err(err) => {
                 return Err((
-                    anyhow!("Error recursive_find_content failed with: {err:?}"),
+                    anyhow!("Error get_content failed with: {err:?}"),
                     current_content_key,
                 ));
             }
@@ -183,9 +183,7 @@ async fn random_state_walk(
             } => content_value,
             other_content_info => {
                 return Err((
-                    anyhow!(
-                        "Error unexpected recursive_find_content response: {other_content_info:?}"
-                    ),
+                    anyhow!("Error unexpected get_content response: {other_content_info:?}"),
                     current_content_key,
                 ));
             }
