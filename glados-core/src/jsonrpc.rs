@@ -3,7 +3,7 @@ use std::{path::PathBuf, time::Duration};
 use alloy_primitives::hex::FromHexError;
 use entity::content;
 use ethportal_api::types::enr::Enr;
-use ethportal_api::types::portal::{GetContentInfo, TraceContentInfo};
+use ethportal_api::types::portal::TraceContentInfo;
 use ethportal_api::utils::bytes::ByteUtilsError;
 use ethportal_api::{
     BeaconNetworkApiClient, ContentKeyError, Discv5ApiClient, HistoryNetworkApiClient, NodeInfo,

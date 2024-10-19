@@ -14,7 +14,6 @@ use ethportal_api::{
     jsonrpsee::http_client::HttpClient,
     types::{
         content_key::state::AccountTrieNodeKey,
-        portal::GetContentInfo,
         state_trie::{nibbles::Nibbles, EncodedTrieNode},
     },
     StateContentKey, StateNetworkApiClient,
