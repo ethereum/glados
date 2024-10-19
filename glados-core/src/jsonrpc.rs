@@ -173,8 +173,8 @@ impl PortalApi {
             content::SubProtocol::History => {
                 match HistoryNetworkApiClient::get_content(&self.client, raw_key.try_into()?).await
                 {
-                    Ok(GetContentInfo { content, .. }) => Ok(Some(Content {
-                        raw: content.into(),
+                    Ok(content_info) => Ok(Some(Content {
+                        raw: content_info.content.into(),
                     })),
                     Err(err) => match err.into() {
                         JsonRpcError::ContentNotFound { trace: _ } => Ok(None),
@@ -184,8 +184,8 @@ impl PortalApi {
             }
             content::SubProtocol::State => {
                 match StateNetworkApiClient::get_content(&self.client, raw_key.try_into()?).await {
-                    Ok(GetContentInfo { content, .. }) => Ok(Some(Content {
-                        raw: content.into(),
+                    Ok(content_info) => Ok(Some(Content {
+                        raw: content_info.content.into(),
                     })),
                     Err(err) => match err.into() {
                         JsonRpcError::ContentNotFound { trace: _ } => Ok(None),
@@ -195,8 +195,8 @@ impl PortalApi {
             }
             content::SubProtocol::Beacon => {
                 match BeaconNetworkApiClient::get_content(&self.client, raw_key.try_into()?).await {
-                    Ok(GetContentInfo { content, .. }) => Ok(Some(Content {
-                        raw: content.into(),
+                    Ok(content_info) => Ok(Some(Content {
+                        raw: content_info.content.into(),
                     })),
                     Err(err) => match err.into() {
                         JsonRpcError::ContentNotFound { trace: _ } => Ok(None),

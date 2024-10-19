@@ -177,12 +177,7 @@ async fn random_state_walk(
             }
         };
 
-        let GetContentInfo {
-            content: content_value,
-            ..
-        } = response;
-
-        let encoded_trie_node: EncodedTrieNode = content_value.to_vec().into();
+        let encoded_trie_node: EncodedTrieNode = response.content.to_vec().into();
 
         let trie_node = encoded_trie_node.as_trie_node().map_err(|err| {
             (
