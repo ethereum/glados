@@ -3,7 +3,7 @@ use std::{path::PathBuf, time::Duration};
 use alloy_primitives::hex::FromHexError;
 use entity::content;
 use ethportal_api::types::enr::Enr;
-use ethportal_api::types::portal::{ContentInfo, TraceContentInfo};
+use ethportal_api::types::portal::TraceContentInfo;
 use ethportal_api::utils::bytes::ByteUtilsError;
 use ethportal_api::{
     BeaconNetworkApiClient, ContentKeyError, Discv5ApiClient, HistoryNetworkApiClient, NodeInfo,
@@ -173,10 +173,9 @@ impl PortalApi {
             content::SubProtocol::History => {
                 match HistoryNetworkApiClient::get_content(&self.client, raw_key.try_into()?).await
                 {
-                    Ok(ContentInfo::Content { content, .. }) => Ok(Some(Content {
-                        raw: content.into(),
+                    Ok(content_info) => Ok(Some(Content {
+                        raw: content_info.content.into(),
                     })),
-                    Ok(_) => Ok(None),
                     Err(err) => match err.into() {
                         JsonRpcError::ContentNotFound { trace: _ } => Ok(None),
                         err => Err(err),
@@ -185,10 +184,9 @@ impl PortalApi {
             }
             content::SubProtocol::State => {
                 match StateNetworkApiClient::get_content(&self.client, raw_key.try_into()?).await {
-                    Ok(ContentInfo::Content { content, .. }) => Ok(Some(Content {
-                        raw: content.into(),
+                    Ok(content_info) => Ok(Some(Content {
+                        raw: content_info.content.into(),
                     })),
-                    Ok(_) => Ok(None),
                     Err(err) => match err.into() {
                         JsonRpcError::ContentNotFound { trace: _ } => Ok(None),
                         err => Err(err),
@@ -197,10 +195,9 @@ impl PortalApi {
             }
             content::SubProtocol::Beacon => {
                 match BeaconNetworkApiClient::get_content(&self.client, raw_key.try_into()?).await {
-                    Ok(ContentInfo::Content { content, .. }) => Ok(Some(Content {
-                        raw: content.into(),
+                    Ok(content_info) => Ok(Some(Content {
+                        raw: content_info.content.into(),
                     })),
-                    Ok(_) => Ok(None),
                     Err(err) => match err.into() {
                         JsonRpcError::ContentNotFound { trace: _ } => Ok(None),
                         err => Err(err),
