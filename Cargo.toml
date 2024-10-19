@@ -27,7 +27,7 @@ clap = { version = "4.0.26", features = ["derive"] }
 enr = "0.10.0"
 entity = { path = "entity" }
 env_logger = "0.10.0"
-ethportal-api = { git = "https://github.com/ethereum/trin", rev = "3fc51309a59334a1e5498baf4cdc2e868b4efe68" }
+ethportal-api = { git = "https://github.com/ethereum/trin", rev = "4b212d4f3e8afa7b3298eebd4b4b6e3ec04d680f" }
 glados-core = { path = "glados-core" }
 glados-monitor = { path = "glados-monitor" }
 glados-audit = { path = "glados-audit" }

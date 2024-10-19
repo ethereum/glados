@@ -13,8 +13,9 @@ use eth_trie::node::Node;
 use ethportal_api::{
     jsonrpsee::http_client::HttpClient,
     types::{
-        content_key::state::AccountTrieNodeKey, portal::ContentInfo, state_trie::nibbles::Nibbles,
-        state_trie::EncodedTrieNode,
+        content_key::state::AccountTrieNodeKey,
+        portal::GetContentInfo,
+        state_trie::{nibbles::Nibbles, EncodedTrieNode},
     },
     StateContentKey, StateNetworkApiClient,
 };
@@ -176,18 +177,10 @@ async fn random_state_walk(
             }
         };
 
-        let content_value = match response {
-            ContentInfo::Content {
-                content: content_value,
-                ..
-            } => content_value,
-            other_content_info => {
-                return Err((
-                    anyhow!("Error unexpected get_content response: {other_content_info:?}"),
-                    current_content_key,
-                ));
-            }
-        };
+        let GetContentInfo {
+            content: content_value,
+            ..
+        } = response;
 
         let encoded_trie_node: EncodedTrieNode = content_value.to_vec().into();
 
