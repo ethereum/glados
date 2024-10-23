@@ -5,7 +5,8 @@ use chrono::{DateTime, Utc};
 use entity::{
     content::{self, SubProtocol},
     content_audit::{
-        self, AuditResult, HistorySelectionStrategy, SelectionStrategy, StateSelectionStrategy,
+        self, AuditResult, BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy,
+        StateSelectionStrategy,
     },
 };
 use sea_orm::{
@@ -31,10 +32,15 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
             content_audit::Column::StrategyUsed
                 .eq(SelectionStrategy::History(HistorySelectionStrategy::Random)),
         ),
-        StrategyFilter::Latest => audits.filter(
-            content_audit::Column::StrategyUsed
-                .eq(SelectionStrategy::History(HistorySelectionStrategy::Latest)),
-        ),
+        StrategyFilter::Latest => audits.filter(content_audit::Column::StrategyUsed.eq(
+            match filters.network {
+                SubProtocol::History => {
+                    SelectionStrategy::History(HistorySelectionStrategy::Latest)
+                }
+                SubProtocol::State => SelectionStrategy::State(StateSelectionStrategy::StateRoots),
+                SubProtocol::Beacon => SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest),
+            },
+        )),
         StrategyFilter::Oldest => audits.filter(content_audit::Column::StrategyUsed.eq(
             SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited),
         )),
@@ -70,6 +76,9 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
         }
         ContentTypeFilter::AccountTrieNodes => {
             audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x20").into_condition())
+        }
+        ContentTypeFilter::BlockRoots => {
+            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x10").into_condition())
         }
     }
 }
@@ -206,4 +215,5 @@ pub enum ContentTypeFilter {
     Bodies,
     Receipts,
     AccountTrieNodes,
+    BlockRoots,
 }
