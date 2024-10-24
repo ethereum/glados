@@ -809,6 +809,38 @@ pub async fn get_audit_stats_handler(
     Ok(Json(stats))
 }
 
+pub async fn get_failed_keys_handler(
+    http_args: HttpQuery<HashMap<String, String>>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<String>>, StatusCode> {
+    let subprotocol = get_subprotocol_from_params(&http_args);
+
+    let strategy: String = match http_args.get("strategy") {
+        // Set a default for each subprotocol
+        None => match subprotocol {
+            SubProtocol::History => "FourFours".to_string(),
+            SubProtocol::State => "StateRoots".to_string(),
+            SubProtocol::Beacon => "Latest".to_string(),
+        },
+        Some(strategy) => strategy.to_string(),
+    };
+
+    let page: u32 = match http_args.get("page") {
+        None => 1,
+        Some(page) => page.parse::<u32>().unwrap_or(1),
+    };
+
+    let failed_keys =
+        content_audit::get_failed_keys(subprotocol, strategy, page, &state.database_connection)
+            .await
+            .map_err(|e| {
+                error!(err=?e, "Could not fetch failed keys");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+
+    Ok(Json(failed_keys))
+}
+
 pub async fn census_explorer_list(
     params: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,

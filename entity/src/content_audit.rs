@@ -2,12 +2,13 @@
 use crate::content;
 use crate::utils;
 use anyhow::{bail, Result};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use clap::ValueEnum;
-use ethportal_api::OverlayContentKey;
+use content::SubProtocol;
+use ethportal_api::{utils::bytes::hex_encode, OverlayContentKey};
 use sea_orm::{
-    entity::prelude::*, strum::IntoEnumIterator, ActiveValue::NotSet, DeriveActiveEnum, Set,
-    TryGetable,
+    entity::prelude::*, strum::IntoEnumIterator, ActiveValue::NotSet, Condition, DeriveActiveEnum,
+    JoinType, QueryOrder, QuerySelect, Set, TryGetable,
 };
 use sea_query::{ArrayType, Nullable, SeaRc, ValueType, ValueTypeErr};
 
@@ -58,6 +59,21 @@ impl From<i32> for HistorySelectionStrategy {
     }
 }
 
+impl TryFrom<String> for HistorySelectionStrategy {
+    type Error = anyhow::Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "Latest" => Ok(HistorySelectionStrategy::Latest),
+            "Random" => Ok(HistorySelectionStrategy::Random),
+            "Failed" => Ok(HistorySelectionStrategy::Failed),
+            "SelectOldestUnaudited" => Ok(HistorySelectionStrategy::SelectOldestUnaudited),
+            "SpecificContentKey" => Ok(HistorySelectionStrategy::SpecificContentKey),
+            "FourFours" => Ok(HistorySelectionStrategy::FourFours),
+            _ => bail!("Invalid value for HistorySelectionStrategy {}", value),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, Hash, PartialEq, EnumIter, DeriveActiveEnum, ValueEnum)]
 #[clap(rename_all = "snake_case")]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
@@ -78,6 +94,16 @@ impl From<i32> for BeaconSelectionStrategy {
     }
 }
 
+impl TryFrom<String> for BeaconSelectionStrategy {
+    type Error = anyhow::Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "Latest" => Ok(BeaconSelectionStrategy::Latest),
+            _ => bail!("Invalid value for BeaconSelectionStrategy {}", value),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, Hash, PartialEq, EnumIter, DeriveActiveEnum, ValueEnum)]
 #[clap(rename_all = "snake_case")]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
@@ -92,6 +118,16 @@ impl From<i32> for StateSelectionStrategy {
         match value {
             0 => StateSelectionStrategy::StateRoots,
             _ => panic!("Invalid value for StateSelectionStrategy"),
+        }
+    }
+}
+
+impl TryFrom<String> for StateSelectionStrategy {
+    type Error = anyhow::Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "StateRoots" => Ok(StateSelectionStrategy::StateRoots),
+            _ => bail!("Invalid value for StateSelectionStrategy {}", value),
         }
     }
 }
@@ -335,6 +371,46 @@ pub async fn get_audits<T: OverlayContentKey>(
         .await?)
 }
 
+pub async fn get_failed_keys(
+    subprotocol: SubProtocol,
+    strategy_used: String,
+    page: u32,
+    conn: &DatabaseConnection,
+) -> Result<Vec<String>> {
+    let page_size: u32 = 1000;
+
+    let strat: SelectionStrategy = match subprotocol {
+        SubProtocol::History => SelectionStrategy::History(strategy_used.try_into()?),
+        SubProtocol::State => SelectionStrategy::State(strategy_used.try_into()?),
+        SubProtocol::Beacon => SelectionStrategy::Beacon(strategy_used.try_into()?),
+    };
+
+    let twenty_four_hours = TimeDelta::try_hours(24).expect("Couldn't calculate 24 hours delta.");
+    let twenty_four_hours_ago = Utc::now() - twenty_four_hours;
+
+    let keys = Entity::find()
+        .join(JoinType::InnerJoin, Relation::Content.def())
+        .select_only()
+        .column(content::Column::ContentKey)
+        .filter(
+            Condition::all()
+                .add(Column::Result.eq(AuditResult::Failure))
+                .add(Column::StrategyUsed.eq(strat))
+                .add(Column::CreatedAt.gt(twenty_four_hours_ago)),
+        )
+        .order_by_asc(Column::Id)
+        .limit(page_size as u64)
+        .offset(((page - 1) * page_size) as u64)
+        .into_tuple()
+        .all(conn)
+        .await?;
+
+    Ok(keys
+        .into_iter()
+        .map(|key: Vec<u8>| hex_encode(key))
+        .collect::<Vec<String>>())
+}
+
 impl SelectionStrategy {
     /// This performs the function of Display, which is not able to be implemented
     /// for this enum.
@@ -497,6 +573,42 @@ mod tests {
         assert_eq!(
             SelectionStrategy::State(StateSelectionStrategy::StateRoots).as_text(),
             "State Roots"
+        );
+    }
+
+    #[test]
+    fn test_selection_strategy_from_text() {
+        assert_eq!(
+            HistorySelectionStrategy::try_from("Latest".to_string()).unwrap(),
+            HistorySelectionStrategy::Latest,
+        );
+        assert_eq!(
+            HistorySelectionStrategy::try_from("Random".to_string()).unwrap(),
+            HistorySelectionStrategy::Random,
+        );
+        assert_eq!(
+            HistorySelectionStrategy::try_from("Failed".to_string()).unwrap(),
+            HistorySelectionStrategy::Failed
+        );
+        assert_eq!(
+            HistorySelectionStrategy::try_from("SelectOldestUnaudited".to_string()).unwrap(),
+            HistorySelectionStrategy::SelectOldestUnaudited
+        );
+        assert_eq!(
+            HistorySelectionStrategy::try_from("SpecificContentKey".to_string()).unwrap(),
+            HistorySelectionStrategy::SpecificContentKey
+        );
+        assert_eq!(
+            HistorySelectionStrategy::try_from("FourFours".to_string()).unwrap(),
+            HistorySelectionStrategy::FourFours
+        );
+        assert_eq!(
+            BeaconSelectionStrategy::try_from("Latest".to_string()).unwrap(),
+            BeaconSelectionStrategy::Latest
+        );
+        assert_eq!(
+            StateSelectionStrategy::try_from("StateRoots".to_string()).unwrap(),
+            StateSelectionStrategy::StateRoots
         );
     }
 
