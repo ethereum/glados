@@ -488,15 +488,15 @@ pub async fn contentkey_detail(
         })?;
 
     let (content_id, content_kind) =
-        if let Ok(content_key) = HistoryContentKey::from_hex(&content_key_hex) {
+        if let Ok(content_key) = HistoryContentKey::try_from_hex(&content_key_hex) {
             let content_id = hex_encode(content_key.content_id());
             let content_kind = content_key.to_string();
             (content_id, content_kind)
-        } else if let Ok(content_key) = StateContentKey::from_hex(&content_key_hex) {
+        } else if let Ok(content_key) = StateContentKey::try_from_hex(&content_key_hex) {
             let content_id = hex_encode(content_key.content_id());
             let content_kind = content_key.to_string();
             (content_id, content_kind)
-        } else if let Ok(content_key) = BeaconContentKey::from_hex(&content_key_hex) {
+        } else if let Ok(content_key) = BeaconContentKey::try_from_hex(&content_key_hex) {
             let content_id = hex_encode(content_key.content_id());
             let content_kind = content_key.to_string();
             (content_id, content_kind)

@@ -6,8 +6,9 @@ use ethportal_api::types::enr::Enr;
 use ethportal_api::types::portal::TraceContentInfo;
 use ethportal_api::utils::bytes::ByteUtilsError;
 use ethportal_api::{
-    BeaconNetworkApiClient, ContentKeyError, Discv5ApiClient, HistoryNetworkApiClient, NodeInfo,
-    RawContentKey, RoutingTableInfo, StateNetworkApiClient, Web3ApiClient,
+    BeaconContentKey, BeaconNetworkApiClient, ContentKeyError, Discv5ApiClient, HistoryContentKey,
+    HistoryNetworkApiClient, NodeInfo, OverlayContentKey, RoutingTableInfo, StateContentKey,
+    StateNetworkApiClient, Web3ApiClient,
 };
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use serde_json::json;
@@ -168,10 +169,13 @@ impl PortalApi {
         self,
         content: &content::Model,
     ) -> Result<Option<Content>, JsonRpcError> {
-        let raw_key = RawContentKey::from_iter(&content.content_key);
         match content.protocol_id {
             content::SubProtocol::History => {
-                match HistoryNetworkApiClient::get_content(&self.client, raw_key.try_into()?).await
+                match HistoryNetworkApiClient::get_content(
+                    &self.client,
+                    HistoryContentKey::try_from_bytes(&content.content_key)?,
+                )
+                .await
                 {
                     Ok(content_info) => Ok(Some(Content {
                         raw: content_info.content.into(),
@@ -183,7 +187,12 @@ impl PortalApi {
                 }
             }
             content::SubProtocol::State => {
-                match StateNetworkApiClient::get_content(&self.client, raw_key.try_into()?).await {
+                match StateNetworkApiClient::get_content(
+                    &self.client,
+                    StateContentKey::try_from_bytes(&content.content_key)?,
+                )
+                .await
+                {
                     Ok(content_info) => Ok(Some(Content {
                         raw: content_info.content.into(),
                     })),
@@ -194,7 +203,12 @@ impl PortalApi {
                 }
             }
             content::SubProtocol::Beacon => {
-                match BeaconNetworkApiClient::get_content(&self.client, raw_key.try_into()?).await {
+                match BeaconNetworkApiClient::get_content(
+                    &self.client,
+                    BeaconContentKey::try_from_bytes(&content.content_key)?,
+                )
+                .await
+                {
                     Ok(content_info) => Ok(Some(Content {
                         raw: content_info.content.into(),
                     })),
@@ -211,11 +225,13 @@ impl PortalApi {
         self,
         content: &content::Model,
     ) -> Result<(Option<Content>, String), JsonRpcError> {
-        let raw_key = RawContentKey::from_iter(&content.content_key);
         match content.protocol_id {
             content::SubProtocol::History => {
-                match HistoryNetworkApiClient::trace_get_content(&self.client, raw_key.try_into()?)
-                    .await
+                match HistoryNetworkApiClient::trace_get_content(
+                    &self.client,
+                    HistoryContentKey::try_from_bytes(&content.content_key)?,
+                )
+                .await
                 {
                     Ok(TraceContentInfo { content, trace, .. }) => Ok((
                         Some(Content {
@@ -232,8 +248,11 @@ impl PortalApi {
                 }
             }
             content::SubProtocol::State => {
-                match StateNetworkApiClient::trace_get_content(&self.client, raw_key.try_into()?)
-                    .await
+                match StateNetworkApiClient::trace_get_content(
+                    &self.client,
+                    StateContentKey::try_from_bytes(&content.content_key)?,
+                )
+                .await
                 {
                     Ok(TraceContentInfo { content, trace, .. }) => Ok((
                         Some(Content {
@@ -250,8 +269,11 @@ impl PortalApi {
                 }
             }
             content::SubProtocol::Beacon => {
-                match BeaconNetworkApiClient::trace_get_content(&self.client, raw_key.try_into()?)
-                    .await
+                match BeaconNetworkApiClient::trace_get_content(
+                    &self.client,
+                    BeaconContentKey::try_from_bytes(&content.content_key)?,
+                )
+                .await
                 {
                     Ok(TraceContentInfo { content, trace, .. }) => Ok((
                         Some(Content {
