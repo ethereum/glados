@@ -163,7 +163,7 @@ pub async fn run_glados_command(conn: DatabaseConnection, command: cli::Command)
         } => (content_key, portal_client),
     };
     let content_key =
-        HistoryContentKey::from_hex(&content_key).expect("needs valid hex-encoded history key");
+        HistoryContentKey::try_from_hex(&content_key).expect("needs valid hex-encoded history key");
 
     let task = AuditTask {
         strategy: SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey),
