@@ -644,8 +644,7 @@ pub async fn contentaudit_detail(
         .find_related(execution_metadata::Entity)
         .one(&state.database_connection)
         .await
-        .unwrap()
-        .expect("Failed to get audit metadata");
+        .unwrap();
 
     let template = ContentAuditDetailTemplate {
         audit,
