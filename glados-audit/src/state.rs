@@ -12,11 +12,8 @@ use entity::{
 use eth_trie::node::Node;
 use ethportal_api::{
     jsonrpsee::http_client::HttpClient,
-    types::{
-        content_key::state::AccountTrieNodeKey,
-        state_trie::{nibbles::Nibbles, EncodedTrieNode},
-    },
-    StateContentKey, StateNetworkApiClient,
+    types::{content_key::state::AccountTrieNodeKey, state_trie::nibbles::Nibbles},
+    ContentValue, StateContentKey, StateContentValue, StateNetworkApiClient,
 };
 use glados_core::{db::store_content_key, jsonrpc::PortalClient};
 use rand::seq::IteratorRandom;
@@ -160,25 +157,35 @@ async fn random_state_walk(
         node_hash: state_root,
     };
     let mut current_content_key = root_content_key.clone();
+
     loop {
-        let response = match StateNetworkApiClient::get_content(
-            &client,
-            StateContentKey::AccountTrieNode(current_content_key.clone()),
-        )
-        .await
-        {
-            Ok(response) => response,
-            Err(err) => {
-                return Err((
-                    anyhow!("Error get_content failed with: {err:?}"),
-                    current_content_key,
-                ));
-            }
+        let state_content_key = StateContentKey::AccountTrieNode(current_content_key.clone());
+        let response =
+            match StateNetworkApiClient::get_content(&client, state_content_key.clone()).await {
+                Ok(response) => response,
+                Err(err) => {
+                    return Err((
+                        anyhow!("Error get_content failed with: {err:?}"),
+                        current_content_key,
+                    ));
+                }
+            };
+
+        let content_value = StateContentValue::decode(&state_content_key, &response.content)
+            .map_err(|err| {
+                (
+                    anyhow!("Error decoding content value: {err:?}"),
+                    current_content_key.clone(),
+                )
+            })?;
+
+        let StateContentValue::TrieNode(trie_node) = content_value else {
+            return Err((
+                anyhow!("Tried to decode non-trie node as trie node: {content_value:?}"),
+                current_content_key,
+            ));
         };
-
-        let encoded_trie_node: EncodedTrieNode = response.content.to_vec().into();
-
-        let trie_node = encoded_trie_node.as_trie_node().map_err(|err| {
+        let trie_node = trie_node.node.as_trie_node().map_err(|err| {
             (
                 anyhow!("Error decoding node while walking trie: {err:?}"),
                 current_content_key.clone(),
