@@ -83,7 +83,7 @@ pub struct ContentIdDetailTemplate {
 pub struct ContentAuditDetailTemplate {
     pub audit: content_audit::Model,
     pub content: content::Model,
-    pub execution_metadata: execution_metadata::Model,
+    pub execution_metadata: Option<execution_metadata::Model>,
 }
 
 #[derive(Template)]
