@@ -15,9 +15,10 @@
                 <li>Content Key: <a href="/content/key/{{content.key_as_hex() }}/">{{ content.key_as_hex() }}</a></li>
                 <li>Content ID: <a href="/content/id/{{content.id_as_hex() }}/">{{ content.id_as_hex() }}</a></li>
                 {% if execution_metadata.is_some() %}
+                {% let block_num = execution_metadata.as_ref().unwrap().block_number %}
                 <li>Block:
-                    <a href="https://etherscan.io/block/{{ execution_metadata.as_ref().unwrap().block_number }}">
-                        {{ execution_metadata.as_ref().unwrap().block_number }}
+                    <a href="https://etherscan.io/block/{{ block_num }}">
+                        {{ block_num }}
                     </a>
                 </li>
                 {% endif %}
