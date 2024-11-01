@@ -85,6 +85,7 @@ impl From<i32> for BeaconSelectionStrategy {
 pub enum StateSelectionStrategy {
     /// Does a random walk of the state at a random walk.
     StateRoots = 0,
+    Latest = 1,
 }
 
 impl From<i32> for StateSelectionStrategy {
@@ -359,6 +360,7 @@ impl SelectionStrategy {
             SelectionStrategy::State(StateSelectionStrategy::StateRoots) => {
                 "State Roots".to_string()
             }
+            SelectionStrategy::State(StateSelectionStrategy::Latest) => "Latest".to_string(),
         }
     }
 }
