@@ -37,7 +37,7 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
                 SubProtocol::History => {
                     SelectionStrategy::History(HistorySelectionStrategy::Latest)
                 }
-                SubProtocol::State => SelectionStrategy::State(StateSelectionStrategy::StateRoots),
+                SubProtocol::State => SelectionStrategy::State(StateSelectionStrategy::Latest),
                 SubProtocol::Beacon => SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest),
             },
         )),
