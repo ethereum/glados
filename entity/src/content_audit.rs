@@ -2,13 +2,13 @@
 use crate::content;
 use crate::utils;
 use anyhow::{bail, Result};
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{DateTime, Utc};
 use clap::ValueEnum;
 use content::SubProtocol;
 use ethportal_api::{utils::bytes::hex_encode, OverlayContentKey};
 use sea_orm::{
-    entity::prelude::*, strum::IntoEnumIterator, ActiveValue::NotSet, Condition, DeriveActiveEnum,
-    JoinType, QueryOrder, QuerySelect, Set, TryGetable,
+    entity::prelude::*, strum::IntoEnumIterator, ActiveValue::NotSet, DbBackend, DeriveActiveEnum,
+    FromQueryResult, Set, Statement, TryGetable,
 };
 use sea_query::{ArrayType, Nullable, SeaRc, ValueType, ValueTypeErr};
 
@@ -273,6 +273,11 @@ impl AuditResult {
     }
 }
 
+#[derive(FromQueryResult)]
+struct FailedKeysResult {
+    content_key: Vec<u8>,
+}
+
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "content_audit")]
 pub struct Model {
@@ -379,35 +384,45 @@ pub async fn get_failed_keys(
 ) -> Result<Vec<String>> {
     let page_size: u32 = 1000;
 
-    let strat: SelectionStrategy = match subprotocol {
+    let subprotocol_strategy: SelectionStrategy = match subprotocol {
         SubProtocol::History => SelectionStrategy::History(strategy_used.try_into()?),
         SubProtocol::State => SelectionStrategy::State(strategy_used.try_into()?),
         SubProtocol::Beacon => SelectionStrategy::Beacon(strategy_used.try_into()?),
     };
 
-    let twenty_four_hours = TimeDelta::try_hours(24).expect("Couldn't calculate 24 hours delta.");
-    let twenty_four_hours_ago = Utc::now() - twenty_four_hours;
+    let keys_result = FailedKeysResult::find_by_statement(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "
+        SELECT
+          content_key
+        FROM (
+          SELECT
+            content.content_key,
+            MAX(content_audit.created_at) AS created_at
+          FROM content_audit
+          JOIN content ON content.id = content_audit.content_key
+          WHERE
+            content_audit.result = 0  AND
+            content_audit.strategy_used = $1 AND
+            content_audit.created_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours'
+          GROUP BY content.content_key
+        ) prep
+        ORDER BY created_at DESC
+        LIMIT $2
+        OFFSET $3
+        ",
+        vec![
+            subprotocol_strategy.into(),
+            page_size.into(),
+            ((page - 1) * page_size).into(),
+        ],
+    ))
+    .all(conn)
+    .await?;
 
-    let keys = Entity::find()
-        .join(JoinType::InnerJoin, Relation::Content.def())
-        .select_only()
-        .column(content::Column::ContentKey)
-        .filter(
-            Condition::all()
-                .add(Column::Result.eq(AuditResult::Failure))
-                .add(Column::StrategyUsed.eq(strat))
-                .add(Column::CreatedAt.gt(twenty_four_hours_ago)),
-        )
-        .order_by_asc(Column::Id)
-        .limit(page_size as u64)
-        .offset(((page - 1) * page_size) as u64)
-        .into_tuple()
-        .all(conn)
-        .await?;
-
-    Ok(keys
+    Ok(keys_result
         .into_iter()
-        .map(|key: Vec<u8>| hex_encode(key))
+        .map(|result_item| hex_encode(result_item.content_key))
         .collect::<Vec<String>>())
 }
 
