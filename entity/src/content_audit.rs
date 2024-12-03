@@ -382,7 +382,7 @@ pub async fn get_failed_keys(
     page: u32,
     conn: &DatabaseConnection,
 ) -> Result<Vec<String>> {
-    let page_size: u32 = 1000;
+    const PAGE_SIZE: u32 = 1000;
 
     let subprotocol_strategy: SelectionStrategy = match subprotocol {
         SubProtocol::History => SelectionStrategy::History(strategy_used.try_into()?),
@@ -394,6 +394,17 @@ pub async fn get_failed_keys(
         DbBackend::Postgres,
         "
         SELECT
+              content.content_key
+        FROM content_audit
+        INNER JOIN content ON content.id = content_audit.content_key
+        WHERE
+            content_audit.result = 0 AND
+            content_audit.strategy_used = $1 AND
+            content_audit.created_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours'
+        GROUP BY content.content_key
+        ORDER BY MAX(content_audit.created_at) DESC
+        LIMIT $2
+        OFFSET $3
           content_key
         FROM (
           SELECT
@@ -413,8 +424,8 @@ pub async fn get_failed_keys(
         ",
         vec![
             subprotocol_strategy.into(),
-            page_size.into(),
-            ((page - 1) * page_size).into(),
+            PAGE_SIZE.into(),
+            ((page - 1) * PAGE_SIZE).into(),
         ],
     ))
     .all(conn)
