@@ -24,7 +24,7 @@ const SOCKET: &str = "0.0.0.0:3001";
 
 const ASSET_PATH_ENV_VAR: &str = "GLADOS_WEB_ASSETS_PATH";
 
-pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
+async fn build_router(config: Arc<State>) -> Result<Router> {
     let assets_path = match std::env::var(ASSET_PATH_ENV_VAR) {
         Ok(path) => Path::new(&path).to_path_buf(),
         Err(_) => {
@@ -40,27 +40,8 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
 
     let serve_dir = get_service(ServeDir::new(assets_path)).handle_error(routes::handle_error);
 
-    let nodes_with_zero_high_bits = entity::node::Entity::find()
-        .filter(entity::node::Column::NodeIdHigh.eq(0))
-        .all(&config.database_connection)
-        .await
-        .unwrap();
-
-    info!(rows=?nodes_with_zero_high_bits.len(), "One time migration: setting high bits for node model");
-
-    for node_model in nodes_with_zero_high_bits {
-        let raw_node_id = U256::from_be_slice(&node_model.get_node_id().raw());
-        let node_id_high: i64 = raw_node_id.wrapping_shr(193).to::<i64>();
-
-        let mut node: entity::node::ActiveModel = node_model.into();
-        let previous_value = node.node_id_high;
-        node.node_id_high = Set(node_id_high);
-        let updated = node.update(&config.database_connection).await?;
-        info!(row.id=?updated.id, old=?previous_value, new=?updated.node_id_high, "Setting high bits");
-    }
-
     // setup router
-    let app = Router::new()
+    Ok(Router::new()
         .route("/", get(routes::network_overview))
         .route("/census/census-list/", get(routes::census_explorer_list))
         .route("/census/", get(routes::single_census_view))
@@ -99,11 +80,51 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
         )
         .nest_service("/static/", serve_dir.clone())
         .fallback_service(serve_dir)
-        .layer(Extension(config));
+        .layer(Extension(config)))
+}
 
+pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
+    let nodes_with_zero_high_bits = entity::node::Entity::find()
+        .filter(entity::node::Column::NodeIdHigh.eq(0))
+        .all(&config.database_connection)
+        .await
+        .unwrap();
+
+    info!(rows=?nodes_with_zero_high_bits.len(), "One time migration: setting high bits for node model");
+
+    for node_model in nodes_with_zero_high_bits {
+        let raw_node_id = U256::from_be_slice(&node_model.get_node_id().raw());
+        let node_id_high: i64 = raw_node_id.wrapping_shr(193).to::<i64>();
+
+        let mut node: entity::node::ActiveModel = node_model.into();
+        let previous_value = node.node_id_high;
+        node.node_id_high = Set(node_id_high);
+        let updated = node.update(&config.database_connection).await?;
+        info!(row.id=?updated.id, old=?previous_value, new=?updated.node_id_high, "Setting high bits");
+    }
+
+    let app = build_router(config).await?;
     let socket: SocketAddr = SOCKET.parse()?;
     info!("Serving glados-web at {}", socket);
     Ok(axum::Server::bind(&socket)
         .serve(app.into_make_service())
         .await?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum_test::TestServer;
+
+    #[tokio::test]
+    async fn test_root_routing() {
+        // Confirm that basic routing from the root works by loading the favicon
+        let config = Arc::new(State {
+            database_connection: Default::default(),
+        });
+        let router = build_router(config).await.unwrap();
+        let server = TestServer::new(router).unwrap();
+        let response = server.get("/favicon.ico").await;
+        response.assert_status_ok();
+    }
 }

@@ -27,3 +27,6 @@ serde.workspace = true
 tokio.workspace = true
 tower-http = { version = "0.3.5", features = ["fs"] }
 tracing.workspace = true
+
+[dev-dependencies]
+axum-test = "13.4.1"
