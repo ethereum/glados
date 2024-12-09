@@ -17,9 +17,11 @@ use glados_core::stats::AuditStats;
 #[derive(Template)]
 #[template(path = "index.html")]
 pub struct IndexTemplate {
+    pub main_stats_header: String,
     pub client_diversity_data: Vec<ClientDiversityResult>,
     pub average_radius_chart: Vec<CalculatedRadiusChartData>,
     pub stats: [AuditStats; 3],
+    pub new_content: [u32; 3],
 }
 
 #[derive(Template)]
