@@ -83,6 +83,22 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
     }
 }
 
+/// Counts new content items for the given subprotocol and period
+pub async fn get_new_content_count(
+    subprotocol: SubProtocol,
+    period: Period,
+    conn: &DatabaseConnection,
+) -> Result<u32, DbErr> {
+    let cutoff = period.cutoff_time();
+
+    let new_content = content::Entity::find()
+        .filter(content::Column::ProtocolId.eq(subprotocol))
+        .filter(content::Column::FirstAvailableAt.gt(cutoff))
+        .count(conn)
+        .await? as u32;
+    Ok(new_content)
+}
+
 /// Calculates stats for the given set of audits over the given period.
 pub async fn get_audit_stats(
     filtered: Select<content_audit::Entity>,
@@ -90,11 +106,6 @@ pub async fn get_audit_stats(
     conn: &DatabaseConnection,
 ) -> Result<AuditStats, DbErr> {
     let cutoff = period.cutoff_time();
-
-    let new_content = content::Entity::find()
-        .filter(content::Column::FirstAvailableAt.gt(cutoff))
-        .count(conn)
-        .await? as u32;
 
     let total_audits = filtered
         .clone()
@@ -126,7 +137,6 @@ pub async fn get_audit_stats(
 
     Ok(AuditStats {
         period,
-        new_content,
         total_audits,
         total_passes,
         pass_percent,
@@ -138,7 +148,6 @@ pub async fn get_audit_stats(
 
 pub struct AuditStats {
     pub period: Period,
-    pub new_content: u32,
     pub total_audits: u32,
     pub total_passes: u32,
     pub pass_percent: f32,
@@ -199,6 +208,20 @@ pub enum StrategyFilter {
     Oldest,
     FourFours,
     StateRoots,
+}
+
+impl Display for StrategyFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match &self {
+            StrategyFilter::All => "All",
+            StrategyFilter::Random => "Random",
+            StrategyFilter::Latest => "Latest",
+            StrategyFilter::Oldest => "Oldest",
+            StrategyFilter::FourFours => "4444s",
+            StrategyFilter::StateRoots => "State Roots",
+        };
+        write!(f, "{}", name)
+    }
 }
 
 #[derive(Deserialize, Copy, Clone)]
