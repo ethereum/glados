@@ -32,12 +32,9 @@ use sea_orm::{
     LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 use serde::Serialize;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Formatter;
 use std::sync::Arc;
-use std::{
-    collections::{HashMap, HashSet},
-    time::UNIX_EPOCH,
-};
 use std::{fmt::Display, io};
 use tracing::{error, info, warn};
 
@@ -558,13 +555,10 @@ pub async fn contentaudit_detail(
     // If we were able to deserialize the trace, we can look up & interpolate the radius for the nodes in the trace.
     if let Some(trace) = &mut trace {
         // Get the timestamp of the query
-        let query_timestamp = trace.started_at_ms;
-        let timestamp: DateTime<Utc> = {
-            let duration = query_timestamp.duration_since(UNIX_EPOCH).unwrap();
-            Utc.timestamp_opt(duration.as_secs() as i64, duration.subsec_nanos())
-                .single()
-                .expect("Failed to convert timestamp to DateTime")
-        };
+        let timestamp: DateTime<Utc> = Utc
+            .timestamp_millis_opt(trace.started_at_ms as i64)
+            .single()
+            .expect("Failed to convert timestamp to DateTime");
 
         // Do a query to get, for each node, the radius recorded closest to the time at which the trace took place.
         let node_ids: Vec<Vec<u8>> = trace
