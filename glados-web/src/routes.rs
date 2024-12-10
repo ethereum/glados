@@ -88,8 +88,6 @@ pub async fn network_overview(
         SubProtocol::Beacon => StrategyFilter::Latest,
     };
 
-    let main_stats_header: String = strategy.to_string();
-
     // Run queries for content dashboard data concurrently
     let (hour_new, hour_stats, day_new, day_stats, week_new, week_stats) = tokio::join!(
         get_new_content_count(subprotocol, Period::Hour, &state.database_connection,),
@@ -135,7 +133,7 @@ pub async fn network_overview(
     let week_stats = week_stats.unwrap();
 
     let template = IndexTemplate {
-        main_stats_header,
+        strategy,
         client_diversity_data,
         average_radius_chart: radius_percentages,
         stats: [hour_stats, day_stats, week_stats],

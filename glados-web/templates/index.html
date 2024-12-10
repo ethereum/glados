@@ -7,7 +7,7 @@
 <script src="/static/js/piechart.js"></script>
 <script src="/static/js/trace/enr.js"></script>
 <script src="/static/js/radiusdensity.js"></script>
-<script src="/static/js/stats.js"></script>
+<script src="/static/js/stats_history.js"></script>
 <script src="/static/js/explanations.js"></script>
 {% endblock %}
 
@@ -21,10 +21,22 @@
                 <div class="card-body">
                     <button class="question-mark" aria-label="Toggle explanation"></button>
                     <div class="explanation">
-                        Glados continuously queries the Portal network for random 4444s headers, blocks, and receipts.
-                        Statistical results of these audits are displayed here and can be viewed in more granular detail on the Audit Dashboard.
-                     </div>
-                     <h2>{{ main_stats_header }} stats</h2>
+                    {% match strategy %}
+                        {% when StrategyFilter::FourFours %}
+                            Glados continuously queries the Portal network for random 4444s headers, blocks, and receipts.
+                            Statistical results of these audits are displayed here and can be viewed in more granular detail on the Audit Dashboard.
+                        {% when StrategyFilter::StateRoots %}
+                            Glados continuously queries the Portal network for random state roots.
+                            Statistical results of these audits are displayed here and can be viewed in more granular detail on the Audit Dashboard.
+                        {% when StrategyFilter::Latest %}
+                            Glados continuously queries the Portal network recent beacon block roots.
+                            Statistical results of these audits are displayed here and can be viewed in more granular detail on the Audit Dashboard.
+                        {% else %}
+                            No explanation available for {{ strategy }}
+                    {% endmatch %}
+
+                    </div>
+                    <h2>{{ strategy }} stats</h2>
                     <div class="table-responsive">
                         <table class="table">
                             <thead>
@@ -144,7 +156,7 @@
     const census_data = {{ average_radius_chart| json | safe }};
     radius_node_id_scatter_chart(census_data);
     radius_stacked_chart(census_data);
-    statsChart();
+    statsHistoryChart();
 </script>
 
 {% endblock %}

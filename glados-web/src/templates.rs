@@ -12,12 +12,12 @@ use entity::{
 use crate::routes::{
     CalculatedRadiusChartData, ClientDiversityResult, PaginatedCensusListResult, RawEnr,
 };
-use glados_core::stats::AuditStats;
+use glados_core::stats::{AuditStats, StrategyFilter};
 
 #[derive(Template)]
 #[template(path = "index.html")]
 pub struct IndexTemplate {
-    pub main_stats_header: String,
+    pub strategy: StrategyFilter,
     pub client_diversity_data: Vec<ClientDiversityResult>,
     pub average_radius_chart: Vec<CalculatedRadiusChartData>,
     pub stats: [AuditStats; 3],
