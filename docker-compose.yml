@@ -2,7 +2,7 @@ version: '3'
 services:
 
   glados_postgres:
-    image: postgres:latest
+    image: postgres:16.4
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${GLADOS_POSTGRES_PASSWORD?Glados Postgres Password Required}
