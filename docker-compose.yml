@@ -92,7 +92,7 @@ services:
     restart: always
 
   glados_monitor_beacon:
-    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados follow-beacon-pandaops --provider-url ${GLADOS_PROVIDER_URL?Glados monitor provider URL required}"
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados follow-beacon-pandaops"
     image: portalnetwork/glados-monitor:latest
     environment:
       RUST_LOG: warn,glados_monitor=info
