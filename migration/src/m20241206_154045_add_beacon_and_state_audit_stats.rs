@@ -11,12 +11,22 @@ impl MigrationTrait for Migration {
                 Table::alter()
                     .table(AuditStats::Table)
                     .add_column_if_not_exists(
+                        ColumnDef::new(AuditStats::SuccessRateStateAll)
+                            .float()
+                            .default(0.0),
+                    )
+                    .add_column_if_not_exists(
                         ColumnDef::new(AuditStats::SuccessRateStateLatest)
                             .float()
                             .default(0.0),
                     )
                     .add_column_if_not_exists(
                         ColumnDef::new(AuditStats::SuccessRateStateStateRoots)
+                            .float()
+                            .default(0.0),
+                    )
+                    .add_column_if_not_exists(
+                        ColumnDef::new(AuditStats::SuccessRateBeaconAll)
                             .float()
                             .default(0.0),
                     )
@@ -35,8 +45,10 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(AuditStats::Table)
+                    .drop_column(AuditStats::SuccessRateStateAll)
                     .drop_column(AuditStats::SuccessRateStateLatest)
                     .drop_column(AuditStats::SuccessRateStateStateRoots)
+                    .drop_column(AuditStats::SuccessRateBeaconAll)
                     .drop_column(AuditStats::SuccessRateBeaconLatest)
                     .to_owned(),
             )
@@ -47,7 +59,9 @@ impl MigrationTrait for Migration {
 #[derive(Iden)]
 enum AuditStats {
     Table,
+    SuccessRateStateAll,
     SuccessRateStateLatest,
     SuccessRateStateStateRoots,
+    SuccessRateBeaconAll,
     SuccessRateBeaconLatest,
 }

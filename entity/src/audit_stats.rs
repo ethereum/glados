@@ -29,8 +29,10 @@ pub struct Model {
     pub success_rate_four_fours_headers: f32,
     pub success_rate_four_fours_bodies: f32,
     pub success_rate_four_fours_receipts: f32,
+    pub success_rate_state_all: f32,
     pub success_rate_state_latest: f32,
     pub success_rate_state_state_roots: f32,
+    pub success_rate_beacon_all: f32,
     pub success_rate_beacon_latest: f32,
 }
 
@@ -60,8 +62,10 @@ pub async fn create(
     success_rate_four_fours_headers: f32,
     success_rate_four_fours_bodies: f32,
     success_rate_four_fours_receipts: f32,
+    success_rate_state_all: f32,
     success_rate_state_latest: f32,
     success_rate_state_state_roots: f32,
+    success_rate_beacon_all: f32,
     success_rate_beacon_latest: f32,
     conn: &DatabaseConnection,
 ) -> Result<Model> {
@@ -86,8 +90,10 @@ pub async fn create(
         success_rate_four_fours_headers: Set(success_rate_four_fours_headers),
         success_rate_four_fours_bodies: Set(success_rate_four_fours_bodies),
         success_rate_four_fours_receipts: Set(success_rate_four_fours_receipts),
+        success_rate_state_all: Set(success_rate_state_all),
         success_rate_state_latest: Set(success_rate_state_latest),
         success_rate_state_state_roots: Set(success_rate_state_state_roots),
+        success_rate_beacon_all: Set(success_rate_beacon_all),
         success_rate_beacon_latest: Set(success_rate_beacon_latest),
     };
     Ok(audit_stats.insert(conn).await?)
@@ -121,6 +127,7 @@ pub struct HistoryStats {
 pub struct StateStats {
     id: i32,
     timestamp: DateTime<Utc>,
+    success_rate_state_all: f32,
     success_rate_state_latest: f32,
     success_rate_state_state_roots: f32,
 }
@@ -129,6 +136,7 @@ pub struct StateStats {
 pub struct BeaconStats {
     id: i32,
     timestamp: DateTime<Utc>,
+    success_rate_beacon_all: f32,
     success_rate_beacon_latest: f32,
 }
 
@@ -193,6 +201,7 @@ pub async fn get_weekly_state_stats(
         .columns([
             Column::Id,
             Column::Timestamp,
+            Column::SuccessRateStateAll,
             Column::SuccessRateStateLatest,
             Column::SuccessRateStateStateRoots,
         ])
@@ -215,6 +224,7 @@ pub async fn get_weekly_beacon_stats(
         .columns([
             Column::Id,
             Column::Timestamp,
+            Column::SuccessRateBeaconAll,
             Column::SuccessRateBeaconLatest,
         ])
         .filter(Column::Timestamp.gt(beginning))
