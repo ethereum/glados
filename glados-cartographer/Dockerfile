@@ -1,8 +1,5 @@
-# select build image
-FROM rust:1.81.0 AS builder
-
-# create a new empty shell project
-RUN USER=root cargo new --bin glados
+# Prepare base image
+FROM rust:1.81 AS chef
 WORKDIR /glados
 
 ARG GIT_HASH=unknown
@@ -10,20 +7,33 @@ ENV GIT_HASH=$GIT_HASH
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends clang ca-certificates \
-    && update-ca-certificates
+    && update-ca-certificates \
+    && cargo install cargo-chef --locked
 
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
+
+# Compute dependencies
+FROM chef AS planner
 COPY . .
 
+RUN cargo chef prepare --recipe-path recipe.json
+
+# Build dependencies
+FROM chef AS builder
+COPY --from=planner /glados/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+
+# Build Glados
+COPY . .
 RUN cargo build -p glados-cartographer --release
 
+# Build runtime
 FROM ubuntu:22.04
-
 RUN apt-get update
 
 # copy build artifacts from build stage
-COPY --from=builder /glados/target/release/glados-cartographer /usr/bin/
+COPY --from=builder ./glados/target/release/glados-cartographer /usr/bin/
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 ENV RUST_LOG=info
