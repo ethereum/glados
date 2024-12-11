@@ -39,8 +39,12 @@ pub async fn run_glados_monitor(conn: DatabaseConnection, w3: web3::Web3<web3::t
     info!("got CTRL+C. shutting down...");
 }
 
-pub async fn run_glados_monitor_beacon(conn: DatabaseConnection, client: HttpClient) {
-    tokio::spawn(follow_beacon_head(conn, client));
+pub async fn run_glados_monitor_beacon(
+    conn: DatabaseConnection,
+    client: HttpClient,
+    beacon_url: String,
+) {
+    tokio::spawn(follow_beacon_head(conn, client, beacon_url));
 
     debug!("setting up CTRL+C listener");
     tokio::signal::ctrl_c()

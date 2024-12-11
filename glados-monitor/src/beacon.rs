@@ -18,16 +18,20 @@ use tokio::time::sleep;
 use tracing::{debug, error, info};
 
 /// Nimbus node to retrieve beacon data from.
-const PANDA_OPS_BEACON: &str = "https://nimbus.mainnet.ethpandaops.io";
+pub const PANDA_OPS_BEACON: &str = "https://nimbus.mainnet.ethpandaops.io";
 /// How often the provider will be queried for a new block hash.
 const POLL_PERIOD_SECONDS: u64 = 1;
 // Beacon chain mainnet genesis time: Tue Dec 01 2020 12:00:23 GMT+0000
 pub const BEACON_GENESIS_TIME: u64 = 1606824023;
 
 /// Checks for and stores new Beacon Light Client Bootstrap content keys.
-pub async fn follow_beacon_head(conn: DatabaseConnection, client: HttpClient) {
+pub async fn follow_beacon_head(
+    conn: DatabaseConnection,
+    client: HttpClient,
+    beacon_base_url: String,
+) {
     debug!("Getting initial block root");
-    let mut latest_finalized_block_root = get_current_beacon_block_root(&client)
+    let mut latest_finalized_block_root = get_current_beacon_block_root(&client, &beacon_base_url)
         .await
         .expect("Failed to get initial finalized beacon block");
 
@@ -44,13 +48,14 @@ pub async fn follow_beacon_head(conn: DatabaseConnection, client: HttpClient) {
         sleep(Duration::from_secs(POLL_PERIOD_SECONDS)).await;
 
         debug!("Checking for new finalized block root");
-        let current_finalized_block_root = match get_current_beacon_block_root(&client).await {
-            Ok(block_root) => block_root,
-            Err(e) => {
-                error!(err=?e, "Failed to get current beacon block root");
-                continue;
-            }
-        };
+        let current_finalized_block_root =
+            match get_current_beacon_block_root(&client, &beacon_base_url).await {
+                Ok(block_root) => block_root,
+                Err(e) => {
+                    error!(err=?e, "Failed to get current beacon block root");
+                    continue;
+                }
+            };
 
         if current_finalized_block_root != latest_finalized_block_root {
             latest_finalized_block_root = current_finalized_block_root;
@@ -88,8 +93,9 @@ async fn store_bootstrap_content_key(hash: &str, conn: DatabaseConnection) -> an
 pub async fn store_lc_optimistic_update(
     conn: DatabaseConnection,
     client: &HttpClient,
+    beacon_base_url: &String,
 ) -> anyhow::Result<()> {
-    let content_key = get_lc_optimistic_update_key(client).await?;
+    let content_key = get_lc_optimistic_update_key(client, beacon_base_url).await?;
     let content_key = BeaconContentKey::LightClientOptimisticUpdate(content_key);
 
     match content::get_or_create(SubProtocol::Beacon, &content_key, Utc::now(), &conn).await {
@@ -132,8 +138,11 @@ pub async fn store_lc_update_by_range(conn: DatabaseConnection) -> anyhow::Resul
 }
 
 /// Retrieve the latest finalized block root from the beacon node.
-async fn get_current_beacon_block_root(client: &HttpClient) -> anyhow::Result<String> {
-    let url = format!("{}/eth/v1/beacon/blocks/finalized/root", PANDA_OPS_BEACON);
+async fn get_current_beacon_block_root(
+    client: &HttpClient,
+    beacon_base_url: &String,
+) -> anyhow::Result<String> {
+    let url = format!("{}/eth/v1/beacon/blocks/finalized/root", beacon_base_url);
     let response = client.get(url).send().await?.text().await?;
     let response: Value = serde_json::from_str(&response)?;
     let latest_finalized_block_root: String =
@@ -144,10 +153,11 @@ async fn get_current_beacon_block_root(client: &HttpClient) -> anyhow::Result<St
 /// Requests the latest `LightClientOptimisticUpdateKey` known by the server.
 pub async fn get_lc_optimistic_update_key(
     client: &HttpClient,
+    beacon_base_url: &String,
 ) -> anyhow::Result<LightClientOptimisticUpdateKey> {
     let url = format!(
         "{}/eth/v1/beacon/light_client/optimistic_update",
-        PANDA_OPS_BEACON
+        beacon_base_url
     );
     let response = client.get(url).send().await?.text().await?;
     let update: Value = serde_json::from_str(&response)?;
@@ -168,10 +178,11 @@ pub async fn get_lc_optimistic_update_key(
 /// Gets the latest `LightClientFinalityUpdateKey` known by the server.
 pub async fn get_lc_finality_update_key(
     client: &HttpClient,
+    beacon_base_url: &String,
 ) -> anyhow::Result<LightClientFinalityUpdateKey> {
     let url = format!(
         "{}/eth/v1/beacon/light_client/finality_update",
-        PANDA_OPS_BEACON
+        beacon_base_url
     );
     let response = client.get(url).send().await?.text().await?;
     let update: Value = serde_json::from_str(&response)?;
