@@ -21,10 +21,22 @@
                 <div class="card-body">
                     <button class="question-mark" aria-label="Toggle explanation"></button>
                     <div class="explanation">
-                        Glados continuously queries the Portal network for random 4444s headers, blocks, and receipts.
-                        Statistical results of these audits are displayed here and can be viewed in more granular detail on the Audit Dashboard.
-                     </div>
-                    <h2>4444s stats</h2>
+                    {% match strategy %}
+                        {% when StrategyFilter::FourFours %}
+                            Glados continuously queries the Portal network for random 4444s headers, blocks, and receipts.
+                            Statistical results of these audits are displayed here and can be viewed in more granular detail on the Audit Dashboard.
+                        {% when StrategyFilter::StateRoots %}
+                            Glados continuously queries the Portal network for random state roots.
+                            Statistical results of these audits are displayed here and can be viewed in more granular detail on the Audit Dashboard.
+                        {% when StrategyFilter::Latest %}
+                            Glados continuously queries the Portal network recent beacon block roots.
+                            Statistical results of these audits are displayed here and can be viewed in more granular detail on the Audit Dashboard.
+                        {% else %}
+                            No explanation available for {{ strategy }}
+                    {% endmatch %}
+
+                    </div>
+                    <h2>{{ strategy }} stats</h2>
                     <div class="table-responsive">
                         <table class="table">
                             <thead>
@@ -43,7 +55,7 @@
                                 {% for stat in stats %}
                                 <tr>
                                     <th scope="row">{{ stat.period.to_string() }}</th>
-                                    <td>{{ stat.new_content }}</td>
+                                    <td>{{ new_content[loop.index0] }}</td>
                                     <td>{{ stat.total_audits }}</td>
                                     <td>{{ stat.total_passes }}</td>
                                     <td>{{ stat.total_failures }}</td>

@@ -42,6 +42,11 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         fourfours_headers,
         fourfours_bodies,
         fourfours_receipts,
+        state_all,
+        state_latest,
+        state_state_roots,
+        beacon_all,
+        beacon_latest,
     ) = tokio::join!(
         get_audit_stats(
             filter_audits(AuditFilters {
@@ -202,7 +207,57 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             },),
             Period::Hour,
             conn
-        )
+        ),
+        get_audit_stats(
+            filter_audits(AuditFilters {
+                strategy: StrategyFilter::All,
+                content_type: ContentTypeFilter::All,
+                success: SuccessFilter::All,
+                network: SubProtocol::State
+            },),
+            Period::Hour,
+            conn
+        ),
+        get_audit_stats(
+            filter_audits(AuditFilters {
+                strategy: StrategyFilter::Latest,
+                content_type: ContentTypeFilter::All,
+                success: SuccessFilter::All,
+                network: SubProtocol::State
+            },),
+            Period::Hour,
+            conn
+        ),
+        get_audit_stats(
+            filter_audits(AuditFilters {
+                strategy: StrategyFilter::StateRoots,
+                content_type: ContentTypeFilter::All,
+                success: SuccessFilter::All,
+                network: SubProtocol::State
+            },),
+            Period::Hour,
+            conn
+        ),
+        get_audit_stats(
+            filter_audits(AuditFilters {
+                strategy: StrategyFilter::All,
+                content_type: ContentTypeFilter::All,
+                success: SuccessFilter::All,
+                network: SubProtocol::Beacon
+            },),
+            Period::Hour,
+            conn
+        ),
+        get_audit_stats(
+            filter_audits(AuditFilters {
+                strategy: StrategyFilter::Latest,
+                content_type: ContentTypeFilter::All,
+                success: SuccessFilter::All,
+                network: SubProtocol::Beacon
+            },),
+            Period::Hour,
+            conn
+        ),
     );
 
     // Handle errors and get success rates.
@@ -223,6 +278,11 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
     let success_rate_fourfours_headers = fourfours_headers?.pass_percent;
     let success_rate_fourfours_bodies = fourfours_bodies?.pass_percent;
     let success_rate_fourfours_receipts = fourfours_receipts?.pass_percent;
+    let success_rate_state_all = state_all?.pass_percent;
+    let success_rate_state_latest = state_latest?.pass_percent;
+    let success_rate_state_state_roots = state_state_roots?.pass_percent;
+    let success_rate_beacon_all = beacon_all?.pass_percent;
+    let success_rate_beacon_latest = beacon_latest?.pass_percent;
 
     // Record the values.
     match audit_stats::create(
@@ -245,6 +305,11 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         success_rate_fourfours_headers,
         success_rate_fourfours_bodies,
         success_rate_fourfours_receipts,
+        success_rate_state_all,
+        success_rate_state_latest,
+        success_rate_state_state_roots,
+        success_rate_beacon_all,
+        success_rate_beacon_latest,
         conn,
     )
     .await
