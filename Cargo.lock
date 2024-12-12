@@ -2001,7 +2001,7 @@ dependencies = [
 [[package]]
 name = "ethportal-api"
 version = "0.3.0"
-source = "git+https://github.com/ethereum/trin?rev=580a72b9a0c059af82b67c7da7c8bd56ddb41ad2#580a72b9a0c059af82b67c7da7c8bd56ddb41ad2"
+source = "git+https://github.com/ethereum/trin?rev=e18427e8db833259b8af8238fc6453b4fb7b152a#e18427e8db833259b8af8238fc6453b4fb7b152a"
 dependencies = [
  "alloy",
  "alloy-rlp",
