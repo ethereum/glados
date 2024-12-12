@@ -184,7 +184,7 @@ function createMultiLineChart(height, width, dataSets) {
 
     tooltip.append("text")
         .attr("class", "tooltip-date")
-        .attr("y", marginTop / 2)
+        .attr("y", marginTop - 4)
         .attr("x", marginLeft)
         .attr("text-anchor", "middle")
         .attr("font-size", "12px")
