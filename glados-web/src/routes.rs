@@ -953,29 +953,29 @@ pub async fn census_timeseries(
         NodeStatus::find_by_statement(Statement::from_sql_and_values(
             DbBackend::Postgres,
             "
-            SELECT 
-                c.started_at AS census_time, 
+            SELECT
+                c.started_at AS census_time,
                 c.id AS census_id,
                 n.node_id,
                 r.id as enr_id,
-                CASE 
-                    WHEN r.id IS NOT NULL THEN true 
-                    ELSE false 
+                CASE
+                    WHEN r.id IS NOT NULL THEN true
+                    ELSE false
                 END AS present
-            FROM 
+            FROM
                 (
                     SELECT * FROM census
                     WHERE sub_network = $2
                     AND started_at >= NOW() - INTERVAL '1 day' * ($1 + 1)
                     AND started_at < NOW() - INTERVAL '1 day' * $1
                 ) AS c
-            LEFT JOIN 
+            LEFT JOIN
                 census_node AS cn ON c.id = cn.census_id
             LEFT JOIN
                 record AS r ON r.id = cn.record_id
-            LEFT JOIN 
+            LEFT JOIN
                 node AS n ON n.id = r.node_id
-            ORDER BY 
+            ORDER BY
                 c.started_at, n.node_id;",
             vec![days_ago.into(), subprotocol.into()],
         ))
@@ -1014,10 +1014,9 @@ pub async fn census_timeseries(
         error!(err=?e, "Failed to lookup census node timeseries data");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    let enr_id_map: HashMap<i32, String> = records.into_iter().map(|r| (r.id, r.raw)).collect();
 
     let (node_ids, censuses) = decouple_nodes_and_censuses(node_statuses);
-    let node_ids_with_nicknames: Vec<(String, Option<String>)> = node_ids
+    let found_node_ids_with_nicknames: Vec<(String, Option<String>)> = node_ids
         .iter()
         .map(|id| {
             if id.len() != 66 {
@@ -1034,6 +1033,27 @@ pub async fn census_timeseries(
 
             (id.clone(), nickname)
         })
+        .collect();
+
+    let missing_bootnodes_with_nicknames: Vec<(String, Option<String>)> = node::BOOTNODE_NICKNAMES
+        .iter()
+        .filter(|(id, _)| !node_ids.contains(id))
+        .map(|(id, nickname)| (id.clone(), Some(nickname.clone())))
+        .collect();
+
+    let missing_bootnodes_enrs = (-1..(-(missing_bootnodes_with_nicknames.len() as i32)))
+        .map(|index| (index, "not found in period".to_string()));
+
+    let node_ids_with_nicknames = [
+        found_node_ids_with_nicknames,
+        missing_bootnodes_with_nicknames,
+    ]
+    .concat();
+
+    let enr_id_map: HashMap<i32, String> = records
+        .into_iter()
+        .map(|r| (r.id, r.raw))
+        .chain(missing_bootnodes_enrs)
         .collect();
 
     Ok(Json(CensusTimeSeriesData {
@@ -1276,11 +1296,11 @@ async fn generate_radius_graph_data(
             ORDER BY started_at DESC
             LIMIT 1
         )
-        SELECT 
+        SELECT
             census_node.data_radius,
             record.raw,
             node.node_id
-        FROM 
+        FROM
             census_node,
             node,
             record,
@@ -1381,7 +1401,7 @@ async fn generate_client_diversity_data(
                 FROM key_value
                 WHERE convert_from(key, 'UTF8') = 'c'
             )
-            SELECT 
+            SELECT
                 CAST(COUNT(*) AS INTEGER) AS client_count,
                 CAST(COALESCE(substr(substr(right_table.value, 1, 2), length(substr(right_table.value, 1, 2)), 1), 'unknown') AS TEXT) AS client_name
             FROM left_table
