@@ -118,6 +118,7 @@ impl From<i32> for StateSelectionStrategy {
     fn from(value: i32) -> Self {
         match value {
             0 => StateSelectionStrategy::StateRoots,
+            1 => StateSelectionStrategy::Latest,
             _ => panic!("Invalid value for StateSelectionStrategy"),
         }
     }
@@ -128,6 +129,7 @@ impl TryFrom<String> for StateSelectionStrategy {
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.as_str() {
             "StateRoots" => Ok(StateSelectionStrategy::StateRoots),
+            "Latest" => Ok(StateSelectionStrategy::Latest),
             _ => bail!("Invalid value for StateSelectionStrategy {}", value),
         }
     }

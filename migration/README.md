@@ -6,7 +6,7 @@ Install
 cargo install sea-orm-cli
 ```
 Create (if none already created) a new blank postgres instance:
-`docker run --name postgres -e POSTGRES_DB=glados POSTGRES_PASSWORD=password -d -p 5432:5432 postgres`
+`docker run --name postgres -e POSTGRES_DB=glados -e POSTGRES_PASSWORD=password -d -p 5432:5432 postgres`
 `export DATABASE_URL=postgres://postgres:password@localhost:5432/glados`
 ```
 Generate all entities. Commands are made from the project root directory.
