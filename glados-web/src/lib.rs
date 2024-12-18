@@ -91,7 +91,18 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
             "/api/is-content-in-deadzone/:content_key",
             get(routes::is_content_in_deadzone),
         )
-        .route("/api/stat-history/", get(routes::get_audit_stats_handler))
+        .route(
+            "/api/stats-history/",
+            get(routes::get_history_audit_stats_handler),
+        )
+        .route(
+            "/api/stats-state/",
+            get(routes::get_state_audit_stats_handler),
+        )
+        .route(
+            "/api/stats-beacon/",
+            get(routes::get_beacon_audit_stats_handler),
+        )
         .route("/api/failed-keys/", get(routes::get_failed_keys_handler))
         .route(
             "/census/census-node-timeseries-data/",

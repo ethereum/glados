@@ -16,6 +16,7 @@ mod m20240720_111606_create_census_index;
 mod m20240814_121507_census_subnetwork;
 mod m20240919_121611_census_subnetwork_index;
 mod m20241010_151313_audit_stats_performance;
+mod m20241206_154045_add_beacon_and_state_audit_stats;
 
 pub struct Migrator;
 
@@ -39,6 +40,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20240814_121507_census_subnetwork::Migration),
             Box::new(m20240919_121611_census_subnetwork_index::Migration),
             Box::new(m20241010_151313_audit_stats_performance::Migration),
+            Box::new(m20241206_154045_add_beacon_and_state_audit_stats::Migration),
         ]
     }
 }
