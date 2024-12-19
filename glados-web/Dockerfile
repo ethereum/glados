@@ -33,8 +33,8 @@ FROM ubuntu:22.04
 RUN apt-get update
 
 # copy build artifacts from build stage
-COPY --from=builder ./glados/glados-web/assets/ /usr/bin/assets/
-COPY --from=builder ./glados/target/release/glados-web /usr/bin/
+COPY --from=builder /glados/glados-web/assets/ /usr/bin/assets/
+COPY --from=builder /glados/target/release/glados-web /usr/bin/
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 ENV RUST_LOG=info
