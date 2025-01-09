@@ -108,6 +108,9 @@ pub async fn get_audit_stats(
         .count(conn)
         .await? as u32;
 
+    // In case the numbers change in between queries, make sure passes don't exceed total audits
+    let total_passes = std::cmp::min(total_passes, total_audits);
+
     let total_failures = total_audits - total_passes;
 
     let audits_per_minute = (60 * total_audits)
