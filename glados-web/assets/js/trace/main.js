@@ -152,7 +152,7 @@ function createGraphData(trace) {
             nodesContacted: nodes.length - 1,
             nodesResponded: Object.keys(responses).length - 1
         },
-        contentId: '0x' + trace.targetId.map(byte => byte.toString(16).padStart(2, '0')).join(''),
+        contentId: trace.targetId,
     }
     console.log(graph);
     return graph;
