@@ -1159,6 +1159,54 @@ fn decouple_nodes_and_censuses(
     (node_ids, censuses)
 }
 
+#[derive(Debug, Clone, Serialize, FromQueryResult)]
+#[serde(rename_all = "camelCase")]
+pub struct CensusHistoryData {
+    census_id: i32,
+    start: DateTime<Utc>,
+    node_count: i64,
+}
+pub async fn weekly_census_history(
+    http_args: HttpQuery<HashMap<String, String>>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<CensusHistoryData>>, StatusCode> {
+    let weeks_ago: i32 = match http_args.get("weeks-ago") {
+        None => 0,
+        Some(days_ago) => days_ago.parse::<i32>().unwrap_or(0),
+    };
+
+    let subprotocol = get_subprotocol_from_params(&http_args);
+
+    let census_history: Vec<CensusHistoryData> =
+        CensusHistoryData::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "
+            SELECT
+                census.id AS census_id,
+                census.started_at AS start,
+                COUNT(1) AS node_count
+            FROM census
+            LEFT JOIN census_node ON census.id = census_node.census_id
+            WHERE
+                census.sub_network = $2 AND
+                started_at >= NOW() - INTERVAL '1 day' * ($1 + 1) AND
+                started_at < NOW() - INTERVAL '1 day' * $1
+            GROUP BY
+              census.id,
+              census.started_at
+            ORDER BY census.started_at
+        ",
+            vec![weeks_ago.into(), subprotocol.into()],
+        ))
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Failed to lookup census node timeseries data");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    Ok(Json(census_history))
+}
+
 pub async fn single_census_view(
     params: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,

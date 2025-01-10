@@ -104,6 +104,7 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
             get(routes::get_beacon_audit_stats_handler),
         )
         .route("/api/failed-keys/", get(routes::get_failed_keys_handler))
+        .route("/api/census-weekly/", get(routes::weekly_census_history))
         .route(
             "/census/census-node-timeseries-data/",
             get(routes::census_timeseries),
