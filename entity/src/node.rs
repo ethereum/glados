@@ -844,4 +844,11 @@ lazy_static! {
 
         nicknames
     };
+    pub static ref BOOTNODE_NICKNAMES: HashMap<String, String> = {
+        NODE_NICKNAME_MAP
+            .iter()
+            .filter(|(_, nickname)| nickname.contains("bootnode"))
+            .map(|(id, nickname)| (id.clone(), nickname.clone()))
+            .collect()
+    };
 }
