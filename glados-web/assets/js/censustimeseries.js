@@ -148,7 +148,8 @@ function createSquareChart(width, data) {
                 .attr("y", y(node.nodeId))
                 .attr("width", `${(width * 0.96) / data.censuses.length}px`)
                 .attr("height", y.bandwidth() + "px")
-                .attr("stroke-width", 1)
+                .attr("stroke-width", 0.1)
+                .attr("stroke", "rgb(245, 245, 245)")
                 .attr("fill", censusResult ? "green" : "gray");
 
             let title = "";
