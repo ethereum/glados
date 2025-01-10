@@ -21,8 +21,8 @@ use ethportal_api::utils::bytes::{hex_decode, hex_encode};
 use ethportal_api::{jsonrpsee::core::__reexports::serde_json, BeaconContentKey, StateContentKey};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use glados_core::stats::{
-    filter_audits, get_audit_stats, AuditFilters, ContentTypeFilter, Period, StrategyFilter,
-    SuccessFilter,
+    filter_audits, get_audit_stats, get_new_content_count, AuditFilters, ContentTypeFilter, Period,
+    StrategyFilter, SuccessFilter,
 };
 use migration::{Alias, Order};
 use sea_orm::sea_query::{Expr, Query};
@@ -78,11 +78,19 @@ pub async fn network_overview(
     };
 
     let radius_percentages = generate_radius_graph_data(&state, subprotocol).await;
+
+    let strategy: StrategyFilter = match subprotocol {
+        SubProtocol::History => StrategyFilter::FourFours,
+        SubProtocol::State => StrategyFilter::StateRoots,
+        SubProtocol::Beacon => StrategyFilter::Latest,
+    };
+
     // Run queries for content dashboard data concurrently
-    let (hour_stats, day_stats, week_stats) = tokio::join!(
+    let (hour_new, hour_stats, day_new, day_stats, week_new, week_stats) = tokio::join!(
+        get_new_content_count(subprotocol, Period::Hour, &state.database_connection,),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::FourFours,
+                strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
                 network: subprotocol,
@@ -90,9 +98,10 @@ pub async fn network_overview(
             Period::Hour,
             &state.database_connection,
         ),
+        get_new_content_count(subprotocol, Period::Day, &state.database_connection,),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::FourFours,
+                strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
                 network: subprotocol,
@@ -100,9 +109,10 @@ pub async fn network_overview(
             Period::Day,
             &state.database_connection,
         ),
+        get_new_content_count(subprotocol, Period::Week, &state.database_connection,),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::FourFours,
+                strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
                 network: subprotocol,
@@ -112,14 +122,19 @@ pub async fn network_overview(
         ),
     );
     // Get results from queries
+    let hour_new = hour_new.unwrap();
     let hour_stats = hour_stats.unwrap();
+    let day_new = day_new.unwrap();
     let day_stats = day_stats.unwrap();
+    let week_new = week_new.unwrap();
     let week_stats = week_stats.unwrap();
 
     let template = IndexTemplate {
+        strategy,
         client_diversity_data,
         average_radius_chart: radius_percentages,
         stats: [hour_stats, day_stats, week_stats],
+        new_content: [hour_new, day_new, week_new],
     };
     HtmlTemplate(template)
 }
@@ -783,15 +798,51 @@ pub async fn is_content_in_deadzone(
     Ok(Json(enrs))
 }
 
-pub async fn get_audit_stats_handler(
+pub async fn get_history_audit_stats_handler(
     http_args: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
-) -> Result<Json<Vec<audit_stats::Model>>, StatusCode> {
+) -> Result<Json<Vec<audit_stats::HistoryStats>>, StatusCode> {
     let weeks_ago: i32 = match http_args.get("weeks-ago") {
         None => 0,
         Some(days_ago) => days_ago.parse::<i32>().unwrap_or(0),
     };
-    let stats = audit_stats::get_recent_stats(&state.database_connection, weeks_ago)
+    let stats = audit_stats::get_weekly_history_stats(&state.database_connection, weeks_ago)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Could not look up audit stat history");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
+        .unwrap();
+
+    Ok(Json(stats))
+}
+pub async fn get_state_audit_stats_handler(
+    http_args: HttpQuery<HashMap<String, String>>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<audit_stats::StateStats>>, StatusCode> {
+    let weeks_ago: i32 = match http_args.get("weeks-ago") {
+        None => 0,
+        Some(days_ago) => days_ago.parse::<i32>().unwrap_or(0),
+    };
+    let stats = audit_stats::get_weekly_state_stats(&state.database_connection, weeks_ago)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Could not look up audit stat history");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
+        .unwrap();
+
+    Ok(Json(stats))
+}
+pub async fn get_beacon_audit_stats_handler(
+    http_args: HttpQuery<HashMap<String, String>>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<audit_stats::BeaconStats>>, StatusCode> {
+    let weeks_ago: i32 = match http_args.get("weeks-ago") {
+        None => 0,
+        Some(days_ago) => days_ago.parse::<i32>().unwrap_or(0),
+    };
+    let stats = audit_stats::get_weekly_beacon_stats(&state.database_connection, weeks_ago)
         .await
         .map_err(|e| {
             error!(err=?e, "Could not look up audit stat history");
