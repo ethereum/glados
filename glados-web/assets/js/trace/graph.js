@@ -82,7 +82,7 @@ function ForceGraph({
         .attr("width", width)
         .attr("height", height)
         .attr("viewBox", [-width / 2, -height / 2, width, height])
-        .attr("style", "max-width: 100%; height: auto; height: intrinsic;");
+        .attr("style", "max-width: 100%; height: auto; height: intrinsic; padding-left: 25px;");
 
     if (sortByNodeId) {
         // Add the vertical dotted line
