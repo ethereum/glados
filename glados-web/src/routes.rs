@@ -1172,7 +1172,7 @@ pub async fn weekly_census_history(
 ) -> Result<Json<Vec<CensusHistoryData>>, StatusCode> {
     let weeks_ago: i32 = match http_args.get("weeks-ago") {
         None => 0,
-        Some(days_ago) => days_ago.parse::<i32>().unwrap_or(0),
+        Some(weeks_ago) => weeks_ago.parse::<i32>().unwrap_or(0),
     };
 
     let subprotocol = get_subprotocol_from_params(&http_args);
@@ -1189,8 +1189,8 @@ pub async fn weekly_census_history(
             LEFT JOIN census_node ON census.id = census_node.census_id
             WHERE
                 census.sub_network = $2 AND
-                started_at >= NOW() - INTERVAL '1 day' * ($1 + 1) AND
-                started_at < NOW() - INTERVAL '1 day' * $1
+                started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
+                started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
               census.id,
               census.started_at

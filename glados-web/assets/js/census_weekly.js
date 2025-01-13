@@ -52,10 +52,7 @@ function createMultiLineChart(
   // Declare the y (vertical position) scale.
   const y = d3
     .scaleLinear()
-    .domain([
-      d3.min(dataSets.flat(), (d) => d.value) * 0.99,
-      d3.max(dataSets.flat(), (d) => d.value) * 1.01,
-    ])
+    .domain([0, d3.max(dataSets.flat(), (d) => d.value)])
     .range([height - marginBottom, marginTop]);
 
   svg
