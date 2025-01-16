@@ -3,6 +3,7 @@ use chrono::Utc;
 use cli::Args;
 use ethportal_api::{utils::bytes::hex_encode, HistoryContentKey, OverlayContentKey};
 use sea_orm::DatabaseConnection;
+use serde_json::json;
 use std::{
     collections::HashMap,
     sync::{
@@ -350,7 +351,7 @@ async fn perform_single_audit(
     );
     let (content_response, trace) = if client.supports_trace() {
         match client.api.get_content_with_trace(&task.content).await {
-            Ok(c) => c,
+            Ok((content_response, query_trace)) => (content_response, Some(query_trace)),
             Err(e) => {
                 error!(
                     content.key=hex_encode(&task.content.content_key),
@@ -363,7 +364,7 @@ async fn perform_single_audit(
         }
     } else {
         match client.api.get_content(&task.content).await {
-            Ok(c) => (c, "".to_owned()),
+            Ok(c) => (c, None),
             Err(e) => {
                 error!(
                     content.key=hex_encode(task.content.content_key),
@@ -409,7 +410,7 @@ async fn perform_single_audit(
         node_id,
         audit_result,
         task.strategy,
-        trace,
+        json!(trace).to_string(),
         &conn,
     )
     .await

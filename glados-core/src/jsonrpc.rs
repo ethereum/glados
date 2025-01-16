@@ -4,6 +4,7 @@ use alloy_primitives::hex::FromHexError;
 use entity::content;
 use ethportal_api::types::enr::Enr;
 use ethportal_api::types::portal::TraceContentInfo;
+use ethportal_api::types::query_trace::QueryTrace;
 use ethportal_api::utils::bytes::ByteUtilsError;
 use ethportal_api::{
     BeaconContentKey, BeaconNetworkApiClient, ContentKeyError, Discv5ApiClient, HistoryContentKey,
@@ -11,7 +12,6 @@ use ethportal_api::{
     StateNetworkApiClient, Web3ApiClient,
 };
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
-use serde_json::json;
 use thiserror::Error;
 use url::Url;
 
@@ -35,6 +35,7 @@ pub struct PortalClient {
 }
 
 const CONTENT_NOT_FOUND_ERROR_CODE: i32 = -39001;
+#[allow(clippy::large_enum_variant)]
 #[derive(Error, Debug)]
 pub enum JsonRpcError {
     #[error("received formatted response with no error, but contains a None result")]
@@ -97,16 +98,30 @@ pub enum JsonRpcError {
     ContentKeyError(#[from] ContentKeyError),
 
     #[error("Query completed without finding content")]
-    ContentNotFound { trace: Option<String> },
+    ContentNotFound { trace: Option<QueryTrace> },
+
+    #[error("Query trace was missing")]
+    MissingQueryTrace,
+
+    #[error("Invalid Query trace format")]
+    // The string is the raw input that was expected to be a QueryTrace
+    InvalidQueryTrace(String),
 }
 
 impl From<jsonrpsee::core::client::Error> for JsonRpcError {
     fn from(e: jsonrpsee::core::client::Error) -> Self {
         if let jsonrpsee::core::client::Error::Call(ref error) = e {
             if error.code() == CONTENT_NOT_FOUND_ERROR_CODE {
-                return JsonRpcError::ContentNotFound {
-                    trace: error.data().map(|data| data.to_string()),
-                };
+                return error
+                    .data()
+                    .map(|data| {
+                        let trace_str = data.to_string();
+                        serde_json::from_str(&trace_str)
+                            .map_or(JsonRpcError::InvalidQueryTrace(trace_str), |trace| {
+                                JsonRpcError::ContentNotFound { trace: Some(trace) }
+                            })
+                    })
+                    .unwrap_or(JsonRpcError::ContentNotFound { trace: None });
             }
         }
 
@@ -224,7 +239,7 @@ impl PortalApi {
     pub async fn get_content_with_trace(
         self,
         content: &content::Model,
-    ) -> Result<(Option<Content>, String), JsonRpcError> {
+    ) -> Result<(Option<Content>, QueryTrace), JsonRpcError> {
         match content.protocol_id {
             content::SubProtocol::History => {
                 match HistoryNetworkApiClient::trace_get_content(
@@ -237,11 +252,15 @@ impl PortalApi {
                         Some(Content {
                             raw: content.into(),
                         }),
-                        json!(trace).to_string(),
+                        trace,
                     )),
                     Err(err) => match err.into() {
                         JsonRpcError::ContentNotFound { trace } => {
-                            Ok((None, trace.unwrap_or_default()))
+                            if let Some(trace) = trace {
+                                Ok((None, trace))
+                            } else {
+                                Err(JsonRpcError::MissingQueryTrace)
+                            }
                         }
                         err => Err(err),
                     },
@@ -258,11 +277,15 @@ impl PortalApi {
                         Some(Content {
                             raw: content.into(),
                         }),
-                        json!(trace).to_string(),
+                        trace,
                     )),
                     Err(err) => match err.into() {
                         JsonRpcError::ContentNotFound { trace } => {
-                            Ok((None, trace.unwrap_or_default()))
+                            if let Some(trace) = trace {
+                                Ok((None, trace))
+                            } else {
+                                Err(JsonRpcError::MissingQueryTrace)
+                            }
                         }
                         err => Err(err),
                     },
@@ -279,11 +302,15 @@ impl PortalApi {
                         Some(Content {
                             raw: content.into(),
                         }),
-                        json!(trace).to_string(),
+                        trace,
                     )),
                     Err(err) => match err.into() {
                         JsonRpcError::ContentNotFound { trace } => {
-                            Ok((None, trace.unwrap_or_default()))
+                            if let Some(trace) = trace {
+                                Ok((None, trace))
+                            } else {
+                                Err(JsonRpcError::MissingQueryTrace)
+                            }
                         }
                         err => Err(err),
                     },
