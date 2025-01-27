@@ -1,6 +1,7 @@
 use anyhow::Result;
 use chrono::Utc;
 use cli::Args;
+use ethportal_api::types::query_trace::QueryTrace;
 use ethportal_api::{utils::bytes::hex_encode, HistoryContentKey, OverlayContentKey};
 use sea_orm::DatabaseConnection;
 use serde_json::json;
@@ -424,6 +425,10 @@ async fn perform_single_audit(
         return;
     };
 
+    if let Some(trace) = trace {
+        create_entry_for_failures(task.content.clone(), client_info_id, node_id, trace, &conn).await;
+    }
+
     // Display audit result.
     match task.content.protocol_id {
         SubProtocol::History => {
@@ -446,6 +451,22 @@ async fn perform_single_audit(
     }
 
     active_threads.fetch_sub(1, Ordering::Relaxed);
+}
+
+// For each transfer failure in the trace, create a new entry in the database.
+async fn create_entry_for_failures(
+    task_content: content::Model,
+    client_info_id: i32,
+    node_id: i32,
+    trace: QueryTrace,
+    conn: &DatabaseConnection,
+) {
+    // Create a list of the failures from the parsed trace json
+    for (sender_node_id, fail_type) in trace.failures.iter() {
+        // For now, just log out the failure, and related info.
+        // Later, write this data into a new table in the database.
+        info!("Found a new transfer failure: Sender: {sender_node_id}, FailureType: {fail_type:?}, ContentID: {}, recipient_client_info_id: {client_info_id}, recipient_node: {node_id}", task_content.id);
+    }
 }
 
 async fn display_history_audit_result(
