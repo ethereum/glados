@@ -2,6 +2,7 @@
 
 pub mod prelude;
 
+pub mod audit_internal_failure;
 pub mod audit_stats;
 pub mod census;
 pub mod census_node;
