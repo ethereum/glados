@@ -725,51 +725,6 @@ pub async fn is_content_in_deadzone(
     Path(content_key): Path<String>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<Vec<String>>, StatusCode> {
-    let builder = state.database_connection.get_database_backend();
-    let mut select_dead_zone_data = Query::select();
-    select_dead_zone_data
-        .expr(Expr::col((census_node::Entity, census_node::Column::DataRadius)))
-        .expr(Expr::col((node::Entity, node::Column::NodeId)))
-        .expr(Expr::col((record::Entity, record::Column::Raw)))
-        .from(census_node::Entity)
-        .from(node::Entity)
-        .from(record::Entity)
-        .from_subquery(
-            Query::select()
-                .from(census::Entity)
-                .expr_as(Expr::col(census::Column::StartedAt), Alias::new("started_at"))
-                .expr_as(Expr::col(census::Column::Duration), Alias::new("duration"))
-                .order_by(census::Column::StartedAt, Order::Desc)
-                .limit(1)
-                .take(),
-            Alias::new("latest_census"),
-        )
-        .and_where(
-            Expr::col((census_node::Entity, census_node::Column::SurveyedAt))
-                .gte(Expr::col((Alias::new("latest_census"), Alias::new("started_at")))),
-        )
-        .and_where(
-            Expr::col((census_node::Entity, census_node::Column::SurveyedAt))
-                .lt(Expr::cust(if builder == DbBackend::Sqlite {
-                    "STRFTIME('%Y-%m-%dT%H:%M:%S.%f', DATETIME(latest_census.started_at, '+' || latest_census.duration || ' seconds'))"
-                } else {
-                    "latest_census.started_at + latest_census.duration * interval '1 second'"
-                })),
-        )
-        .and_where(
-            Expr::col((census_node::Entity, census_node::Column::RecordId))
-                .eq(Expr::col((record::Entity, record::Column::Id))),
-        )
-        .and_where(
-            Expr::col((record::Entity, record::Column::NodeId))
-                .eq(Expr::col((node::Entity, node::Column::Id))),
-        );
-
-    let dead_zone_data_vec = DeadZoneData::find_by_statement(builder.build(&select_dead_zone_data))
-        .all(&state.database_connection)
-        .await
-        .unwrap();
-
     let content_id = if let Ok(content_key) =
         serde_json::from_value::<HistoryContentKey>(serde_json::json!(content_key))
     {
@@ -785,6 +740,34 @@ pub async fn is_content_in_deadzone(
     } else {
         return Err(StatusCode::BAD_REQUEST);
     };
+
+    // First byte can be extracted from content_key, since it is already sanitized
+    let sub_protocol: i32 = (content_key[2..4]).parse().unwrap();
+
+    let dead_zone_data_vec = DeadZoneData::find_by_statement(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "
+            SELECT
+                census_node.data_radius,
+                node.node_id,
+                record.raw
+            FROM census_node
+            JOIN record ON census_node.record_id = record.id
+            JOIN node ON record.node_id = node.id
+            WHERE census_node.census_id = (
+                SELECT MAX(id)
+                FROM census
+                WHERE sub_network = $1
+            )
+        ",
+        vec![sub_protocol.into()],
+    ))
+    .all(&state.database_connection)
+    .await
+    .map_err(|e| {
+        error!(err=?e, "Could not look up nodes with radius");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let mut enrs: Vec<String> = vec![];
     for dead_zone_data in dead_zone_data_vec {
