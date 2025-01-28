@@ -41,7 +41,7 @@ function ForceGraph({
 
     // Replace the input nodes and links with mutable objects for the simulation.
     if (sortByNodeId) {
-        nodes = d3.map(nodes, (node, i) => ({ id: N[i], fixedX: (calculateNodeIdX(node.id) * width) - (width / 2), ...node}));
+        nodes = d3.map(nodes, (node, i) => ({ id: N[i], fixedX: calculateNodeIdX(node.id, width) - (width / 2), ...node}));
     } else {
         nodes = d3.map(nodes, (_, i) => ({ id: N[i] }));
     }
@@ -60,7 +60,6 @@ function ForceGraph({
     if (linkStrength !== undefined) forceLink.strength(linkStrength);
 
     const paddingY = 50;
-    const xPadding = 0;
     let simulation;
 
     if (sortByNodeId) {
@@ -83,11 +82,11 @@ function ForceGraph({
         .attr("width", width)
         .attr("height", height)
         .attr("viewBox", [-width / 2, -height / 2, width, height])
-        .attr("style", "max-width: 100%; height: auto; height: intrinsic;");
+        .attr("style", "max-width: 100%; height: auto; height: intrinsic; padding-left: 25px;");
 
     if (sortByNodeId) {
         // Add the vertical dotted line
-        const contentIdMarkerX = calculateNodeIdX(contentId) * width;
+        const contentIdMarkerX = calculateNodeIdX(contentId, width);
         svg.append("line")
             .attr("x1", contentIdMarkerX - (width / 2))
             .attr("y1", -height / 2)
@@ -208,11 +207,9 @@ function enforceBorder(position, lowerLimit, upperLimit) {
     return position;
 }
 
-function calculateNodeIdX(nodeId) {
+const MAX_NODE_ID = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 
-    const nodeIdInt = BigInt(nodeId);
-    const maxNodeId = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    const nodeIdRatio = (Number(nodeIdInt.toString()) / Number(maxNodeId.toString()));
-    return nodeIdRatio;
-    
+function calculateNodeIdX(nodeId, width) {
+    const x_pos = BigInt(nodeId) * BigInt(Math.floor(width)) / MAX_NODE_ID;
+    return Number(x_pos);
 }
