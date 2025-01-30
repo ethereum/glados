@@ -14,9 +14,56 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(AuditInternalFailure::Table)
                     .if_not_exists()
-                    .col(pk_auto(Post::Id))
-                    .col(string(Post::Title))
-                    .col(string(Post::Text))
+                    .col(
+                        ColumnDef::new(AuditInternalFailure::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(AuditInternalFailure::Audit)
+                            .integer()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("FK_auditinternalfailure_audit")
+                            .from(AuditInternalFailure::Table, AuditInternalFailure::Audit)
+                            .to(Audit::Table, Audit::Id)
+                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_update(ForeignKeyAction::Cascade),
+                    )
+                    .col(
+                        ColumnDef::new(AuditInternalFailure::SenderClientInfo)
+                            .integer()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("FK_auditinternalfailure_sender_client_info")
+                            .from(
+                                AuditInternalFailure::Table,
+                                AuditInternalFailure::SenderClientInfo,
+                            )
+                            .to(ClientInfo::Table, ClientInfo::Id),
+                    )
+                    .col(
+                        ColumnDef::new(AuditInternalFailure::SenderNode)
+                            .integer()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("FK_auditinternalfailure_sender_node")
+                            .from(AuditInternalFailure::Table, AuditInternalFailure::SenderNode)
+                            .to(Node::Table, Node::Id),
+                    )
+                    .col(
+                        ColumnDef::new(AuditInternalFailure::FailureType)
+                            .integer()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await
