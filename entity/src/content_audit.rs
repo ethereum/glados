@@ -10,7 +10,7 @@ use sea_orm::{
     entity::prelude::*, strum::IntoEnumIterator, ActiveValue::NotSet, DbBackend, DeriveActiveEnum,
     FromQueryResult, Set, Statement, TryGetable,
 };
-use sea_query::{ArrayType, Nullable, SeaRc, ValueType, ValueTypeErr};
+use sea_query::{ArrayType, ColumnType, Nullable, SeaRc, Value, ValueType, ValueTypeErr};
 
 #[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
@@ -210,8 +210,8 @@ impl IntoEnumIterator for SelectionStrategy {
     }
 }
 
-#[derive(Debug, Iden)]
-#[iden = "selection_strategy"]
+#[derive(Debug, DeriveIden)]
+#[sea_orm(iden = "selection_strategy")]
 pub struct SelectionStrategyEnum;
 
 impl ActiveEnum for SelectionStrategy {
