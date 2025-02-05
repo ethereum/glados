@@ -231,7 +231,7 @@ function generateTable(nodes) {
         let tr = document.createElement("tr");
         tr.innerHTML = `<th scope="row">${index + 1}</th>
             <td>${enr_shortened}</td>
-            <td>${nodeIdString}</td>
+            <td><a href="/network/node/${node.id}/">${nodeIdString}</a></td>
             <td>${node.distanceLog2}</td>
             <td>${node.ip}:${node.port}</td>
             <td>${node.client === undefined ? "" : node.client}</td>
