@@ -44,17 +44,6 @@ impl ActiveModelBehavior for ActiveModel {}
 pub async fn get_or_create(enr: &Enr, conn: &DatabaseConnection) -> Result<Model> {
     let node_id = super::node::get_or_create(enr.node_id(), conn).await?;
 
-    // First try to lookup an existing entry.
-    if let Some(enr_model) = Entity::find()
-        .filter(Column::NodeId.eq(node_id.id))
-        .filter(Column::SequenceNumber.eq(enr.seq()))
-        .one(conn)
-        .await?
-    {
-        // If there is an existing record, return it
-        return Ok(enr_model);
-    }
-
     // Wrap-around large sequence numbers
     // TODO: migrate DB schema to use BigInt
     let seq: i32 = match enr.seq().try_into() {
@@ -67,6 +56,17 @@ pub async fn get_or_create(enr: &Enr, conn: &DatabaseConnection) -> Result<Model
             }
         }
     };
+
+    // First try to lookup an existing entry.
+    if let Some(enr_model) = Entity::find()
+        .filter(Column::NodeId.eq(node_id.id))
+        .filter(Column::SequenceNumber.eq(seq))
+        .one(conn)
+        .await?
+    {
+        // If there is an existing record, return it
+        return Ok(enr_model);
+    }
 
     // If no record exists, create one and return it
     let enr_model_unsaved = ActiveModel {
