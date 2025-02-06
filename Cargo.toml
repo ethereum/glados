@@ -24,10 +24,10 @@ alloy-primitives = "0.8.5"
 anyhow = "1.0.70"
 chrono = "0.4.24"
 clap = { version = "4.0.26", features = ["derive"] }
-enr = "0.10.0"
+enr = "0.13.0"
 entity = { path = "entity" }
 env_logger = "0.10.0"
-ethportal-api = { git = "https://github.com/ethereum/trin", rev = "e18427e8db833259b8af8238fc6453b4fb7b152a" }
+ethportal-api = "0.4.1"
 glados-core = { path = "glados-core" }
 glados-monitor = { path = "glados-monitor" }
 glados-audit = { path = "glados-audit" }
