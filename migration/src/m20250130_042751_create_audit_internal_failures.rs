@@ -32,20 +32,6 @@ impl MigrationTrait for Migration {
                             .on_update(ForeignKeyAction::Cascade),
                     )
                     .col(
-                        ColumnDef::new(AuditInternalFailure::SenderClientInfo)
-                            .integer()
-                            .not_null(),
-                    )
-                    .foreign_key(
-                        ForeignKey::create()
-                            .name("FK_auditinternalfailure_sender_client_info")
-                            .from(
-                                AuditInternalFailure::Table,
-                                AuditInternalFailure::SenderClientInfo,
-                            )
-                            .to(ClientInfo::Table, ClientInfo::Id),
-                    )
-                    .col(
                         ColumnDef::new(AuditInternalFailure::SenderNode)
                             .integer()
                             .not_null(),
@@ -80,8 +66,6 @@ enum AuditInternalFailure {
     // Foreign key
     Audit,
     // Foreign key
-    SenderClientInfo,
-    // Foreign key
     SenderNode,
     // Custom enum
     FailureType,
@@ -89,12 +73,6 @@ enum AuditInternalFailure {
 
 #[derive(Iden)]
 enum ContentAudit {
-    Table,
-    Id,
-}
-
-#[derive(Iden)]
-enum ClientInfo {
     Table,
     Id,
 }
