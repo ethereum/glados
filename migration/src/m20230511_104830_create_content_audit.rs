@@ -79,7 +79,7 @@ impl MigrationTrait for Migration {
     }
 }
 
-#[derive(Iden)]
+#[derive(DeriveIden)]
 enum ContentAudit {
     Table,
     Id,
@@ -92,19 +92,19 @@ enum ContentAudit {
     Trace,
 }
 
-#[derive(Iden)]
+#[derive(DeriveIden)]
 enum Node {
     Table,
     Id,
 }
 
-#[derive(Iden)]
+#[derive(DeriveIden)]
 enum ClientInfo {
     Table,
     Id,
 }
 
-#[derive(Iden)]
+#[derive(DeriveIden)]
 enum Content {
     Table,
     Id, // Database primary key
