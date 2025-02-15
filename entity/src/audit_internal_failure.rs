@@ -78,7 +78,7 @@ pub async fn create(
     conn: &DatabaseConnection,
 ) -> Result<Model> {
     // Get the 'id' database field representing the node with sender_node_id
-    let sender_node = node::get_or_create(sender_node_id, &conn).await?;
+    let sender_node = node::get_or_create(sender_node_id, conn).await?;
 
     let internal_failure = ActiveModel {
         audit: sea_orm::Set(audit_id),

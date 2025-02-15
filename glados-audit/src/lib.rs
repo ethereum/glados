@@ -473,7 +473,7 @@ async fn create_entry_for_failures(
         info!("Found a new transfer failure: Sender: {sender_node_id}, FailureType: {fail_type:?}, Audit ID: {}, recipient_client_info_id: {:?}, recipient_node: {node_id}", audit.id, audit.client_info);
 
         if let Err(e) =
-            audit_internal_failure::create(audit.id, sender_node_id, fail_type.into(), &conn).await
+            audit_internal_failure::create(audit.id, sender_node_id, fail_type.into(), conn).await
         {
             error!(
                 err=?e,
