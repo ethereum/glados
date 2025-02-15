@@ -1,6 +1,7 @@
 use anyhow::Result;
 use chrono::Utc;
 use cli::Args;
+use ethportal_api::types::query_trace::QueryTrace;
 use ethportal_api::{utils::bytes::hex_encode, HistoryContentKey, OverlayContentKey};
 use sea_orm::DatabaseConnection;
 use serde_json::json;
@@ -21,7 +22,7 @@ use tokio::{
 use tracing::{debug, error, info, warn};
 
 use entity::{
-    client_info,
+    audit_internal_failure, client_info,
     content::{self, SubProtocol},
     content_audit::{
         self, BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy,
@@ -404,7 +405,8 @@ async fn perform_single_audit(
             return;
         }
     };
-    if let Err(e) = content_audit::create(
+
+    let created_audit = content_audit::create(
         task.content.id,
         client_info_id,
         node_id,
@@ -413,16 +415,24 @@ async fn perform_single_audit(
         json!(trace).to_string(),
         &conn,
     )
-    .await
-    {
-        error!(
-            content.key=?task.content,
-            err=?e,
-            "Could not create audit entry in db."
-        );
-        active_threads.fetch_sub(1, Ordering::Relaxed);
-        return;
+    .await;
+
+    let created_audit: content_audit::Model = match created_audit {
+        Ok(inserted_audit) => inserted_audit,
+        Err(e) => {
+            error!(
+                content.key=?task.content,
+                err=?e,
+                "Could not create audit entry in db."
+            );
+            active_threads.fetch_sub(1, Ordering::Relaxed);
+            return;
+        }
     };
+
+    if let Some(trace) = trace {
+        create_entry_for_failures(created_audit, node_id, trace, &conn).await;
+    }
 
     // Display audit result.
     match task.content.protocol_id {
@@ -446,6 +456,31 @@ async fn perform_single_audit(
     }
 
     active_threads.fetch_sub(1, Ordering::Relaxed);
+}
+
+// For each transfer failure in the trace, create a new entry in the database.
+async fn create_entry_for_failures(
+    audit: content_audit::Model,
+    node_id: i32,
+    trace: QueryTrace,
+    conn: &DatabaseConnection,
+) {
+    // Create a list of the failures from the parsed trace json
+    for (sender_node_id, failure_entry) in trace.failures.into_iter() {
+        let fail_type = failure_entry.failure;
+        // For now, just log out the failure, and related info.
+        // Later, write this data into a new table in the database.
+        info!("Found a new transfer failure: Sender: {sender_node_id}, FailureType: {fail_type:?}, Audit ID: {}, recipient_client_info_id: {:?}, recipient_node: {node_id}", audit.id, audit.client_info);
+
+        if let Err(e) =
+            audit_internal_failure::create(audit.id, sender_node_id, fail_type.into(), conn).await
+        {
+            error!(
+                err=?e,
+                "Failed to insert audit transfer failure into database"
+            );
+        }
+    }
 }
 
 async fn display_history_audit_result(
