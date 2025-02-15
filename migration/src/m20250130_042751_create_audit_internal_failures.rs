@@ -39,7 +39,10 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .name("FK_auditinternalfailure_sender_node")
-                            .from(AuditInternalFailure::Table, AuditInternalFailure::SenderNode)
+                            .from(
+                                AuditInternalFailure::Table,
+                                AuditInternalFailure::SenderNode,
+                            )
                             .to(Node::Table, Node::Id),
                     )
                     .col(
