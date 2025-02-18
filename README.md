@@ -93,3 +93,26 @@ First, launch a portal client, like trin, with an HTTP endpoint. Assuming you al
 ```sh
 cargo run -p glados-audit -- --database-url postgres://postgres:password@localhost:5432/glados --history-strategy latest --portal-client http://localhost:8545
 ```
+
+## Running Tests Locally
+
+Generally, you can run the standard:
+
+```sh
+cargo test --all
+```
+
+See the following for some common issues:
+
+### Failed to start initdb
+
+The tests launch a temporary postgres instance using PgTemp. When running these tests locally, you may run into an error like:
+
+> Failed to start initdb. Is it installed and on your path?: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+If so, that can be fixed by putting `initdb` for the correct postgres version on your path. Currently, Glados is confirmed to work with postgres 16. See the docker-compose.yml file for the current confirmed postgres version. Put the `initdb` binary for that version on your path. For example, on Debian-flavored linux, with postgres 16 installed, you can permanently add the `initdb` binary to your path with the following command:
+
+```sh
+echo 'export PATH="/usr/lib/postgresql/16/bin:$PATH"' >> ~/.profile
+source ~/.profile
+```
