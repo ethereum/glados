@@ -5,3 +5,6 @@
 
 # most popular python virtual enviroment folder name
 venv
+
+# ctags files
+rusty-tags.*
