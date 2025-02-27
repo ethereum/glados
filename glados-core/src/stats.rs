@@ -22,9 +22,16 @@ use serde::Deserialize;
 pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
     // This base query will have filters added to it
     let audits = content_audit::Entity::find();
-    let audits = audits
-        .join(JoinType::InnerJoin, content_audit::Relation::Content.def())
-        .filter(content::Column::ProtocolId.eq(filters.network));
+    let audits = audits.join(
+        JoinType::LeftJoin,
+        content_audit::Relation::Content
+            .def()
+            .on_condition(move |_left, _right| {
+                content::Column::ProtocolId
+                    .eq(filters.network)
+                    .into_condition()
+            }),
+    );
     // Strategy filters
     let audits = match filters.strategy {
         StrategyFilter::All => audits,
