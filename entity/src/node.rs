@@ -843,47 +843,47 @@ lazy_static! {
         );
         nicknames.insert(
             "0x811aba898877c23e3b79b76f8f607392756c06ccb36c23bad4d23caf109fc343".to_string(),
-            "ultralight bootnode A4".to_string()
+            "ultralight bootnode A4".to_string(),
         );
         nicknames.insert(
             "0x29412e15c3b5fbcb9a564340c1a7fd430b9def54a26dfcadc4f83917033bc888".to_string(),
-            "ultralight bootnode B0".to_string()
+            "ultralight bootnode B0".to_string(),
         );
         nicknames.insert(
             "0xdedfdee9cfe1d391f17ad84652cca1e4cdb2d0cb113189dab98564d44bfc31e1".to_string(),
-            "ultralight bootnode B1".to_string()
+            "ultralight bootnode B1".to_string(),
         );
         nicknames.insert(
             "0xa232a70530fd6d84f899352f98ee662686bba1baf198b59d91197b3b2c3caca8".to_string(),
-            "ultralight bootnode B2".to_string()
+            "ultralight bootnode B2".to_string(),
         );
         nicknames.insert(
             "0xa4d57bf5a5b257d819520887f365d52fa075e264f8b74f135fd503bc9324ff40".to_string(),
-            "ultralight bootnode B3".to_string()
+            "ultralight bootnode B3".to_string(),
         );
         nicknames.insert(
             "0xb7c67f23d040346395829f5818d7b2bd4d66dbfd961db2b4c15b93aded406c26".to_string(),
-            "ultralight bootnode B4".to_string()
+            "ultralight bootnode B4".to_string(),
         );
         nicknames.insert(
             "0xeef7a92a7386989ef096e39422814b87c6adbc8076d4dd324864348967aebad6".to_string(),
-            "ultralight bootnode B5".to_string()
+            "ultralight bootnode B5".to_string(),
         );
         nicknames.insert(
             "0x8675259d5e9ee1344c2e1135ca97a081ab40452c6d872defe9e4159c1f23c7c3".to_string(),
-            "ultralight bootnode B6".to_string()
+            "ultralight bootnode B6".to_string(),
         );
         nicknames.insert(
             "0x8f13d0eba75f5bd98bcc5688742d57ca0f695440732e585310544156401db7f3".to_string(),
-            "ultralight bootnode B7".to_string()
+            "ultralight bootnode B7".to_string(),
         );
         nicknames.insert(
             "0xef75a4aecf52f34f90f14042bbc002075c3fe323eb24803629953083053c0320".to_string(),
-            "ultralight bootnode B8".to_string()
+            "ultralight bootnode B8".to_string(),
         );
         nicknames.insert(
             "0x88b9db5dbae3e62cb9b6248818509b758181addfc200ddae7a95b9a9021e4c6f".to_string(),
-            "ultralight bootnode B9".to_string()
+            "ultralight bootnode B9".to_string(),
         );
 
         nicknames
