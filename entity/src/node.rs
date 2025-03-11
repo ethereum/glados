@@ -885,6 +885,8 @@ lazy_static! {
             "0x88b9db5dbae3e62cb9b6248818509b758181addfc200ddae7a95b9a9021e4c6f".to_string(),
             "ultralight bootnode B9".to_string()
         );
+
+        nicknames
     };
     pub static ref BOOTNODE_NICKNAMES: HashMap<String, String> = {
         NODE_NICKNAME_MAP
