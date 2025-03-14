@@ -85,7 +85,7 @@ impl SeedTrait for Migrator {
         vec![SeedConfig {
             migration_name: "m20250311_115816_create_blocks".into(),
             // TODO(ktlxv): Update when file is uploaded
-            url: "http://192.168.2.70:8080/premerge.csv".into(),
+            url: "https://github.com/ethereum/glados/raw/refs/heads/master/datasets/mainnet/blocks/premerge.csv".into(),
             table: "block".into(),
         }]
     }
