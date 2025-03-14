@@ -35,7 +35,7 @@ pub enum ContentType {
 }
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "latest_fourfours_audit")]
+#[sea_orm(table_name = "audit_result_latest")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub content_id: i32,
