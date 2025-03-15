@@ -7,12 +7,13 @@ use axum::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use enr::NodeId;
-use entity::{audit_stats, census, census_node, client_info, content::SubProtocol};
 use entity::{
+    audit_result_latest::ContentType,
     content,
     content_audit::{self, AuditResult},
     execution_metadata, key_value, node, record,
 };
+use entity::{audit_stats, census, census_node, client_info, content::SubProtocol};
 use ethportal_api::types::{
     distance::{Distance, Metric, XorMetric},
     query_trace::QueryTrace,
@@ -29,14 +30,15 @@ use sea_orm::sea_query::{Expr, Query};
 use sea_orm::{sea_query::SimpleExpr, Statement};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult,
-    LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
+    Iterable, LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Formatter;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::{fmt::Display, io};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::templates::{
     AuditDashboardTemplate, AuditTableTemplate, CensusExplorerTemplate, ContentAuditDetailTemplate,
@@ -130,11 +132,13 @@ pub async fn network_overview(
     let week_stats = week_stats.unwrap();
 
     let template = IndexTemplate {
+        subprotocol,
         strategy,
         client_diversity_data,
         average_radius_chart: radius_percentages,
         stats: [hour_stats, day_stats, week_stats],
         new_content: [hour_new, day_new, week_new],
+        content_types: ContentType::iter().collect(),
     };
     HtmlTemplate(template)
 }
@@ -434,6 +438,7 @@ pub async fn contentkey_list(
             error!(key.count=KEY_COUNT, err=?e, "Could not look up keys");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
+
     let template = ContentKeyListTemplate { contentkey_list };
     Ok(HtmlTemplate(template))
 }
@@ -1188,6 +1193,101 @@ pub async fn weekly_census_history(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
     Ok(Json(census_history))
+}
+
+#[derive(Debug, Clone, Serialize, FromQueryResult)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditBlockStatusData {
+    start: DateTime<Utc>,
+    success: i64,
+    error: i64,
+    unaudited: i64,
+}
+pub async fn audit_block_status(
+    http_args: HttpQuery<HashMap<String, String>>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<AuditBlockStatusData>>, StatusCode> {
+    const GENESIS_TIMESTAMP: &str = "1438269976"; // 2015-07-30 15:26:13
+    const LAST_MINED_BLOCK_TIMESTAMP: &str = "1663224162"; // 2022-09-15 06:42:42
+    const BIN_COUNT: i64 = 80; // ~200k blocks per bin for all pre-merge data
+
+    let Ok(start) = i64::from_str(
+        http_args
+            .get("start")
+            .unwrap_or(&(GENESIS_TIMESTAMP.to_string())),
+    ) else {
+        debug!("Audit Block Status: invalid start argument");
+        return Err(StatusCode::BAD_REQUEST);
+    };
+
+    let Ok(end) = i64::from_str(
+        http_args
+            .get("end")
+            .unwrap_or(&(LAST_MINED_BLOCK_TIMESTAMP.to_string())),
+    ) else {
+        debug!("Audit Block Status: invalid end argument");
+        return Err(StatusCode::BAD_REQUEST);
+    };
+
+    let interval_size_seconds: i64 = (end - start) / BIN_COUNT;
+
+    let Ok(content_type) =
+        ContentType::from_str(http_args.get("content_type").unwrap_or(&("".to_string())))
+    else {
+        debug!("Audit Block Status: invalid content_type argument");
+        return Err(StatusCode::BAD_REQUEST);
+    };
+
+    let audit_block_status: Vec<AuditBlockStatusData> =
+    AuditBlockStatusData::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "
+            SELECT
+              start,
+              success,
+              error,
+              (COALESCE((LEAD(number) OVER (ORDER BY start)), last_block) - number) - (success + error) AS unaudited
+            FROM (
+              SELECT
+                 date_bin($1 * INTERVAL '1 second' , first_available_at, TO_TIMESTAMP($2)) AS start,
+                 SUM(CASE WHEN RESULT = 1 THEN 1 ELSE 0 END) AS success,
+                 SUM(CASE WHEN RESULT = 0 THEN 1 ELSE 0 END) AS error,
+                 0::INT8 AS unaudited
+              FROM public.audit_result_latest
+              WHERE
+                 content_type = $4 AND
+                 first_available_at >= TO_TIMESTAMP($2) AND
+                 first_available_at <= TO_TIMESTAMP($3)
+              GROUP BY 1
+            ) ranges,
+            LATERAL (
+              SELECT
+                number,
+                timestamp
+              FROM block
+              WHERE ranges.start <= block.timestamp
+              ORDER BY timestamp
+              LIMIT 1
+            )
+            CROSS JOIN (
+              SELECT number AS last_block
+                FROM block
+                WHERE timestamp <= TO_TIMESTAMP($3)
+                ORDER BY timestamp DESC
+                LIMIT 1
+            ) AS max_block_number
+            ORDER BY start
+            ",
+            vec![interval_size_seconds.into(), start.into(), end.into(), content_type.into()],
+        ))
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Failed to lookup audit block status data");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(audit_block_status))
 }
 
 pub async fn single_census_view(
