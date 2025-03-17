@@ -81,6 +81,9 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
         ContentTypeFilter::Receipts => {
             audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x02").into_condition())
         }
+        ContentTypeFilter::HeadersByNumber => {
+            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x03").into_condition())
+        }
         ContentTypeFilter::AccountTrieNodes => {
             audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x20").into_condition())
         }
@@ -249,4 +252,5 @@ pub enum ContentTypeFilter {
     Receipts,
     AccountTrieNodes,
     BlockRoots,
+    HeadersByNumber,
 }

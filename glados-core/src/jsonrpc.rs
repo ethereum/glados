@@ -157,12 +157,15 @@ impl PortalClient {
 impl PortalApi {
     pub async fn new(client_url: String) -> Result<Self, JsonRpcError> {
         let http_prefix = "http://";
-        let client = if client_url.strip_prefix(http_prefix).is_some() {
+        let https_prefix = "https://";
+        let client = if client_url.strip_prefix(http_prefix).is_some()
+            || client_url.strip_prefix(https_prefix).is_some()
+        {
             HttpClientBuilder::default()
                 .request_timeout(Duration::from_secs(120))
                 .build(client_url)?
         } else {
-            panic!("None supported RPC interface {client_url}, use http.");
+            panic!("Not supported RPC interface {client_url}, use http(s).");
         };
 
         Ok(PortalApi { client })

@@ -178,7 +178,7 @@ function radius_stacked_chart(data) {
 function radius_node_id_scatter_chart(data) {
     const margin = {top: 40, right: 2.5, bottom: 50, left: 37},
         width = 475 - margin.left - margin.right,
-        height = 425 - margin.top - margin.bottom;
+        height = 485 - margin.top - margin.bottom;
 
     // append the svg object to the body of the page
     const svg = d3.select("#census-scatterplot")

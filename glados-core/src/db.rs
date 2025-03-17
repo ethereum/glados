@@ -33,6 +33,7 @@ pub async fn store_block_keys(
     conn: &DatabaseConnection,
 ) -> Vec<content::Model> {
     let header = HistoryContentKey::new_block_header_by_hash(*block_hash);
+    let header_by_number = HistoryContentKey::new_block_header_by_number(block_number as u64);
     let body = HistoryContentKey::BlockBody(BlockBodyKey {
         block_hash: *block_hash,
     });
@@ -42,7 +43,16 @@ pub async fn store_block_keys(
 
     let header = store_content_key(
         &header,
-        "block_header",
+        "block_header_by_hash",
+        block_number,
+        available_at,
+        conn,
+        SubProtocol::History,
+    )
+    .await;
+    let header_by_number = store_content_key(
+        &header_by_number,
+        "block_header_by_number",
         block_number,
         available_at,
         conn,
@@ -71,6 +81,9 @@ pub async fn store_block_keys(
     let mut returned_values = vec![];
     if let Some(header) = header {
         returned_values.push(header);
+    }
+    if let Some(header_by_number) = header_by_number {
+        returned_values.push(header_by_number);
     }
     if let Some(body) = body {
         returned_values.push(body);
