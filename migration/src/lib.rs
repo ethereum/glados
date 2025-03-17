@@ -53,6 +53,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250314_144135_add_history_headers_by_number_audit_stats::Migration),
             Box::new(m20250311_115816_create_blocks::Migration),
             Box::new(m20250311_121724_create_audit_result_latest::Migration),
+            Box::new(m20250314_144135_add_history_headers_by_number_audit_stats::Migration),
         ]
     }
 }
