@@ -29,6 +29,10 @@ database table creation.
     follow-head \
     --provider-url https://mainnet.infura.io/v3/<api-key>
 ```
+Seed pre-merge block data to the database, for old blocks a RPC endpoint is not needed.
+```command
+~/glados$ RUST_LOG=glados_monitor=info cargo run -p glados-monitor -- --database-url postgres://<user>:<password>@localhost:5432/<database> seed --table-name block
+```
 Start `glados-audit`, which takes monitoring data from the glados database,
 checks if `trin` has it, then records the outcome in the glados database.
 ```command
