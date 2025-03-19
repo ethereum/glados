@@ -1,19 +1,8 @@
-use clap::{Parser, Subcommand};
+use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-pub struct Cli {
+pub struct Args {
     #[arg(short, long)]
     pub database_url: String,
-
-    #[arg(short, long, default_value = "false")]
-    pub skip_seeding: bool,
-
-    #[command(subcommand)]
-    pub command: Option<Commands>,
-}
-
-#[derive(Subcommand, Debug)]
-pub enum Commands {
-    Seed { table_name: String },
 }
