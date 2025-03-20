@@ -9,6 +9,8 @@
 <script src="/static/js/radiusdensity.js"></script>
 <script src="/static/js/stats_history.js"></script>
 <script src="/static/js/explanations.js"></script>
+
+<link href="/static/css/spin.css" rel="stylesheet" />
 {% endblock %}
 
 {% block content %}
@@ -116,6 +118,8 @@
                 </div>
             </div>
         </div>
+    </div>
+    <div class="row">
         <div class="col-lg-13 col-md-18 col-sm-18 margin-bottom">
             <div class="card pie-box h-100">
                 <div class="card-body">
@@ -148,7 +152,37 @@
                 </div>
             </div>
         </div>
-        <div class="col-lg-13 col-md-18 col-sm-18 margin-bottom">
+    </div>
+  {% if subprotocol == SubProtocol::History %}
+    <div class="row">
+        <div class="col-lg-12 col-md-12 col-sm-12 margin-bottom">
+            <div class="card pie-box h-100">
+                <div class="card-body">
+                    <button class="question-mark" aria-label="Toggle explanation"></button>
+                    <div class="explanation">
+                        This graph shows the result of the latest audit for each block
+                    </div>
+                    <div class="table-responsive">
+                        <select
+                            id="audit-block-status-content-type"
+                            class="form-select"
+                            style="width: auto"
+                        >
+                        {% for content_type in content_types %}
+                            <option value = "{{content_type.get_serializations()[0]}}">{{content_type.get_message().unwrap()}}</option>
+                        {% endfor %}
+                        </select>
+                        <div id="audit-block-status-graph-container" style="position: relative">
+                            <div id="audit-block-status-graph"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+  {% endif %}
+    <div class="row">
+        <div class="col-lg-12 col-md-12 col-sm-12 margin-bottom">
             <div class="card pie-box h-100">
                 <div class="card-body">
                     <button class="question-mark" aria-label="Toggle explanation"></button>
@@ -162,7 +196,6 @@
             </div>
         </div>
     </div>
-
 </div>
 <script>
     pie_chart_count({{ client_diversity_data| json | safe }});
@@ -175,6 +208,9 @@
 <script type="module">
     import {censusWeeklyChart} from "../static/js/census_weekly.js";
     censusWeeklyChart();
+
+    import {auditBlockStatusChart} from "../static/js/audit_block_status.js";
+    auditBlockStatusChart();
 </script>
 
 {% endblock %}

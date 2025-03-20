@@ -7,7 +7,7 @@ use glados_monitor::{
     panda_ops_web3, run_glados_monitor, run_glados_monitor_beacon,
     state::{follow_head_state_command, populate_state_roots_range_command},
 };
-use migration::{Migrator, MigratorTrait};
+use migration::{Migrator, MigratorTrait, SeedTrait};
 use sea_orm::{Database, DatabaseConnection};
 use tokio::{signal, task};
 use tracing::{debug, info};
@@ -95,6 +95,10 @@ async fn main() -> Result<()> {
                 provider_url.to_string(),
                 *concurrency,
             ))
+        }
+        Some(Commands::Seed { table_name }) => {
+            info!("Running seed");
+            task::spawn(Migrator::seed_by_table(conn, table_name.to_string()))
         }
         &None => {
             info!("No command specified");
