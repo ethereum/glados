@@ -22,9 +22,9 @@ mod m20240919_121611_census_subnetwork_index;
 mod m20241010_151313_audit_stats_performance;
 mod m20241206_154045_add_beacon_and_state_audit_stats;
 mod m20250130_042751_create_audit_internal_failures;
-mod m20250314_144135_add_history_headers_by_number_audit_stats;
 mod m20250311_115816_create_blocks;
 mod m20250311_121724_create_audit_result_latest;
+mod m20250314_144135_add_history_headers_by_number_audit_stats;
 
 pub struct Migrator;
 
