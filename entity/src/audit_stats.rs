@@ -34,6 +34,10 @@ pub struct Model {
     pub success_rate_state_state_roots: f32,
     pub success_rate_beacon_all: f32,
     pub success_rate_beacon_latest: f32,
+    pub success_rate_history_all_headers_by_number: f32,
+    pub success_rate_history_latest_headers_by_number: f32,
+    pub success_rate_history_random_headers_by_number: f32,
+    pub success_rate_history_four_fours_headers_by_number: f32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -67,6 +71,10 @@ pub async fn create(
     success_rate_state_state_roots: f32,
     success_rate_beacon_all: f32,
     success_rate_beacon_latest: f32,
+    success_rate_history_all_headers_by_number: f32,
+    success_rate_history_latest_headers_by_number: f32,
+    success_rate_history_random_headers_by_number: f32,
+    success_rate_history_four_fours_headers_by_number: f32,
     conn: &DatabaseConnection,
 ) -> Result<Model> {
     let audit_stats = ActiveModel {
@@ -95,6 +103,16 @@ pub async fn create(
         success_rate_state_state_roots: Set(success_rate_state_state_roots),
         success_rate_beacon_all: Set(success_rate_beacon_all),
         success_rate_beacon_latest: Set(success_rate_beacon_latest),
+        success_rate_history_all_headers_by_number: Set(success_rate_history_all_headers_by_number),
+        success_rate_history_latest_headers_by_number: Set(
+            success_rate_history_latest_headers_by_number,
+        ),
+        success_rate_history_random_headers_by_number: Set(
+            success_rate_history_random_headers_by_number,
+        ),
+        success_rate_history_four_fours_headers_by_number: Set(
+            success_rate_history_four_fours_headers_by_number,
+        ),
     };
     Ok(audit_stats.insert(conn).await?)
 }
@@ -121,6 +139,10 @@ pub struct HistoryStats {
     success_rate_four_fours_headers: f32,
     success_rate_four_fours_bodies: f32,
     success_rate_four_fours_receipts: f32,
+    success_rate_history_all_headers_by_number: f32,
+    success_rate_history_latest_headers_by_number: f32,
+    success_rate_history_random_headers_by_number: f32,
+    success_rate_history_four_fours_headers_by_number: f32,
 }
 
 #[derive(Clone, Debug, Serialize, FromQueryResult)]
@@ -181,6 +203,10 @@ pub async fn get_weekly_history_stats(
             Column::SuccessRateFourFoursHeaders,
             Column::SuccessRateFourFoursBodies,
             Column::SuccessRateFourFoursReceipts,
+            Column::SuccessRateHistoryAllHeadersByNumber,
+            Column::SuccessRateHistoryLatestHeadersByNumber,
+            Column::SuccessRateHistoryRandomHeadersByNumber,
+            Column::SuccessRateHistoryFourFoursHeadersByNumber,
         ])
         .filter(Column::Timestamp.gt(beginning))
         .filter(Column::Timestamp.lt(end))

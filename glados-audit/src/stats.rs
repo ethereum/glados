@@ -47,6 +47,10 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         state_state_roots,
         beacon_all,
         beacon_latest,
+        history_all_headers_by_number,
+        history_latest_headers_by_number,
+        history_random_headers_by_number,
+        history_fourfours_headers_by_number,
     ) = tokio::join!(
         get_audit_stats(
             filter_audits(AuditFilters {
@@ -258,6 +262,46 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             Period::Hour,
             conn
         ),
+        get_audit_stats(
+            filter_audits(AuditFilters {
+                strategy: StrategyFilter::All,
+                content_type: ContentTypeFilter::HeadersByNumber,
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
+            Period::Hour,
+            conn
+        ),
+        get_audit_stats(
+            filter_audits(AuditFilters {
+                strategy: StrategyFilter::Latest,
+                content_type: ContentTypeFilter::HeadersByNumber,
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
+            Period::Hour,
+            conn
+        ),
+        get_audit_stats(
+            filter_audits(AuditFilters {
+                strategy: StrategyFilter::Random,
+                content_type: ContentTypeFilter::HeadersByNumber,
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
+            Period::Hour,
+            conn
+        ),
+        get_audit_stats(
+            filter_audits(AuditFilters {
+                strategy: StrategyFilter::FourFours,
+                content_type: ContentTypeFilter::HeadersByNumber,
+                success: SuccessFilter::All,
+                network: SubProtocol::History
+            },),
+            Period::Hour,
+            conn
+        ),
     );
 
     // Handle errors and get success rates.
@@ -283,6 +327,13 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
     let success_rate_state_state_roots = state_state_roots?.pass_percent;
     let success_rate_beacon_all = beacon_all?.pass_percent;
     let success_rate_beacon_latest = beacon_latest?.pass_percent;
+    let success_rate_history_all_headers_by_number = history_all_headers_by_number?.pass_percent;
+    let success_rate_history_latest_headers_by_number =
+        history_latest_headers_by_number?.pass_percent;
+    let success_rate_history_random_headers_by_number =
+        history_random_headers_by_number?.pass_percent;
+    let success_rate_history_fourfours_headers_by_number =
+        history_fourfours_headers_by_number?.pass_percent;
 
     // Record the values.
     match audit_stats::create(
@@ -310,6 +361,10 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         success_rate_state_state_roots,
         success_rate_beacon_all,
         success_rate_beacon_latest,
+        success_rate_history_all_headers_by_number,
+        success_rate_history_latest_headers_by_number,
+        success_rate_history_random_headers_by_number,
+        success_rate_history_fourfours_headers_by_number,
         conn,
     )
     .await
