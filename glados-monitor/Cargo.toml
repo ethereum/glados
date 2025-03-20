@@ -16,10 +16,10 @@ chrono.workspace = true
 entity.workspace = true
 env_logger.workspace = true
 ethportal-api.workspace = true
-futures = "0.3.21"
+futures.workspace = true
 glados-core.workspace = true
 migration.workspace = true
-reqwest = { version = "0.11.6", default-features = false, features = ["rustls-tls"] }
+reqwest.workspace = true
 sea-orm.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

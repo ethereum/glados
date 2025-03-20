@@ -84,4 +84,8 @@ pub enum Commands {
         #[arg(short, long, default_value = "100")]
         concurrency: u32,
     },
+    Seed {
+        #[arg(short, long, help = "The name of the table to seed")]
+        table_name: String,
+    },
 }

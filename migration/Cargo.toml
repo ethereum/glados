@@ -11,7 +11,13 @@ name = "migration"
 path = "src/lib.rs"
 
 [dependencies]
+anyhow.workspace = true
 async-std = { version = "^1", features = ["attributes", "tokio1"] }
+futures.workspace = true
+reqwest.workspace = true
+sea-orm.workspace = true
+tokio-util = "0.7.13"
+tracing.workspace = true
 
 [dependencies.sea-orm-migration]
 version = "^0.11.3"

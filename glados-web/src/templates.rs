@@ -3,7 +3,10 @@ use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Response},
 };
+use sea_orm::strum::EnumMessage;
+
 use entity::{
+    audit_result_latest::ContentType,
     client_info,
     content::{self, SubProtocol},
     content_audit, execution_metadata, key_value, node, record,
@@ -17,11 +20,13 @@ use glados_core::stats::{AuditStats, StrategyFilter};
 #[derive(Template)]
 #[template(path = "index.html")]
 pub struct IndexTemplate {
+    pub subprotocol: SubProtocol,
     pub strategy: StrategyFilter,
     pub client_diversity_data: Vec<ClientDiversityResult>,
     pub average_radius_chart: Vec<CalculatedRadiusChartData>,
     pub stats: [AuditStats; 3],
     pub new_content: [u32; 3],
+    pub content_types: Vec<ContentType>,
 }
 
 #[derive(Template)]
