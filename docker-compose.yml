@@ -7,8 +7,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${GLADOS_POSTGRES_PASSWORD?Glados Postgres Password Required}
       POSTGRES_DB: glados
-      PANDAOPS_ID: ${GLADOS_PANDAOPS_ID?Glados Pandaops ID Required}
-      PANDAOPS_SECRET: ${GLADOS_PANDAOPS_SECRET?Glados Pandaops Secret Required}
     volumes:
       - ${GLADOS_POSTGRES_DATA_DIR?Glados Postgres Data Directory Required}:/var/lib/postgresql/data
     ports:
@@ -92,12 +90,10 @@ services:
     restart: always
 
   glados_monitor_beacon:
-    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados follow-beacon-pandaops"
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados follow-beacon --beacon-base-url ${GLADOS_BEACON_PROVIDER_URL?Glados monitor beacon provider URL required}"
     image: portalnetwork/glados-monitor:latest
     environment:
       RUST_LOG: warn,glados_monitor=info
-      PANDAOPS_CLIENT_ID: ${GLADOS_PANDAOPS_ID?Glados Pandaops ID Required}
-      PANDAOPS_CLIENT_SECRET: ${GLADOS_PANDAOPS_SECRET?Glados Pandaops Secret Required}
     depends_on:
       - glados_audit
       - glados_postgres
