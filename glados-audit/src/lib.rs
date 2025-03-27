@@ -47,8 +47,6 @@ pub(crate) mod validation;
 pub struct AuditConfig {
     /// For Glados-related data.
     pub database_url: String,
-    /// For getting on-the-fly block information.
-    pub provider_url: String,
     /// Audit History
     pub history: bool,
     /// Specific history audit strategies to run.
@@ -111,14 +109,6 @@ impl AuditConfig {
             };
             weights.insert(strat.clone(), weight);
         }
-        if args.provider_url.is_empty()
-            && args.history
-            && strategies.contains(&HistorySelectionStrategy::FourFours)
-        {
-            return Err(anyhow::anyhow!(
-                "No provider URL provided, required when `four_fours` strategy is enabled."
-            ));
-        }
         let mut portal_clients: Vec<PortalClient> = vec![];
         for client_url in args.portal_client {
             let client = PortalClient::from(client_url).await?;
@@ -127,7 +117,6 @@ impl AuditConfig {
         }
         Ok(AuditConfig {
             database_url: args.database_url,
-            provider_url: args.provider_url,
             weights,
             concurrency: args.concurrency,
             portal_clients,
@@ -245,7 +234,6 @@ async fn start_audit(
             strategy.clone(),
             tx,
             conn.clone(),
-            config.clone(),
         ));
     }
     // Collation of generated tasks, taken proportional to weights.

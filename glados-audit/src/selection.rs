@@ -15,12 +15,12 @@ use tokio::{
 use tracing::{debug, error, warn};
 
 use entity::{
+    block,
     content::{self, SubProtocol},
     content_audit::{self, BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy},
 };
-use web3::types::{BlockId, BlockNumber};
 
-use crate::{AuditConfig, AuditTask};
+use crate::AuditTask;
 
 pub const MERGE_BLOCK_HEIGHT: i32 = 15537393;
 
@@ -28,7 +28,6 @@ pub async fn start_audit_selection_task(
     strategy: SelectionStrategy,
     tx: mpsc::Sender<AuditTask>,
     conn: DatabaseConnection,
-    config: AuditConfig,
 ) {
     match &strategy {
         SelectionStrategy::History(HistorySelectionStrategy::Latest)
@@ -39,9 +38,7 @@ pub async fn start_audit_selection_task(
             select_random_content_for_audit(tx, conn).await
         }
         SelectionStrategy::History(HistorySelectionStrategy::FourFours) => {
-            // Fourfours strategy downloads its own keys rather than waiting on glados-monitor to put them in the DB.
-            let w3 = web3::Web3::new(web3::transports::Http::new(&config.provider_url).unwrap());
-            select_fourfours_content_for_audit(tx, conn, w3).await
+            select_fourfours_content_for_audit(tx, conn).await
         }
         SelectionStrategy::History(HistorySelectionStrategy::Failed) => {
             warn!("Need to implement SelectionStrategy::Failed")
@@ -151,7 +148,6 @@ async fn select_latest_content_for_audit(
 async fn select_fourfours_content_for_audit(
     tx: mpsc::Sender<AuditTask>,
     conn: DatabaseConnection,
-    w3: web3::Web3<web3::transports::Http>,
 ) -> ! {
     let mut interval = interval(Duration::from_secs(5));
 
@@ -162,14 +158,14 @@ async fn select_fourfours_content_for_audit(
             strategy = "4444s",
             "Getting hash for block number {block_number}."
         );
-        let block = match w3
-            .eth()
-            .block(BlockId::Number(BlockNumber::Number(block_number.into())))
+        let block = match block::Entity::find()
+            .filter(block::Column::Number.eq(block_number))
+            .one(&conn)
             .await
         {
             Ok(Some(block)) => block,
             Ok(None) => {
-                error!(strategy = "4444s", block.number=?block_number, "Block not found");
+                error!(strategy = "4444s", block.number=?block_number, "Block not found. Is the block table seeded?");
                 continue;
             }
             Err(err) => {
@@ -178,24 +174,13 @@ async fn select_fourfours_content_for_audit(
             }
         };
 
-        let block_hash = block.hash.unwrap();
-
-        let timestamp = block.timestamp.as_u64() as i64;
-        let block_timestamp = match Utc.timestamp_opt(timestamp, 0) {
-            chrono::LocalResult::Single(time) => time,
-            _ => {
-                error!(block.number=?block_number, block.timestamp=?timestamp, "Could not convert timestamp");
-                continue;
-            }
+        let Ok(block_hash) = block.hash.as_slice().try_into() else {
+            error!(strategy = "4444s", block.number=?block_number,  "Error parsing block hash");
+            continue;
         };
 
-        let items_to_audit = store_block_keys(
-            block_number,
-            block_hash.as_fixed_bytes(),
-            block_timestamp,
-            &conn,
-        )
-        .await;
+        let items_to_audit =
+            store_block_keys(block_number, block_hash, block.timestamp.into(), &conn).await;
         debug!(
             strategy = "4444s",
             item_count = items_to_audit.len(),

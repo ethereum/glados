@@ -2553,7 +2553,6 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
- "web3",
 ]
 
 [[package]]
