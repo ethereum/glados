@@ -213,7 +213,7 @@ async function loadChart() {
     .attr("text-anchor", "middle")
     .attr("x", width / 2)
     .attr("y", marginTop / 2)
-    .text("Status of latest audit per block (pre-merge)");
+    .text("Status of latest 4444 audit per block");
 
   const tooltip = d3
     .select("body")
