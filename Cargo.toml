@@ -2,7 +2,7 @@
 name = "glados"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.81.0"
+rust-version = "1.85.0"
 authors = ["Piper Merriam <piper@pipermerriam.com>"]
 
 [workspace]
@@ -27,7 +27,7 @@ clap = { version = "4.0.26", features = ["derive"] }
 enr = "0.13.0"
 entity = { path = "entity" }
 env_logger = "0.10.0"
-ethportal-api = "0.5.1"
+ethportal-api = "0.6.0"
 futures = "0.3.31"
 glados-core = { path = "glados-core" }
 glados-monitor = { path = "glados-monitor" }
