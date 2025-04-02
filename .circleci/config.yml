@@ -1,6 +1,7 @@
 version: 2.1
 orbs:
   rust: circleci/rust@1.6.1
+  node: circleci/node@7.0.0
 executors:
   docker-publisher:
     docker:
@@ -106,6 +107,21 @@ jobs:
                 name: Test Glados workspace
                 # Add postgresql bin to the PATH and then run the tests.
                 command: PATH=$PATH:$(find /usr/lib/postgresql/ -type d -name "bin") cargo test --workspace -- --nocapture
+  lint-js:
+        description: |
+            Check javascript linting with Prettier.
+        resource_class: small
+        executor:
+            name: node/default
+            tag: 22.9.0
+        steps:
+            - checkout
+            - run:
+                name: Install prettier
+                command: sudo npm install -g prettier@3.3.3
+            - run:
+                name: Test js files with prettier
+                command: prettier -c glados-web/assets/js "!glados-web/assets/js/lib/*"
 workflows:
   merge-test:
     jobs:
@@ -126,3 +142,4 @@ workflows:
             branches:
               only: master
       - lint-build-test
+      - lint-js
