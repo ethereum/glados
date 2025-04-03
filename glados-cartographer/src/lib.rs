@@ -470,15 +470,22 @@ async fn do_liveliness_check(
 
             // Mark node as known to be alive
 
-            if let Some(data_radius) =
-                match PingExtension::decode_json(pong_info.payload_type, pong_info.payload) {
-                    Ok(PingExtension::Capabilities(payload)) => Some(payload.data_radius),
-                    Ok(PingExtension::BasicRadius(payload)) => Some(payload.data_radius),
-                    Ok(PingExtension::HistoryRadius(payload)) => Some(payload.data_radius),
-                    Ok(PingExtension::Error(_)) => None,
-                    Err(_) => None,
+            if let Some(data_radius) = match PingExtension::decode_json(
+                pong_info.payload_type,
+                pong_info.payload,
+            ) {
+                Ok(PingExtension::Capabilities(payload)) => Some(payload.data_radius),
+                Ok(PingExtension::BasicRadius(payload)) => Some(payload.data_radius),
+                Ok(PingExtension::HistoryRadius(payload)) => Some(payload.data_radius),
+                Ok(PingExtension::Error(err)) => {
+                    warn!(node_id=?B256::from(enr.node_id().raw()), err=?err, "Node responded with error PONG");
+                    None
                 }
-            {
+                Err(err) => {
+                    warn!(node_id=?B256::from(enr.node_id().raw()), err=?err, "Error while decoding PONG");
+                    None
+                }
+            } {
                 census
                     .add_alive(enr.clone(), record_model.id, *data_radius)
                     .await;
@@ -491,8 +498,6 @@ async fn do_liveliness_check(
                     }
                 }
             } else {
-                warn!(node_id=?B256::from(enr.node_id().raw()), "No node radius available");
-
                 // Add node to error list.
                 census.add_errored(enr.node_id()).await;
             }
