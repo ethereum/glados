@@ -949,10 +949,10 @@ pub async fn census_explorer_list(
 
 #[derive(Debug, Clone, FromQueryResult)]
 pub struct NodeStatus {
-    enr_id: i32,
+    enr_id: Option<i32>,
     census_time: DateTime<Utc>,
     census_id: i32,
-    node_id: Vec<u8>,
+    node_id: Option<Vec<u8>>,
     present: bool,
 }
 
@@ -1028,7 +1028,7 @@ pub async fn census_timeseries(
     // Load all ENRs found in the census
     let record_ids = node_statuses
         .iter()
-        .map(|n| n.enr_id)
+        .filter_map(|n| n.enr_id)
         .collect::<HashSet<i32>>() // Collect into a HashSet to remove duplicates
         .into_iter()
         .collect::<Vec<i32>>();
@@ -1113,17 +1113,18 @@ fn decouple_nodes_and_censuses(
     let mut census_map: HashMap<i32, (DateTime<Utc>, NodeEnrIdStatuses)> = HashMap::new();
 
     for status in node_statuses {
-        let hex_id = hex_encode(status.node_id);
-        node_set.insert(hex_id.clone());
-        let enr_opt = if status.present {
-            Some(status.enr_id)
-        } else {
-            None
-        };
         let entry = census_map
             .entry(status.census_id)
             .or_insert((status.census_time, HashMap::new()));
-        entry.1.insert(hex_id, enr_opt);
+
+        if let (Some(node_id), Some(enr_id)) = (status.node_id, status.enr_id) {
+            let hex_id = hex_encode(node_id);
+            node_set.insert(hex_id.clone());
+
+            let enr_opt = if status.present { Some(enr_id) } else { None };
+
+            entry.1.insert(hex_id, enr_opt);
+        }
     }
 
     let node_ids: Vec<String> = node_set.into_iter().collect();
