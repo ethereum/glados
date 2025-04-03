@@ -91,7 +91,7 @@ fn validate_history(content_key: &HistoryContentKey, content_bytes: &[u8]) -> bo
                 HistoryContentKey::BlockHeaderByNumber(_) => {
                     HistoryContentKey::new_block_header_by_number(h.header.number)
                 }
-                _ => HistoryContentKey::new_block_header_by_hash(h.header.hash()),
+                _ => HistoryContentKey::new_block_header_by_hash(h.header.hash_slow()),
             };
             match content_key == &computed_key {
                 true => true,
@@ -108,7 +108,7 @@ fn validate_history(content_key: &HistoryContentKey, content_bytes: &[u8]) -> bo
         HistoryContentValue::BlockBody(b) => {
             // Reconstruct the key using the block body contents.
             let _computed_tx_root = b.transactions_root();
-            let _computed_uncles_root = b.uncles_root();
+            let _computed_uncles_root = b.calculate_ommers_root();
             warn!("Need to call trusted provider to check block body correctness.");
             true
         }
