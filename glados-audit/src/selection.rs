@@ -228,7 +228,6 @@ async fn add_to_queue(
 /// 3. Looking up each one separately, then sending them all in the channel.
 ///
 /// At regular intervals the channel capacity is assessed and new tasks are added to reach capacity.
-
 async fn select_random_content_for_audit(
     tx: mpsc::Sender<AuditTask>,
     conn: DatabaseConnection,

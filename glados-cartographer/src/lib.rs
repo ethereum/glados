@@ -8,7 +8,10 @@ use cli::PortalSubnet;
 use enr::NodeId;
 use ethportal_api::Enr;
 use ethportal_api::{generate_random_remote_enr, jsonrpsee::http_client::HttpClientBuilder};
-use ethportal_api::{BeaconNetworkApiClient, HistoryNetworkApiClient, StateNetworkApiClient};
+use ethportal_api::{
+    types::ping_extensions::decode::PingExtension, BeaconNetworkApiClient, HistoryNetworkApiClient,
+    StateNetworkApiClient,
+};
 use sea_orm::DatabaseConnection;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -457,26 +460,46 @@ async fn do_liveliness_check(
     debug!(node_id=?B256::from(enr.node_id().raw()), "Liveliness check");
 
     let ping = match config.subnetwork {
-        PortalSubnet::History => HistoryNetworkApiClient::ping(&client, enr.to_owned()),
-        PortalSubnet::Beacon => BeaconNetworkApiClient::ping(&client, enr.to_owned()),
-        PortalSubnet::State => StateNetworkApiClient::ping(&client, enr.to_owned()),
+        PortalSubnet::History => HistoryNetworkApiClient::ping(&client, enr.to_owned(), None, None),
+        PortalSubnet::Beacon => BeaconNetworkApiClient::ping(&client, enr.to_owned(), None, None),
+        PortalSubnet::State => StateNetworkApiClient::ping(&client, enr.to_owned(), None, None),
     };
     match ping.await {
         Ok(pong_info) => {
             debug!(node_id=?B256::from(enr.node_id().raw()), "Liveliness passed");
 
             // Mark node as known to be alive
-            census
-                .add_alive(enr.clone(), record_model.id, pong_info.data_radius)
-                .await;
 
-            // Send enr to process that enumerates its routing table
-            match to_enumerate_tx.send(enr.clone()).await {
-                Ok(_) => (),
-                Err(err) => {
-                    error!(err=?err, "Error queueing enr for routing table enumeration");
-                    census.add_finished(enr.node_id()).await;
+            if let Some(data_radius) = match PingExtension::decode_json(
+                pong_info.payload_type,
+                pong_info.payload,
+            ) {
+                Ok(PingExtension::Capabilities(payload)) => Some(payload.data_radius),
+                Ok(PingExtension::BasicRadius(payload)) => Some(payload.data_radius),
+                Ok(PingExtension::HistoryRadius(payload)) => Some(payload.data_radius),
+                Ok(PingExtension::Error(err)) => {
+                    warn!(node_id=?B256::from(enr.node_id().raw()), err=?err, "Node responded with error PONG");
+                    None
                 }
+                Err(err) => {
+                    warn!(node_id=?B256::from(enr.node_id().raw()), err=?err, "Error while decoding PONG");
+                    None
+                }
+            } {
+                census
+                    .add_alive(enr.clone(), record_model.id, *data_radius)
+                    .await;
+                // Send enr to process that enumerates its routing table
+                match to_enumerate_tx.send(enr.clone()).await {
+                    Ok(_) => (),
+                    Err(err) => {
+                        error!(err=?err, "Error queueing enr for routing table enumeration");
+                        census.add_finished(enr.node_id()).await;
+                    }
+                }
+            } else {
+                // Add node to error list.
+                census.add_errored(enr.node_id()).await;
             }
         }
         Err(err) => {
