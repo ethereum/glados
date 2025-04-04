@@ -26,6 +26,7 @@ mod m20250311_115816_create_blocks;
 mod m20250311_121724_create_audit_result_latest;
 mod m20250314_144135_add_history_headers_by_number_audit_stats;
 mod m20250317_183352_refactor_history_audit_stats;
+mod m20250404_202958_internal_failures_replace_node_with_record;
 
 pub struct Migrator;
 
@@ -55,6 +56,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250311_121724_create_audit_result_latest::Migration),
             Box::new(m20250314_144135_add_history_headers_by_number_audit_stats::Migration),
             Box::new(m20250317_183352_refactor_history_audit_stats::Migration),
+            Box::new(m20250404_202958_internal_failures_replace_node_with_record::Migration),
         ]
     }
 }
