@@ -3,9 +3,10 @@
 use anyhow::Result;
 use discv5::enr::NodeId;
 use ethportal_api::types::query_trace::QueryFailureKind;
-use sea_orm::entity::prelude::*;
+use sea_orm::{entity::prelude::*, query::*};
+use tracing::warn;
 
-use super::node;
+use super::{node, record};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "audit_internal_failure")]
@@ -14,6 +15,7 @@ pub struct Model {
     pub id: i32,
     pub audit: i32,
     pub sender_node: i32,
+    pub sender_record_id: Option<i32>,
     pub failure_type: TransferFailureType,
 }
 
@@ -80,9 +82,25 @@ pub async fn create(
     // Get the 'id' database field representing the node with sender_node_id
     let sender_node = node::get_or_create(sender_node_id, conn).await?;
 
+    // Identify the most recent record for the sender node
+    let sender_record_id = record::Entity::find()
+        .filter(record::Column::NodeId.eq(sender_node.id))
+        .order_by_desc(record::Column::SequenceNumber)
+        .one(conn)
+        .await?
+        .map(|record| record.id);
+
+    if sender_record_id.is_none() {
+        warn!(
+            "No record found when storing a transfer failure for node ID {}",
+            sender_node_id
+        );
+    }
+
     let internal_failure = ActiveModel {
         audit: sea_orm::Set(audit_id),
         sender_node: sea_orm::Set(sender_node.id),
+        sender_record_id: sea_orm::Set(sender_record_id),
         failure_type: sea_orm::Set(fail_type),
         ..Default::default()
     };

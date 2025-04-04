@@ -25,6 +25,7 @@ sea-orm = { workspace = true, features = ["sqlx-postgres", "macros", "runtime-to
 sea-query = "0.28.4"
 serde.workspace = true
 tokio = { workspace = true, features = ["macros"] }
+tracing.workspace = true
 
 [dev-dependencies]
 rstest.workspace = true

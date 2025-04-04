@@ -509,7 +509,9 @@ mod tests {
         content_audit::{self, AuditResult},
         node,
         prelude::*,
+        record,
     };
+    use ethportal_api::utils::bytes::hex_decode;
     use migration::{DbErr, Migrator, MigratorTrait};
     use pgtemp::PgTempDB;
     use sea_orm::{
@@ -554,6 +556,9 @@ mod tests {
         //  "0x944ca5359881d5bd8ab044ea89517aaefc006b2ec2da406b14bb4eea780cb5e7":
         //      {"durationMs":26148,"failure":"utpConnectionFailed"}
         for failure in failures.into_iter() {
+            // Nodes were all generated on the fly, so the record will be None
+            assert_eq!(failure.sender_record_id, None);
+
             let sender_node = Node::find_by_id(failure.sender_node)
                 .one(&conn)
                 .await
@@ -575,6 +580,72 @@ mod tests {
                 _ => panic!("Unexpected failure"),
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_internal_failures_with_records() {
+        let (conn, _temp_db, audit) = get_populated_test_audit_db().await.unwrap();
+
+        // Deserialize the trace into a QueryTrace object
+        let trace: QueryTrace = serde_json::from_str(&audit.trace).unwrap();
+
+        // Create records for one of the sender nodes
+        // The purpose of the test is to confirm that the failure entries identify and store the
+        // most recent record associated with each sender node.
+
+        let mut node_id = [0u8; 32];
+        node_id.copy_from_slice(
+            &hex_decode("0x95c8df0a57c901c5d4561403a77067996b03b64e7beb1bdee662fae236d2188c")
+                .unwrap(),
+        );
+        let node = node::get_or_create(NodeId::new(&node_id), &conn)
+            .await
+            .unwrap();
+
+        Record::insert_many(vec![
+            record::ActiveModel {
+                id: NotSet,
+                node_id: Set(node.id),
+                sequence_number: Set(1),
+                raw: Set("1".to_string()),
+            },
+            record::ActiveModel {
+                id: NotSet,
+                node_id: Set(node.id),
+                sequence_number: Set(3),
+                raw: Set("3".to_string()),
+            },
+            record::ActiveModel {
+                id: NotSet,
+                node_id: Set(node.id),
+                sequence_number: Set(2),
+                raw: Set("2".to_string()),
+            },
+        ])
+        .exec(&conn)
+        .await
+        .unwrap();
+
+        // Generate the transfer failure rows
+        create_entry_for_failures(audit, trace, &conn).await;
+
+        // Find the created failure for the sender node that we stored records for
+        let failure = AuditInternalFailure::find()
+            .filter(audit_internal_failure::Column::SenderNode.eq(node.id))
+            .one(&conn)
+            .await
+            .unwrap()
+            .unwrap();
+
+        let sender_record_id = failure.sender_record_id.unwrap();
+        let sender_record = Record::find_by_id(sender_record_id)
+            .one(&conn)
+            .await
+            .unwrap()
+            .unwrap();
+
+        // This must match the record with the highest sequence number that we stored
+        assert_eq!(sender_record.sequence_number, 3);
     }
 
     async fn get_populated_test_audit_db() -> Result<(DbConn, PgTempDB, content_audit::Model), DbErr>
