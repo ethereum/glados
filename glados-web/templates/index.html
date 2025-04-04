@@ -3,14 +3,14 @@
 {% block title %}Glados{% endblock %}
 
 {% block head %}
-<script src="/static/js/d3.min.js"></script>
+<script src="/static/js/lib/d3.min.js"></script>
 <script src="/static/js/piechart.js"></script>
 <script src="/static/js/trace/enr.js"></script>
 <script src="/static/js/radiusdensity.js"></script>
 <script src="/static/js/stats_history.js"></script>
 <script src="/static/js/explanations.js"></script>
 
-<link href="/static/css/spin.css" rel="stylesheet" />
+<link href="/static/css/lib/spin.css" rel="stylesheet" />
 {% endblock %}
 
 {% block content %}
@@ -88,7 +88,7 @@
         </div>
     </div>
     <div class="row">
-        <div class="col-lg-5 col-md-6 col-sm-12 margin-bottom">
+        <div class="col-lg-5 col-md-12 margin-bottom">
             <div class="card pie-box h-100">
                 <div class="card-body">
                     <button class="question-mark" aria-label="Toggle explanation"></button>
@@ -106,7 +106,7 @@
             </div>
             <div id="hover" style="pointer-events: none; position: absolute; z-index: 9999; opacity: 0;"></div>
         </div>
-        <div class="col-lg-7 col-md-12 col-sm-12 margin-bottom">
+        <div class="col-lg-7 col-md-12 margin-bottom">
             <div class="card pie-box h-100">
                 <div class="card-body">
                     <button class="question-mark" aria-label="Toggle explanation"></button>

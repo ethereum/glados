@@ -1,4 +1,4 @@
-import { Spinner } from "./spin.js";
+import { Spinner } from "./lib/spin.js";
 
 const BASE_URL = "/api/audit-block-status/";
 const GENESIS_TIMESTAMP = "2015-07-30T15:26:13Z";
