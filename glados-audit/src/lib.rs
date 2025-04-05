@@ -609,6 +609,10 @@ mod tests {
                 sequence_number: Set(1),
                 raw: Set("1".to_string()),
             },
+            // This highest sequence number is the record that the failure should link to.
+            // It is intentionally created earlier in the group, to give it a smaller id,
+            // to test that the record is being selected by highest sequence number instead of
+            // highest id.
             record::ActiveModel {
                 id: NotSet,
                 node_id: Set(node.id),
