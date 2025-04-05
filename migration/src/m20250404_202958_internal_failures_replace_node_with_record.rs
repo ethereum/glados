@@ -33,7 +33,7 @@ impl MigrationTrait for Migration {
         // For all internal transfer failures, infer the sender record from the from the sender node.
         // Use the most recent record available for the node. This is helpful, even if wrong.
         manager.get_connection().execute_unprepared(
-            "WITH maxsn AS ( select r.*, ROW_NUMBER() OVER (PARTITION BY node_id ORDER BY sequence_number DESC) AS rn FROM record AS r) UPDATE audit_internal_failure AS aif SET sender_record_id=maxsn.id FROM maxsn WHERE aif.sender_node=maxsn.node_id;",
+            "WITH maxsn AS ( SELECT r.*, ROW_NUMBER() OVER (PARTITION BY node_id ORDER BY sequence_number DESC) AS rn FROM record AS r) UPDATE audit_internal_failure AS aif SET sender_record_id=maxsn.id FROM maxsn WHERE aif.sender_node=maxsn.node_id AND maxsn.rn=1;",
         ).await?;
 
         Ok(())
