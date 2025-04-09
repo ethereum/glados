@@ -36,6 +36,17 @@ impl MigrationTrait for Migration {
             "WITH maxsn AS ( SELECT r.*, ROW_NUMBER() OVER (PARTITION BY node_id ORDER BY sequence_number DESC) AS rn FROM record AS r) UPDATE audit_internal_failure AS aif SET sender_record_id=maxsn.id FROM maxsn WHERE aif.sender_node=maxsn.node_id AND maxsn.rn=1;",
         ).await?;
 
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(AuditInternalFailure::Table)
+                    .modify_column(
+                        ColumnDef::new(AuditInternalFailure::SenderRecordId).not_null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
         Ok(())
     }
 

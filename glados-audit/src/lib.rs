@@ -457,8 +457,20 @@ async fn create_entry_for_failures(
         let fail_type = failure_entry.failure;
         info!("Found a new transfer failure: Sender: {sender_node_id}, FailureType: {fail_type:?}, Audit ID: {}, recipient_client_info_id: {:?}", audit.id, audit.client_info);
 
+        // Get the ENR for the sender node
+        let sender_enr = match trace.metadata.get(&sender_node_id) {
+            Some(node_info) => &node_info.enr,
+            None => {
+                error!(
+                    "In audit {}, sender ENR for node {sender_node_id} was not found in metadata",
+                    audit.id,
+                );
+                continue;
+            }
+        };
+
         if let Err(e) =
-            audit_internal_failure::create(audit.id, sender_node_id, fail_type.into(), conn).await
+            audit_internal_failure::create(audit.id, sender_enr, fail_type.into(), conn).await
         {
             error!(
                 err=?e,
@@ -556,9 +568,6 @@ mod tests {
         //  "0x944ca5359881d5bd8ab044ea89517aaefc006b2ec2da406b14bb4eea780cb5e7":
         //      {"durationMs":26148,"failure":"utpConnectionFailed"}
         for failure in failures.into_iter() {
-            // Nodes were all generated on the fly, so the record will be None
-            assert_eq!(failure.sender_record_id, None);
-
             let sender_node = Node::find_by_id(failure.sender_node)
                 .one(&conn)
                 .await
@@ -591,7 +600,7 @@ mod tests {
 
         // Create records for one of the sender nodes
         // The purpose of the test is to confirm that the failure entries identify and store the
-        // most recent record associated with each sender node.
+        // link to the matching associated with each sender node.
 
         let mut node_id = [0u8; 32];
         node_id.copy_from_slice(
@@ -602,28 +611,22 @@ mod tests {
             .await
             .unwrap();
 
+        // Create some false records for the node, including a sequence number higher than the one
+        // specified in the query trace. These are red herrings, designed to catch if the logic is
+        // picking up the wrong record to tie to the transfer failure. We should end up with
+        // sequence_number 4, not 5 or 3.
         Record::insert_many(vec![
             record::ActiveModel {
                 id: NotSet,
                 node_id: Set(node.id),
-                sequence_number: Set(1),
-                raw: Set("1".to_string()),
+                sequence_number: Set(5),
+                raw: Set("5".to_string()),
             },
-            // This highest sequence number is the record that the failure should link to.
-            // It is intentionally created earlier in the group, to give it a smaller id,
-            // to test that the record is being selected by highest sequence number instead of
-            // highest id.
             record::ActiveModel {
                 id: NotSet,
                 node_id: Set(node.id),
                 sequence_number: Set(3),
                 raw: Set("3".to_string()),
-            },
-            record::ActiveModel {
-                id: NotSet,
-                node_id: Set(node.id),
-                sequence_number: Set(2),
-                raw: Set("2".to_string()),
             },
         ])
         .exec(&conn)
@@ -633,7 +636,7 @@ mod tests {
         // Generate the transfer failure rows
         create_entry_for_failures(audit, trace, &conn).await;
 
-        // Find the created failure for the sender node that we stored records for
+        // Find the created failure for our node of interest
         let failure = AuditInternalFailure::find()
             .filter(audit_internal_failure::Column::SenderNode.eq(node.id))
             .one(&conn)
@@ -641,15 +644,16 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let sender_record_id = failure.sender_record_id.unwrap();
-        let sender_record = Record::find_by_id(sender_record_id)
+        let sender_record = Record::find_by_id(failure.sender_record_id)
             .one(&conn)
             .await
             .unwrap()
             .unwrap();
 
-        // This must match the record with the highest sequence number that we stored
-        assert_eq!(sender_record.sequence_number, 3);
+        // If you decode the ENR for this node ID you'll find a sequence number of 4.
+        // This can be verified by finding the ENR in the metadata for this test's fixture:
+        // enr:-I24QNw9C_xJvljho0dO27ug7-wZg7KCN1Mmqefdvqwxxqw3X-SLzBO3-KvzCbGFFJJMDn1be6Hd-Bf_TR3afjrwZ7UEY4d1IDAuMC4xgmlkgnY0gmlwhKRc9-KJc2VjcDI1NmsxoQJMpHmGj1xSP1O-Mffk_jYIHVcg6tY5_CjmWVg1gJEsPIN1ZHCCE4o
+        assert_eq!(sender_record.sequence_number, 4);
     }
 
     async fn get_populated_test_audit_db() -> Result<(DbConn, PgTempDB, content_audit::Model), DbErr>
