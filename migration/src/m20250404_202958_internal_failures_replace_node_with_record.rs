@@ -41,6 +41,7 @@ impl MigrationTrait for Migration {
                 Table::alter()
                     .table(AuditInternalFailure::Table)
                     .modify_column(ColumnDef::new(AuditInternalFailure::SenderRecordId).not_null())
+                    .drop_column(AuditInternalFailure::SenderNode)
                     .to_owned(),
             )
             .await?;
@@ -49,12 +50,30 @@ impl MigrationTrait for Migration {
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Add back the Sender Node column
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(AuditInternalFailure::Table)
+                    .add_column_if_not_exists(
+                        ColumnDef::new(AuditInternalFailure::SenderNode).integer(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        // Generate the sender node for all columns in internal failures, by using the record id
+        manager.get_connection().execute_unprepared(
+            "UPDATE audit_internal_failure AS aif SET sender_node=r.node_id FROM record r WHERE aif.sender_record_id=r.id;",
+        ).await?;
+
         // Drop the new sender record column
         manager
             .alter_table(
                 Table::alter()
                     .table(AuditInternalFailure::Table)
                     .drop_column(AuditInternalFailure::SenderRecordId)
+                    .modify_column(ColumnDef::new(AuditInternalFailure::SenderNode).not_null())
                     .to_owned(),
             )
             .await?;
@@ -68,6 +87,8 @@ enum AuditInternalFailure {
     Table,
     // Foreign key
     SenderRecordId,
+    // Foreign key
+    SenderNode,
 }
 
 #[derive(Iden)]

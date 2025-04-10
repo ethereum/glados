@@ -527,8 +527,8 @@ mod tests {
     use migration::{DbErr, Migrator, MigratorTrait};
     use pgtemp::PgTempDB;
     use sea_orm::{
-        ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, Database, DbConn, EntityTrait,
-        QueryFilter, Set,
+        ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, Database, DbBackend, DbConn,
+        EntityTrait, FromQueryResult, QueryFilter, Set, Statement,
     };
 
     use super::*;
@@ -568,7 +568,12 @@ mod tests {
         //  "0x944ca5359881d5bd8ab044ea89517aaefc006b2ec2da406b14bb4eea780cb5e7":
         //      {"durationMs":26148,"failure":"utpConnectionFailed"}
         for failure in failures.into_iter() {
-            let sender_node = Node::find_by_id(failure.sender_node)
+            let sender_record = Record::find_by_id(failure.sender_record_id)
+                .one(&conn)
+                .await
+                .unwrap()
+                .unwrap();
+            let sender_node = Node::find_by_id(sender_record.node_id)
                 .one(&conn)
                 .await
                 .unwrap()
@@ -636,19 +641,20 @@ mod tests {
         // Generate the transfer failure rows
         create_entry_for_failures(audit, trace, &conn).await;
 
-        // Find the created failure for our node of interest
-        let failure = AuditInternalFailure::find()
-            .filter(audit_internal_failure::Column::SenderNode.eq(node.id))
-            .one(&conn)
-            .await
-            .unwrap()
-            .unwrap();
-
-        let sender_record = Record::find_by_id(failure.sender_record_id)
-            .one(&conn)
-            .await
-            .unwrap()
-            .unwrap();
+        // Find the record that matches a created failure and our node of interest
+        let sender_record = record::Model::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "SELECT r.*
+                FROM record AS r
+                LEFT JOIN node AS n ON n.id = r.node_id
+                LEFT JOIN audit_internal_failure AS aif ON aif.sender_record_id = r.id
+                WHERE n.id = $1 AND aif.id IS NOT NULL",
+            vec![node.id.into()],
+        ))
+        .one(&conn)
+        .await
+        .unwrap()
+        .unwrap();
 
         // If you decode the ENR for this node ID you'll find a sequence number of 4.
         // This can be verified by finding the ENR in the metadata for this test's fixture:

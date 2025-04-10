@@ -13,7 +13,6 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub audit: i32,
-    pub sender_node: i32,
     pub sender_record_id: i32,
     pub failure_type: TransferFailureType,
 }
@@ -29,13 +28,13 @@ pub enum Relation {
     )]
     ContentAudit,
     #[sea_orm(
-        belongs_to = "super::node::Entity",
-        from = "Column::SenderNode",
-        to = "super::node::Column::Id",
+        belongs_to = "super::record::Entity",
+        from = "Column::SenderRecordId",
+        to = "super::record::Column::Id",
         on_update = "NoAction",
         on_delete = "NoAction"
     )]
-    Node,
+    Record,
 }
 
 impl Related<super::content_audit::Entity> for Entity {
@@ -44,9 +43,9 @@ impl Related<super::content_audit::Entity> for Entity {
     }
 }
 
-impl Related<super::node::Entity> for Entity {
+impl Related<super::record::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Node.def()
+        Relation::Record.def()
     }
 }
 
@@ -82,7 +81,6 @@ pub async fn create(
 
     let internal_failure = ActiveModel {
         audit: sea_orm::Set(audit_id),
-        sender_node: sea_orm::Set(sender_record.node_id),
         sender_record_id: sea_orm::Set(sender_record.id),
         failure_type: sea_orm::Set(fail_type),
         ..Default::default()
