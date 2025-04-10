@@ -16,5 +16,6 @@ pub mod key_value;
 pub mod node;
 pub mod record;
 pub mod state_roots;
+pub mod sync_audit;
 pub mod test;
 pub mod utils;
