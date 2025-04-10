@@ -457,8 +457,20 @@ async fn create_entry_for_failures(
         let fail_type = failure_entry.failure;
         info!("Found a new transfer failure: Sender: {sender_node_id}, FailureType: {fail_type:?}, Audit ID: {}, recipient_client_info_id: {:?}", audit.id, audit.client_info);
 
+        // Get the ENR for the sender node
+        let sender_enr = match trace.metadata.get(&sender_node_id) {
+            Some(node_info) => &node_info.enr,
+            None => {
+                error!(
+                    "In audit {}, sender ENR for node {sender_node_id} was not found in metadata",
+                    audit.id,
+                );
+                continue;
+            }
+        };
+
         if let Err(e) =
-            audit_internal_failure::create(audit.id, sender_node_id, fail_type.into(), conn).await
+            audit_internal_failure::create(audit.id, sender_enr, fail_type.into(), conn).await
         {
             error!(
                 err=?e,
@@ -509,12 +521,14 @@ mod tests {
         content_audit::{self, AuditResult},
         node,
         prelude::*,
+        record,
     };
+    use ethportal_api::utils::bytes::hex_decode;
     use migration::{DbErr, Migrator, MigratorTrait};
     use pgtemp::PgTempDB;
     use sea_orm::{
-        ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, Database, DbConn, EntityTrait,
-        QueryFilter, Set,
+        ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, Database, DbBackend, DbConn,
+        EntityTrait, FromQueryResult, QueryFilter, Set, Statement,
     };
 
     use super::*;
@@ -554,7 +568,12 @@ mod tests {
         //  "0x944ca5359881d5bd8ab044ea89517aaefc006b2ec2da406b14bb4eea780cb5e7":
         //      {"durationMs":26148,"failure":"utpConnectionFailed"}
         for failure in failures.into_iter() {
-            let sender_node = Node::find_by_id(failure.sender_node)
+            let sender_record = Record::find_by_id(failure.sender_record_id)
+                .one(&conn)
+                .await
+                .unwrap()
+                .unwrap();
+            let sender_node = Node::find_by_id(sender_record.node_id)
                 .one(&conn)
                 .await
                 .unwrap()
@@ -575,6 +594,72 @@ mod tests {
                 _ => panic!("Unexpected failure"),
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_internal_failures_with_records() {
+        let (conn, _temp_db, audit) = get_populated_test_audit_db().await.unwrap();
+
+        // Deserialize the trace into a QueryTrace object
+        let trace: QueryTrace = serde_json::from_str(&audit.trace).unwrap();
+
+        // Create records for one of the sender nodes
+        // The purpose of the test is to confirm that the failure entries identify and store the
+        // link to the matching associated with each sender node.
+
+        let mut node_id = [0u8; 32];
+        node_id.copy_from_slice(
+            &hex_decode("0x95c8df0a57c901c5d4561403a77067996b03b64e7beb1bdee662fae236d2188c")
+                .unwrap(),
+        );
+        let node = node::get_or_create(NodeId::new(&node_id), &conn)
+            .await
+            .unwrap();
+
+        // Create some false records for the node, including a sequence number higher than the one
+        // specified in the query trace. These are red herrings, designed to catch if the logic is
+        // picking up the wrong record to tie to the transfer failure. We should end up with
+        // sequence_number 4, not 5 or 3.
+        Record::insert_many(vec![
+            record::ActiveModel {
+                id: NotSet,
+                node_id: Set(node.id),
+                sequence_number: Set(5),
+                raw: Set("5".to_string()),
+            },
+            record::ActiveModel {
+                id: NotSet,
+                node_id: Set(node.id),
+                sequence_number: Set(3),
+                raw: Set("3".to_string()),
+            },
+        ])
+        .exec(&conn)
+        .await
+        .unwrap();
+
+        // Generate the transfer failure rows
+        create_entry_for_failures(audit, trace, &conn).await;
+
+        // Find the record that matches a created failure and our node of interest
+        let sender_record = record::Model::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "SELECT r.*
+                FROM record AS r
+                LEFT JOIN node AS n ON n.id = r.node_id
+                LEFT JOIN audit_internal_failure AS aif ON aif.sender_record_id = r.id
+                WHERE n.id = $1 AND aif.id IS NOT NULL",
+            vec![node.id.into()],
+        ))
+        .one(&conn)
+        .await
+        .unwrap()
+        .unwrap();
+
+        // If you decode the ENR for this node ID you'll find a sequence number of 4.
+        // This can be verified by finding the ENR in the metadata for this test's fixture:
+        // enr:-I24QNw9C_xJvljho0dO27ug7-wZg7KCN1Mmqefdvqwxxqw3X-SLzBO3-KvzCbGFFJJMDn1be6Hd-Bf_TR3afjrwZ7UEY4d1IDAuMC4xgmlkgnY0gmlwhKRc9-KJc2VjcDI1NmsxoQJMpHmGj1xSP1O-Mffk_jYIHVcg6tY5_CjmWVg1gJEsPIN1ZHCCE4o
+        assert_eq!(sender_record.sequence_number, 4);
     }
 
     async fn get_populated_test_audit_db() -> Result<(DbConn, PgTempDB, content_audit::Model), DbErr>

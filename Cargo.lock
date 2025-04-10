@@ -2019,6 +2019,7 @@ dependencies = [
  "sea-query",
  "serde",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
