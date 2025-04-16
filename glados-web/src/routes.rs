@@ -1487,28 +1487,23 @@ pub async fn weekly_census_protocol_versions(
             SELECT
                 census.id AS census_id,
                 ANY_VALUE(DATE_TRUNC('second', census.started_at)) AS start,
-                COALESCE(protocol_versions.version, '\\x00') AS protocol_versions,
+                key_value.value AS protocol_versions,
                 COUNT(1) AS node_count
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
             LEFT JOIN record ON census_node.record_id = record.id
-            LEFT JOIN (
-                SELECT
-                    record_id,
-                    value AS version
-                FROM key_value
-                WHERE key = '\\x7076' -- hex('pv')
-            ) protocol_versions ON record.id = protocol_versions.record_id
+            LEFT JOIN key_value ON record.id = key_value.record_id
             WHERE
                 census.sub_network = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 census.started_at < NOW() - INTERVAL '1 week' * $1 AND
                 census_node.sub_network = $2 AND
                 census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes'
+                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes' AND
+                key = '\\x7076' -- hex('pv')
             GROUP BY
               census.id,
-              COALESCE(protocol_versions.version, '\\x00')
+              key_value.value
             ORDER BY census.started_at
         ",
             vec![weeks_ago.into(), subprotocol.into()],
