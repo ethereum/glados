@@ -115,6 +115,10 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
             get(routes::weekly_census_client_versions),
         )
         .route(
+            "/api/census-weekly-protocol-versions/",
+            get(routes::weekly_census_protocol_versions),
+        )
+        .route(
             "/api/census-weekly-os/",
             get(routes::weekly_census_operating_systems),
         )

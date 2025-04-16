@@ -153,6 +153,23 @@
             </div>
         </div>
     </div>
+    <div class="row">
+        <div class="col-lg-12 col-md-12 col-sm-12 margin-bottom">
+            <div class="card pie-box h-100">
+                <div class="card-body">
+                    <button class="question-mark" aria-label="Toggle explanation"></button>
+                    <div class="explanation">
+                        This graph shows the maximum version of the Portal Protocol supported by the nodes that were reachable at each census (every 15 minutes).
+                    </div>
+                    <div class="table-responsive">
+                        <div id="census-weekly-protocol-versions-graph-container">
+                            <div id="census-weekly-protocol-versions-graph"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
   {% if subprotocol == SubProtocol::History %}
     <div class="row">
         <div class="col-lg-12 col-md-12 col-sm-12 margin-bottom">
@@ -210,6 +227,34 @@
 <script type="module">
     import {areaGraph} from "../static/js/area_graph.js";
 
+    areaGraph({
+      baseName: "census-weekly-protocol-versions",
+      baseUrl: "/api/census-weekly-protocol-versions/?",
+      graphTitle: "Max Supported Protocol Version, by week",
+      labelY: "# of nodes",
+      kind: "weekly",
+      dataShape: "long",
+      keyAttribute: "maxProtocolVersion",
+      valueAttribute: "nodeCount",
+      seriesMetadata: [],
+      sortDescending: true,
+      initialRanges: {
+        x: [Date.now() - 7 * 24 * 60 * 60 * 1000, Date.now()],
+        y: [0, 100],
+      },
+      customSeriesDisplayFn: (seriesMetadata, keys, select) =>
+        Object.fromEntries(
+          keys.map((k, i, arr) => [
+            k,
+            {
+              color: d3
+                .color("lightblue")
+                .brighter((i - Math.floor(arr.length / 2)) / 2),
+              name: k,
+            },
+          ]),
+        ),
+    });
 
   {% if subprotocol == SubProtocol::History %}
     areaGraph({

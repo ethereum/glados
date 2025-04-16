@@ -1,3 +1,4 @@
+use alloy::rlp::Decodable;
 use alloy_primitives::{hex, B256, U256};
 use axum::{
     extract::{Extension, Path, Query as HttpQuery},
@@ -21,6 +22,7 @@ use entity::{
 };
 use ethportal_api::types::{
     distance::{Distance, Metric, XorMetric},
+    protocol_versions::ProtocolVersionList,
     query_trace::QueryTrace,
 };
 use ethportal_api::utils::bytes::{hex_decode, hex_encode};
@@ -1312,7 +1314,6 @@ pub async fn weekly_census_client_versions(
 
     let Some(client_slug) = http_args.get("client") else {
         return Err(StatusCode::BAD_REQUEST);
-        //Some(client) => Client::from(client.clone()),
     };
 
     let client: Client = client_slug.to_string().into();
@@ -1428,6 +1429,98 @@ pub async fn weekly_census_operating_systems(
         })?;
 
     let census_history_compact: Vec<CensusHistoryOperatinSytemDataCompact> =
+        census_history.into_iter().map(|c| c.into()).collect();
+
+    Ok(Json(census_history_compact))
+}
+
+#[derive(FromQueryResult)]
+pub struct CensusHistoryProtocolVersionsData {
+    census_id: i32,
+    start: DateTime<Utc>,
+    protocol_versions: Vec<u8>,
+    node_count: i64,
+}
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CensusHistoryProtocolVersionsDataCompact {
+    census_id: i32,
+    start: DateTime<Utc>,
+    min_protocol_version: u8,
+    max_protocol_version: u8,
+    node_count: i64,
+}
+
+impl From<CensusHistoryProtocolVersionsData> for CensusHistoryProtocolVersionsDataCompact {
+    fn from(value: CensusHistoryProtocolVersionsData) -> Self {
+        let protocol_version_list: ProtocolVersionList =
+            Decodable::decode(&mut value.protocol_versions.as_slice())
+                .expect("Error decoding supported protocol versions");
+
+        let protocol_versions: Vec<u8> =
+            protocol_version_list.iter().map(|p| u8::from(*p)).collect();
+
+        CensusHistoryProtocolVersionsDataCompact {
+            census_id: value.census_id,
+            start: value.start,
+            min_protocol_version: *protocol_versions.iter().min().unwrap(),
+            max_protocol_version: *protocol_versions.iter().max().unwrap(),
+            node_count: value.node_count,
+        }
+    }
+}
+pub async fn weekly_census_protocol_versions(
+    http_args: HttpQuery<HashMap<String, String>>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<CensusHistoryProtocolVersionsDataCompact>>, StatusCode> {
+    let weeks_ago: i32 = match http_args.get("weeks-ago") {
+        None => 0,
+        Some(weeks_ago) => weeks_ago.parse::<i32>().unwrap_or(0),
+    };
+
+    let subprotocol = get_subprotocol_from_params(&http_args);
+
+    let census_history: Vec<CensusHistoryProtocolVersionsData> =
+        CensusHistoryProtocolVersionsData::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "
+            SELECT
+                census.id AS census_id,
+                ANY_VALUE(DATE_TRUNC('second', census.started_at)) AS start,
+                COALESCE(protocol_versions.version, '\\x00') AS protocol_versions,
+                COUNT(1) AS node_count
+            FROM census
+            LEFT JOIN census_node ON census.id = census_node.census_id
+            LEFT JOIN record ON census_node.record_id = record.id
+            LEFT JOIN (
+                SELECT
+                    record_id,
+                    value AS version
+                FROM key_value
+                WHERE key = '\\x7076' -- hex('pv')
+            ) protocol_versions ON record.id = protocol_versions.record_id
+            WHERE
+                census.sub_network = $2 AND
+                census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
+                census.started_at < NOW() - INTERVAL '1 week' * $1 AND
+                census_node.sub_network = $2 AND
+                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
+                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes'
+            GROUP BY
+              census.id,
+              COALESCE(protocol_versions.version, '\\x00')
+            ORDER BY census.started_at
+        ",
+            vec![weeks_ago.into(), subprotocol.into()],
+        ))
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Failed to lookup census node timeseries by client protocol versions");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let census_history_compact: Vec<CensusHistoryProtocolVersionsDataCompact> =
         census_history.into_iter().map(|c| c.into()).collect();
 
     Ok(Json(census_history_compact))
