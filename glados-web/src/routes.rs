@@ -13,7 +13,12 @@ use entity::{
     content_audit::{self, AuditResult},
     execution_metadata, key_value, node, record,
 };
-use entity::{audit_stats, census, census_node, client_info, content::SubProtocol};
+use entity::{
+    audit_stats, census, census_node,
+    census_node::{Client, OperatingSystem, Version},
+    client_info,
+    content::SubProtocol,
+};
 use ethportal_api::types::{
     distance::{Distance, Metric, XorMetric},
     query_trace::QueryTrace,
@@ -26,11 +31,10 @@ use glados_core::stats::{
     StrategyFilter, SuccessFilter,
 };
 use migration::{Alias, Order};
-use sea_orm::sea_query::{Expr, Query};
-use sea_orm::{sea_query::SimpleExpr, Statement};
 use sea_orm::{
+    sea_query::{Expr, Query, SimpleExpr},
     ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult,
-    Iterable, LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
+    Iterable, LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, Statement,
 };
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
@@ -41,10 +45,10 @@ use std::{fmt::Display, io};
 use tracing::{debug, error, info, warn};
 
 use crate::templates::{
-    AuditDashboardTemplate, AuditTableTemplate, CensusExplorerTemplate, ContentAuditDetailTemplate,
-    ContentIdDetailTemplate, ContentIdListTemplate, ContentKeyDetailTemplate,
-    ContentKeyListTemplate, EnrDetailTemplate, HtmlTemplate, IndexTemplate, NodeDetailTemplate,
-    PaginatedCensusListTemplate, SingleCensusViewTemplate,
+    AuditDashboardTemplate, AuditTableTemplate, CensusExplorerTemplate, ClientsTemplate,
+    ContentAuditDetailTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
+    ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate, HtmlTemplate,
+    IndexTemplate, NodeDetailTemplate, PaginatedCensusListTemplate, SingleCensusViewTemplate,
 };
 use crate::{state::State, templates::AuditTuple};
 
@@ -139,6 +143,17 @@ pub async fn network_overview(
         stats: [hour_stats, day_stats, week_stats],
         new_content: [hour_new, day_new, week_new],
         content_types: ContentType::iter().collect(),
+    };
+    HtmlTemplate(template)
+}
+
+pub async fn clients_overview(params: HttpQuery<HashMap<String, String>>) -> impl IntoResponse {
+    let subprotocol = get_subprotocol_from_params(&params);
+
+    let template = ClientsTemplate {
+        subprotocol,
+        clients: Client::iter().collect(),
+        operating_systems: OperatingSystem::iter().collect(),
     };
     HtmlTemplate(template)
 }
@@ -1172,17 +1187,19 @@ pub async fn weekly_census_history(
             "
             SELECT
                 census.id AS census_id,
-                census.started_at AS start,
+                ANY_VALUE(DATE_TRUNC('second', census.started_at)) AS start,
                 COUNT(1) AS node_count
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
             WHERE
                 census.sub_network = $2 AND
-                started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                started_at < NOW() - INTERVAL '1 week' * $1
+                census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
+                census.started_at < NOW() - INTERVAL '1 week' * $1 AND
+                census_node.sub_network = $2 AND
+                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
+                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes'
             GROUP BY
-              census.id,
-              census.started_at
+                census.id
             ORDER BY census.started_at
         ",
             vec![weeks_ago.into(), subprotocol.into()],
@@ -1194,6 +1211,226 @@ pub async fn weekly_census_history(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
     Ok(Json(census_history))
+}
+
+#[derive(FromQueryResult)]
+pub struct WeeklyCensusClientsData {
+    census_id: i32,
+    start: DateTime<Utc>,
+    client: Client,
+    node_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeeklyCensusClientsDataCompact {
+    census_id: i32,
+    start: DateTime<Utc>,
+    client_slug: String,
+    node_count: i64,
+}
+
+impl From<WeeklyCensusClientsData> for WeeklyCensusClientsDataCompact {
+    fn from(value: WeeklyCensusClientsData) -> Self {
+        WeeklyCensusClientsDataCompact {
+            census_id: value.census_id,
+            start: value.start,
+            client_slug: value.client.to_string(),
+            node_count: value.node_count,
+        }
+    }
+}
+
+pub async fn weekly_census_clients(
+    http_args: HttpQuery<HashMap<String, String>>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<WeeklyCensusClientsDataCompact>>, StatusCode> {
+    let weeks_ago: i32 = match http_args.get("weeks-ago") {
+        None => 0,
+        Some(weeks_ago) => weeks_ago.parse::<i32>().unwrap_or(0),
+    };
+
+    let subprotocol = get_subprotocol_from_params(&http_args);
+
+    let census_history: Vec<WeeklyCensusClientsData> =
+        WeeklyCensusClientsData::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "
+            SELECT
+                census.id AS census_id,
+                ANY_VALUE(DATE_TRUNC('second', census.started_at)) AS start,
+                census_node.client_name AS client,
+                COUNT(1) AS node_count
+            FROM census
+            LEFT JOIN census_node ON census.id = census_node.census_id
+            WHERE
+                census.sub_network = $2 AND
+                census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
+                census.started_at < NOW() - INTERVAL '1 week' * $1 AND
+                census_node.sub_network = $2 AND
+                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
+                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes'
+            GROUP BY
+              census.id,
+              census_node.client_name
+            ORDER BY census.started_at
+        ",
+            vec![weeks_ago.into(), subprotocol.into()],
+        ))
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Failed to lookup census node timeseries by clients data");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let census_history_compact: Vec<WeeklyCensusClientsDataCompact> =
+        census_history.into_iter().map(|c| c.into()).collect();
+
+    Ok(Json(census_history_compact))
+}
+
+#[derive(FromQueryResult, Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeeklyCensusClientVersionsData {
+    census_id: i32,
+    start: DateTime<Utc>,
+    version: Version,
+    node_count: i64,
+}
+
+pub async fn weekly_census_client_versions(
+    http_args: HttpQuery<HashMap<String, String>>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<WeeklyCensusClientVersionsData>>, StatusCode> {
+    let weeks_ago: i32 = match http_args.get("weeks-ago") {
+        None => 0,
+        Some(weeks_ago) => weeks_ago.parse::<i32>().unwrap_or(0),
+    };
+
+    let subprotocol = get_subprotocol_from_params(&http_args);
+
+    let Some(client_slug) = http_args.get("client") else {
+        return Err(StatusCode::BAD_REQUEST);
+        //Some(client) => Client::from(client.clone()),
+    };
+
+    let client: Client = client_slug.to_string().into();
+
+    let census_history: Vec<WeeklyCensusClientVersionsData> =
+        WeeklyCensusClientVersionsData::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "
+            SELECT
+                census.id AS census_id,
+                ANY_VALUE(DATE_TRUNC('second', census.started_at)) AS start,
+                census_node.client_version AS version,
+                COUNT(1) AS node_count
+            FROM census
+            LEFT JOIN census_node ON census.id = census_node.census_id
+            WHERE
+                census.sub_network = $2 AND
+                census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
+                census.started_at < NOW() - INTERVAL '1 week' * $1 AND
+                census_node.sub_network = $2 AND
+                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
+                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes' AND
+                census_node.client_name = $3
+             GROUP BY
+              census.id,
+              census_node.client_version
+            ORDER BY census.started_at
+        ",
+            vec![
+                weeks_ago.into(),
+                subprotocol.into(),
+                client.to_string().into(),
+            ],
+        ))
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Failed to lookup census node timeseries by client versions data");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(census_history))
+}
+
+#[derive(FromQueryResult)]
+pub struct CensusHistoryOperatinSytemData {
+    census_id: i32,
+    start: DateTime<Utc>,
+    operating_system: OperatingSystem,
+    node_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CensusHistoryOperatinSytemDataCompact {
+    census_id: i32,
+    start: DateTime<Utc>,
+    operating_system_slug: String,
+    node_count: i64,
+}
+
+impl From<CensusHistoryOperatinSytemData> for CensusHistoryOperatinSytemDataCompact {
+    fn from(value: CensusHistoryOperatinSytemData) -> Self {
+        CensusHistoryOperatinSytemDataCompact {
+            census_id: value.census_id,
+            start: value.start,
+            operating_system_slug: value.operating_system.to_string(),
+            node_count: value.node_count,
+        }
+    }
+}
+pub async fn weekly_census_operating_systems(
+    http_args: HttpQuery<HashMap<String, String>>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<CensusHistoryOperatinSytemDataCompact>>, StatusCode> {
+    let weeks_ago: i32 = match http_args.get("weeks-ago") {
+        None => 0,
+        Some(weeks_ago) => weeks_ago.parse::<i32>().unwrap_or(0),
+    };
+
+    let subprotocol = get_subprotocol_from_params(&http_args);
+
+    let census_history: Vec<CensusHistoryOperatinSytemData> =
+        CensusHistoryOperatinSytemData::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "
+            SELECT
+                census.id AS census_id,
+                ANY_VALUE(DATE_TRUNC('second', census.started_at)) AS start,
+                census_node.operating_system,
+                COUNT(1) AS node_count
+            FROM census
+            LEFT JOIN census_node ON census.id = census_node.census_id
+            WHERE
+                census.sub_network = $2 AND
+                census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
+                census.started_at < NOW() - INTERVAL '1 week' * $1 AND
+                census_node.sub_network = $2 AND
+                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
+                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes'
+            GROUP BY
+              census.id,
+              census_node.operating_system
+            ORDER BY census.started_at
+        ",
+            vec![weeks_ago.into(), subprotocol.into()],
+        ))
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Failed to lookup census node timeseries by operating system data");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let census_history_compact: Vec<CensusHistoryOperatinSytemDataCompact> =
+        census_history.into_iter().map(|c| c.into()).collect();
+
+    Ok(Json(census_history_compact))
 }
 
 #[derive(Debug, Clone, Serialize, FromQueryResult)]

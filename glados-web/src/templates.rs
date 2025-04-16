@@ -3,17 +3,17 @@ use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Response},
 };
-use sea_orm::strum::EnumMessage;
-
-use entity::{
-    audit_result_latest::ContentType,
-    client_info,
-    content::{self, SubProtocol},
-    content_audit, execution_metadata, key_value, node, record,
-};
+use sea_orm::strum::{EnumMessage, EnumProperty};
 
 use crate::routes::{
     CalculatedRadiusChartData, ClientDiversityResult, PaginatedCensusListResult, RawEnr,
+};
+use entity::{
+    audit_result_latest::ContentType,
+    census_node::{Client, OperatingSystem},
+    client_info,
+    content::{self, SubProtocol},
+    content_audit, execution_metadata, key_value, node, record,
 };
 use glados_core::stats::{AuditStats, StrategyFilter};
 
@@ -121,6 +121,14 @@ pub struct ContentKeyDetailTemplate {
     pub content_kind: String,
     pub block_number: Option<i32>,
     pub contentaudit_list: Vec<content_audit::Model>,
+}
+
+#[derive(Template)]
+#[template(path = "clients.html")]
+pub struct ClientsTemplate {
+    pub subprotocol: SubProtocol,
+    pub clients: Vec<Client>,
+    pub operating_systems: Vec<OperatingSystem>,
 }
 
 pub struct HtmlTemplate<T: Template>(pub T);

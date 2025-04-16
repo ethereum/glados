@@ -65,6 +65,7 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
         .route("/census/census-list/", get(routes::census_explorer_list))
         .route("/census/", get(routes::single_census_view))
         .route("/census/explorer", get(routes::census_explorer))
+        .route("/clients", get(routes::clients_overview))
         .route("/network/node/:node_id_hex/", get(routes::node_detail))
         .route(
             "/network/node/:node_id_hex/enr/:enr_seq/",
@@ -105,6 +106,18 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
         )
         .route("/api/failed-keys/", get(routes::get_failed_keys_handler))
         .route("/api/census-weekly/", get(routes::weekly_census_history))
+        .route(
+            "/api/census-weekly-clients/",
+            get(routes::weekly_census_clients),
+        )
+        .route(
+            "/api/census-weekly-client-versions/",
+            get(routes::weekly_census_client_versions),
+        )
+        .route(
+            "/api/census-weekly-os/",
+            get(routes::weekly_census_operating_systems),
+        )
         .route(
             "/census/census-node-timeseries-data/",
             get(routes::census_timeseries),
