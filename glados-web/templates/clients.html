@@ -4,6 +4,7 @@
 
 {% block head %}
 <script src="/static/js/d3.min.js"></script>
+<script src="/static/js/explanations.js"></script>
 <link href="/static/css/spin.css" rel="stylesheet" />
 {% endblock %}
 
@@ -16,7 +17,7 @@
                 <div class="card-body">
                     <button class="question-mark" aria-label="Toggle explanation"></button>
                     <div class="explanation">
-                        This graph shows the amount of nodes that were reachable at each census (every 15 minutes).
+                        This graph shows the clients used by the nodes that were reachable at each census (every 15 minutes).
                     </div>
                     <div class="table-responsive">
                         <div id="census-weekly-clients-graph-container">
@@ -33,7 +34,7 @@
                 <div class="card-body">
                     <button class="question-mark" aria-label="Toggle explanation"></button>
                     <div class="explanation">
-                        This graph shows the result of the latest audit for each block
+                        This graph shows the client versions used by the nodes that were reachable at each census (every 15 minutes).
                     </div>
                     <div class="table-responsive">
                         <select
@@ -61,7 +62,7 @@
                 <div class="card-body">
                     <button class="question-mark" aria-label="Toggle explanation"></button>
                     <div class="explanation">
-                        This graph shows the amount of nodes that were reachable at each census (every 15 minutes).
+                        This graph shows the operating systems of nodes that were reachable at each census (every 15 minutes).
                     </div>
                     <div class="table-responsive">
                         <div id="census-weekly-os-graph-container">
