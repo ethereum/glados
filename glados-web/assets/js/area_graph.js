@@ -318,7 +318,7 @@ async function loadChart(graphConfig) {
     const y0 = y.invert(relY);
 
     // Get datapoint under the mouse
-    const pointedDatum = data.filter((datapoint) => datapoint.date > x0)[0];
+    const pointedDatum = data.filter((datapoint) => datapoint.date >= x0)[0];
 
     let pointedDateValues = {};
     if (stackHundrethPercent) {
