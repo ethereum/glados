@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Clients Overview{% endblock %}
+
+{% block head %}
+<script src="/static/js/d3.min.js"></script>
+<script src="/static/js/explanations.js"></script>
+<link href="/static/css/spin.css" rel="stylesheet" />
+{% endblock %}
+
+{% block content %}
+
+<div class="container">
+    <div class="row">
+        <div class="col-lg-12 col-md-12 col-sm-12 margin-bottom">
+            <div class="card pie-box h-100">
+                <div class="card-body">
+                    <button class="question-mark" aria-label="Toggle explanation"></button>
+                    <div class="explanation">
+                        This graph shows the clients used by the nodes that were reachable at each census (every 15 minutes).
+                    </div>
+                    <div class="table-responsive">
+                        <div id="census-weekly-clients-graph-container">
+                            <div id="census-weekly-clients-graph"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-lg-12 col-md-12 col-sm-12 margin-bottom">
+            <div class="card pie-box h-100">
+                <div class="card-body">
+                    <button class="question-mark" aria-label="Toggle explanation"></button>
+                    <div class="explanation">
+                        This graph shows the client versions used by the nodes that were reachable at each census (every 15 minutes).
+                    </div>
+                    <div class="table-responsive">
+                        <select
+                            id="census-weekly-client-versions-select"
+                            class="form-select"
+                            style="width: auto"
+                        >
+                        {% for client in clients %}
+                          {% if client.get_str("placeholder").unwrap() == "false" %}
+                            <option value = "{{client.to_string()}}">{{client.get_str("name").unwrap()}}</option>
+                          {% endif %}
+                        {% endfor %}
+                        </select>
+                        <div id="census-weekly-client-versions-graph-container" style="position: relative">
+                            <div id="census-weekly-client-versions-graph"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-lg-12 col-md-12 col-sm-12 margin-bottom">
+            <div class="card pie-box h-100">
+                <div class="card-body">
+                    <button class="question-mark" aria-label="Toggle explanation"></button>
+                    <div class="explanation">
+                        This graph shows the operating systems of nodes that were reachable at each census (every 15 minutes).
+                    </div>
+                    <div class="table-responsive">
+                        <div id="census-weekly-os-graph-container">
+                            <div id="census-weekly-os-graph"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="module">
+    import {areaGraph} from "../static/js/area_graph.js";
+
+    areaGraph({
+      baseName: "census-weekly-clients",
+      baseUrl: "/api/census-weekly-clients/?",
+      graphTitle: "Clients Distribution, by week",
+      labelY: "# of nodes",
+      kind: "weekly",
+      dataShape: "long",
+      keyAttribute: "clientSlug",
+      valueAttribute: "nodeCount",
+      seriesMetadata: {{ clients| json | safe }},
+      initialRanges: {
+        x: [Date.now() - 7 * 24 * 60 * 60 * 1000, Date.now()],
+        y: [0, 100],
+      }
+    });
+
+    areaGraph({
+      baseName: "census-weekly-client-versions",
+      baseUrl: "/api/census-weekly-client-versions/?",
+      graphTitle: "Client Versions Distribution, by week",
+      labelY: "# of nodes",
+      kind: "weekly",
+      dataShape: "long",
+      keyAttribute: "version",
+      valueAttribute: "nodeCount",
+      selectParam: "client",
+      seriesMetadata: {{ clients| json | safe }},
+      sortDescending: true,
+      initialRanges: {
+        x: [Date.now() - 7 * 24 * 60 * 60 * 1000, Date.now()],
+        y: [0, 100],
+      },
+      customSeriesDisplayFn: (seriesMetadata, keys, select) =>
+        Object.fromEntries(
+          keys.map((k, i, arr) => [
+            k,
+            {
+              color: d3
+                .color(seriesMetadata[select.value].color)
+                .brighter((i - Math.floor(arr.length / 2)) / 2),
+              name: k,
+            },
+          ]),
+        ),
+    });
+
+  areaGraph({
+      baseName: "census-weekly-os",
+      baseUrl: "/api/census-weekly-os/?",
+      graphTitle: "Operating System Distribution, by week",
+      labelY: "# of nodes",
+      kind: "weekly",
+      dataShape: "long",
+      keyAttribute: "operatingSystemSlug",
+      valueAttribute: "nodeCount",
+      seriesMetadata: {{ operating_systems| json | safe }},
+      initialRanges: {
+        x: [Date.now() - 7 * 24 * 60 * 60 * 1000, Date.now()],
+        y: [0, 100],
+      }
+    });
+</script>
+
+{% endblock %}

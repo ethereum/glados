@@ -9,8 +9,11 @@ use enr::NodeId;
 use ethportal_api::Enr;
 use ethportal_api::{generate_random_remote_enr, jsonrpsee::http_client::HttpClientBuilder};
 use ethportal_api::{
-    types::ping_extensions::decode::PingExtension, BeaconNetworkApiClient, HistoryNetworkApiClient,
-    StateNetworkApiClient,
+    types::ping_extensions::{
+        decode::PingExtension,
+        extensions::type_0::{ClientInfo, ClientInfoRadiusCapabilities},
+    },
+    BeaconNetworkApiClient, HistoryNetworkApiClient, StateNetworkApiClient,
 };
 use sea_orm::DatabaseConnection;
 use std::collections::{HashMap, HashSet};
@@ -99,6 +102,7 @@ struct DHTCensusRecord {
     enr: Enr,
     record_id: i32,
     data_radius: U256,
+    client_info: Option<ClientInfo>,
     surveyed_at: DateTime<Utc>,
 }
 
@@ -189,14 +193,20 @@ impl DHTCensus {
         known.insert(node_id.raw())
     }
 
-    async fn add_alive(&self, enr: Enr, record_id: i32, data_radius: U256) {
+    async fn add_alive(
+        &self,
+        enr: Enr,
+        record_id: i32,
+        capabilities: ClientInfoRadiusCapabilities,
+    ) {
         if self.alive.read().await.contains_key(&enr.node_id().raw()) {
             return;
         }
         let census_record = DHTCensusRecord {
             enr,
             record_id,
-            data_radius,
+            data_radius: *capabilities.data_radius,
+            client_info: capabilities.client_info,
             surveyed_at: Utc::now(),
         };
         let mut alive = self.alive.write().await;
@@ -364,6 +374,7 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
             census_model.id,
             census_record.record_id,
             census_record.data_radius,
+            census_record.client_info.as_ref(),
             census_record.surveyed_at,
             config.subnetwork.into(),
             &conn,
@@ -470,15 +481,17 @@ async fn do_liveliness_check(
 
             // Mark node as known to be alive
 
-            if let Some(data_radius) = match PingExtension::decode_json(
+            if let Some(capabilities) = match PingExtension::decode_json(
                 pong_info.payload_type,
                 pong_info.payload,
             ) {
-                Ok(PingExtension::Capabilities(payload)) => Some(payload.data_radius),
-                Ok(PingExtension::BasicRadius(payload)) => Some(payload.data_radius),
-                Ok(PingExtension::HistoryRadius(payload)) => Some(payload.data_radius),
+                Ok(PingExtension::Capabilities(capabilities)) => Some(capabilities),
                 Ok(PingExtension::Error(err)) => {
                     warn!(node_id=?B256::from(enr.node_id().raw()), err=?err, "Node responded with error PONG");
+                    None
+                }
+                Ok(_) => {
+                    warn!(node_id=?B256::from(enr.node_id().raw()),  "Unexpected PONG type");
                     None
                 }
                 Err(err) => {
@@ -487,7 +500,7 @@ async fn do_liveliness_check(
                 }
             } {
                 census
-                    .add_alive(enr.clone(), record_model.id, *data_radius)
+                    .add_alive(enr.clone(), record_model.id, capabilities)
                     .await;
                 // Send enr to process that enumerates its routing table
                 match to_enumerate_tx.send(enr.clone()).await {

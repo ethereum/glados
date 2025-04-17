@@ -2,9 +2,19 @@
 use alloy_primitives::U256;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
+use sea_orm::{
+    entity::prelude::*,
+    strum::{Display, EnumProperty},
+    ActiveValue::NotSet,
+    ColIdx, QueryResult, Set, TryGetError, TryGetable,
+};
+use serde::{
+    ser::{Serialize as SerializeTrait, SerializeStruct, Serializer},
+    Deserialize, Serialize,
+};
 
 use crate::content::SubProtocol;
+use ethportal_api::types::ping_extensions::extensions::type_0::ClientInfo;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "census_node")]
@@ -17,6 +27,12 @@ pub struct Model {
     pub data_radius: Vec<u8>,
     pub data_radius_high: i64,
     pub sub_network: SubProtocol,
+    pub client_name: Option<String>,
+    pub client_version: Option<String>,
+    pub short_commit: Option<String>,
+    pub operating_system: Option<String>,
+    pub cpu_architecture: Option<String>,
+    pub programming_language_version: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -51,6 +67,7 @@ pub async fn create(
     census_id: i32,
     record_id: i32,
     data_radius: U256,
+    client_info: Option<&ClientInfo>,
     surveyed_at: DateTime<Utc>,
     network: SubProtocol,
     conn: &DatabaseConnection,
@@ -62,11 +79,187 @@ pub async fn create(
         id: NotSet,
         census_id: Set(census_id),
         record_id: Set(record_id),
-        surveyed_at: Set(surveyed_at),
         data_radius: Set(data_radius_raw.into()),
         data_radius_high: Set(data_radius_high),
+        client_name: Set(client_info.as_ref().map(|c| c.client_name.clone())),
+        client_version: Set(client_info.as_ref().map(|c| c.client_version.clone())),
+        short_commit: Set(client_info.as_ref().map(|c| c.short_commit.clone())),
+        operating_system: Set(client_info.as_ref().map(|c| c.operating_system.clone())),
+        cpu_architecture: Set(client_info.as_ref().map(|c| c.cpu_architecture.clone())),
+        programming_language_version: Set(client_info
+            .as_ref()
+            .map(|c| c.programming_language_version.clone())),
+        surveyed_at: Set(surveyed_at),
         sub_network: Set(network),
     };
 
     Ok(census.insert(conn).await?)
+}
+
+#[derive(Debug, Clone, Display, Deserialize, EnumIter, EnumProperty)]
+#[strum(serialize_all = "lowercase")]
+pub enum Client {
+    #[strum(props(color = "#9B59B6", name = "Trin", placeholder = "false"))]
+    Trin,
+    #[strum(props(color = "#3498DB", name = "Fluffy", placeholder = "false"))]
+    Fluffy,
+    #[strum(props(color = "#DA251D", name = "Shisui", placeholder = "false"))]
+    Shisui,
+    #[strum(props(color = "#E67E22", name = "Ultralight", placeholder = "false"))]
+    Ultralight,
+    #[strum(props(color = "#808080", name = "Other", placeholder = "true"))]
+    Other,
+    #[strum(props(color = "#DDDDDD", name = "Unknown", placeholder = "true"))]
+    Unknown,
+}
+
+impl From<String> for Client {
+    fn from(value: String) -> Self {
+        match value.to_lowercase().as_str() {
+            "fluffy" => Client::Fluffy,
+            "shisui" => Client::Shisui,
+            "trin" => Client::Trin,
+            "ultralight" => Client::Ultralight,
+            _ => Client::Other,
+        }
+    }
+}
+
+impl From<Option<String>> for Client {
+    fn from(value: Option<String>) -> Self {
+        match value {
+            Some(value) => value.into(),
+            None => Client::Unknown,
+        }
+    }
+}
+
+impl TryGetable for Client {
+    fn try_get_by<I: ColIdx>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
+        let value: Option<String> = res.try_get_by(index)?;
+        Ok(value.into())
+    }
+}
+
+impl SerializeTrait for Client {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_struct("Client", 3)?;
+        s.serialize_field("slug", &self.to_string())?;
+        s.serialize_field("name", &self.get_str("name"))?;
+        s.serialize_field("color", &self.get_str("color"))?;
+        s.end()
+    }
+}
+
+#[derive(Debug, Clone, Display, Deserialize, EnumIter)]
+pub enum CpuArchitecture {
+    X86_64,
+    AArch64,
+    Unknown,
+    Other,
+}
+impl From<String> for CpuArchitecture {
+    fn from(value: String) -> Self {
+        match value.to_lowercase().as_str() {
+            "amd64" | "x64" | "x86_64" => CpuArchitecture::X86_64,
+            "aarch64" | "ARM64" => CpuArchitecture::AArch64,
+            _ => CpuArchitecture::Other,
+        }
+    }
+}
+impl From<Option<String>> for CpuArchitecture {
+    fn from(value: Option<String>) -> Self {
+        match value {
+            Some(value) => value.into(),
+            None => CpuArchitecture::Unknown,
+        }
+    }
+}
+impl TryGetable for CpuArchitecture {
+    fn try_get_by<I: ColIdx>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
+        let value: Option<String> = res.try_get_by(index)?;
+        Ok(value.into())
+    }
+}
+
+#[derive(Debug, Clone, Display, Deserialize, EnumIter, EnumProperty)]
+pub enum OperatingSystem {
+    #[strum(props(color = "#22AC66", name = "Linux"))]
+    Linux,
+    #[strum(props(color = "#F5A623", name = "macOS"))]
+    MacOS,
+    #[strum(props(color = "#0078D7", name = "Windows"))]
+    Windows,
+    #[strum(props(color = "#808080", name = "Other"))]
+    Other,
+    #[strum(props(color = "#DDDDDD", name = "Unknown"))]
+    Unknown,
+}
+impl From<String> for OperatingSystem {
+    fn from(value: String) -> Self {
+        match value.to_lowercase().as_str() {
+            "linux" => OperatingSystem::Linux,
+            "darwin" | "macos" => OperatingSystem::MacOS,
+            "windows" => OperatingSystem::Windows,
+            _ => OperatingSystem::Other,
+        }
+    }
+}
+
+impl From<Option<String>> for OperatingSystem {
+    fn from(value: Option<String>) -> Self {
+        match value {
+            Some(value) => value.into(),
+            None => OperatingSystem::Unknown,
+        }
+    }
+}
+
+impl TryGetable for OperatingSystem {
+    fn try_get_by<I: ColIdx>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
+        let value: Option<String> = res.try_get_by(index)?;
+        Ok(value.into())
+    }
+}
+
+impl SerializeTrait for OperatingSystem {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_struct("OperatingSystem", 3)?;
+        s.serialize_field("slug", &self.to_string())?;
+        s.serialize_field("name", &self.get_str("name"))?;
+        s.serialize_field("color", &self.get_str("color"))?;
+        s.end()
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Version(String);
+
+impl From<String> for Version {
+    fn from(value: String) -> Self {
+        // Versions are not completely sanitized, to allow for non-numeric only versions
+        Version(value.strip_prefix('v').unwrap_or(&value).to_string())
+    }
+}
+
+impl From<Option<String>> for Version {
+    fn from(value: Option<String>) -> Self {
+        match value {
+            Some(value) => value.into(),
+            None => "Unknown".to_string().into(),
+        }
+    }
+}
+
+impl TryGetable for Version {
+    fn try_get_by<I: ColIdx>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
+        let value: Option<String> = res.try_get_by(index)?;
+        Ok(value.into())
+    }
 }
