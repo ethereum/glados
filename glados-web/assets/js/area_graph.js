@@ -570,7 +570,7 @@ async function loadChart(graphConfig) {
 }
 
 export var areaGraph = async function (graphConfig) {
-  if (graphConfig.selectField) {
+  if (graphConfig.selectParam) {
     document
       .getElementById(`${graphConfig.baseName}-select`)
       .addEventListener("change", () => {
