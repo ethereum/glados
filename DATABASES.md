@@ -14,7 +14,7 @@ Descriptions of the databases used in glados
     - Based on an existing unique identifier, such as a block hash or transaction hash.
     - Is combined with a selector, allowing two elements from the same block to have different
     content keys. (e.g., body and receipts, which otherwise have the same block hash).
-    - See [spec](https://github.com/ethereum/portal-network-specs/blob/master/history-network.md#data-types).
+    - See [spec](https://github.com/ethereum/portal-network-specs/blob/master/history/history-network.md#data-types).
 - Content id
     - An identifier that is useful in coordinating content in the network.
     - Derived by hashing the content key.
