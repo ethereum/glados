@@ -1,6 +1,12 @@
 use std::fmt::Display;
 
 use chrono::{DateTime, Utc};
+use sea_orm::{
+    sea_query::{Expr, IntoCondition},
+    ColumnTrait, DatabaseConnection, DbErr, EntityTrait, JoinType, PaginatorTrait, QueryFilter,
+    QuerySelect, RelationTrait, Select,
+};
+use serde::Deserialize;
 
 use entity::{
     content::{self, SubProtocol},
@@ -9,12 +15,6 @@ use entity::{
         StateSelectionStrategy,
     },
 };
-use sea_orm::{
-    sea_query::{Expr, IntoCondition},
-    ColumnTrait, DatabaseConnection, DbErr, EntityTrait, JoinType, PaginatorTrait, QueryFilter,
-    QuerySelect, RelationTrait, Select,
-};
-use serde::Deserialize;
 
 /// Generates a SeaORM select query for audits based on the provided filters.
 /// User can decide whether to retrieve or only count results.
@@ -23,7 +23,7 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
     // This base query will have filters added to it
     let audits = content_audit::Entity::find();
     let audits = audits.join(
-        JoinType::LeftJoin,
+        JoinType::Join,
         content_audit::Relation::Content
             .def()
             .on_condition(move |_left, _right| {
