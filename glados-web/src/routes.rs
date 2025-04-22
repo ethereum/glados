@@ -1,3 +1,9 @@
+use std::collections::{HashMap, HashSet};
+use std::fmt::Formatter;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::{fmt::Display, io};
+
 use alloy::rlp::Decodable;
 use alloy_primitives::{hex, B256, U256};
 use axum::{
@@ -8,42 +14,22 @@ use axum::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use enr::NodeId;
-use entity::{
-    audit_result_latest::ContentType,
-    content,
-    content_audit::{self, AuditResult},
-    execution_metadata, key_value, node, record,
+use ethportal_api::{
+    jsonrpsee::core::__reexports::serde_json,
+    types::{
+        distance::{Distance, Metric, XorMetric},
+        protocol_versions::ProtocolVersionList,
+        query_trace::QueryTrace,
+    },
+    utils::bytes::{hex_decode, hex_encode},
+    BeaconContentKey, HistoryContentKey, OverlayContentKey, StateContentKey,
 };
-use entity::{
-    audit_stats, census, census_node,
-    census_node::{Client, OperatingSystem, Version},
-    client_info,
-    content::SubProtocol,
-};
-use ethportal_api::types::{
-    distance::{Distance, Metric, XorMetric},
-    protocol_versions::ProtocolVersionList,
-    query_trace::QueryTrace,
-};
-use ethportal_api::utils::bytes::{hex_decode, hex_encode};
-use ethportal_api::{jsonrpsee::core::__reexports::serde_json, BeaconContentKey, StateContentKey};
-use ethportal_api::{HistoryContentKey, OverlayContentKey};
-use glados_core::stats::{
-    filter_audits, get_audit_stats, get_new_content_count, AuditFilters, ContentTypeFilter, Period,
-    StrategyFilter, SuccessFilter,
-};
-use migration::{Alias, Order};
 use sea_orm::{
     sea_query::{Expr, Query, SimpleExpr},
     ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult,
     Iterable, LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, Statement,
 };
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
-use std::fmt::Formatter;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::{fmt::Display, io};
 use tracing::{debug, error, info, warn};
 
 use crate::templates::{
@@ -53,6 +39,20 @@ use crate::templates::{
     IndexTemplate, NodeDetailTemplate, PaginatedCensusListTemplate, SingleCensusViewTemplate,
 };
 use crate::{state::State, templates::AuditTuple};
+use entity::{
+    audit_result_latest::ContentType,
+    audit_stats, census, census_node,
+    census_node::{Client, OperatingSystem, Version},
+    client_info, content,
+    content::SubProtocol,
+    content_audit::{self, AuditResult},
+    execution_metadata, key_value, node, record,
+};
+use glados_core::stats::{
+    filter_audits, get_audit_stats, get_new_content_count, AuditFilters, ContentTypeFilter, Period,
+    StrategyFilter, SuccessFilter,
+};
+use migration::{Alias, Order};
 
 //
 // Routes
@@ -1521,6 +1521,97 @@ pub async fn weekly_census_protocol_versions(
     Ok(Json(census_history_compact))
 }
 
+fn nest_protocol_versions_clients(
+    census: Vec<CensusProtocolVersionsClientsData>,
+) -> HashMap<String, HashMap<String, i64>> {
+    let mut nested = HashMap::<String, HashMap<String, i64>>::new();
+
+    for row in census.into_iter() {
+        let protocol_versions = match row.protocol_versions {
+            Some(raw_protocol_versions) => {
+                let protocol_version_list: ProtocolVersionList =
+                    Decodable::decode(&mut raw_protocol_versions.as_slice())
+                        .expect("Error decoding supported protocol versions");
+
+                let protocol_versions: Vec<u8> =
+                    protocol_version_list.iter().map(|p| u8::from(*p)).collect();
+
+                protocol_versions
+                    .iter()
+                    .map(|pv| "v".to_string() + &pv.to_string())
+                    .collect()
+            }
+            None => vec!["Unknown".to_string()],
+        };
+
+        for protocol_version in protocol_versions.iter() {
+            *nested
+                .entry(protocol_version.to_string())
+                .or_default()
+                .entry(row.client.to_string())
+                .or_default() += row.node_count;
+        }
+    }
+    nested
+}
+
+#[derive(FromQueryResult, Debug)]
+pub struct CensusProtocolVersionsClientsData {
+    protocol_versions: Option<Vec<u8>>,
+    client: Client,
+    node_count: i64,
+}
+pub async fn census_protocol_versions_clients(
+    http_args: HttpQuery<HashMap<String, String>>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<HashMap<String, HashMap<String, i64>>>, StatusCode> {
+    let subprotocol = get_subprotocol_from_params(&http_args);
+
+    let census: Vec<CensusProtocolVersionsClientsData> =
+        CensusProtocolVersionsClientsData::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "
+            SELECT
+                protocol_versions.versions AS protocol_versions,
+                client_name as client,
+                COUNT(1) AS node_count
+            FROM census
+            LEFT JOIN census_node ON census.id = census_node.census_id
+            LEFT JOIN record ON census_node.record_id = record.id
+            LEFT JOIN (
+                SELECT
+                    record_id,
+                    value AS versions
+                FROM key_value
+                WHERE key = '\\x7076'
+            ) protocol_versions ON record.id = protocol_versions.record_id
+            WHERE
+                census.id = (
+                    SELECT MAX(id)
+                    FROM census
+                    WHERE sub_network = $1
+                ) AND
+                census_node.census_id = (
+                    SELECT MAX(id)
+                    FROM census
+                    WHERE sub_network = $1
+                )
+            GROUP BY
+                versions,
+                client_name
+        ",
+            vec![subprotocol.into()],
+        ))
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Failed to lookup census node timeseries by client protocol versions");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(nest_protocol_versions_clients(census)))
+}
+
 #[derive(Debug, Clone, Serialize, FromQueryResult)]
 #[serde(rename_all = "camelCase")]
 pub struct AuditBlockStatusData {
@@ -1918,4 +2009,79 @@ async fn generate_client_diversity_data(
             ", vec![census_id.into()])
         ).all(&state.database_connection).await.unwrap(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_nest_protocol_versions_clients() {
+        let census = vec![
+            CensusProtocolVersionsClientsData {
+                client: Client::from("shisui".to_string()),
+                protocol_versions: Some(vec![0u8]),
+                node_count: 1,
+            },
+            CensusProtocolVersionsClientsData {
+                client: Client::from("ultralight".to_string()),
+                protocol_versions: Some(vec![0u8]),
+                node_count: 7,
+            },
+            CensusProtocolVersionsClientsData {
+                client: Client::from("shisui".to_string()),
+                protocol_versions: Some(vec![130u8, 0u8, 1u8]),
+                node_count: 8,
+            },
+            CensusProtocolVersionsClientsData {
+                client: Client::from("trin".to_string()),
+                protocol_versions: Some(vec![130u8, 0u8, 1u8]),
+                node_count: 213,
+            },
+            CensusProtocolVersionsClientsData {
+                client: Client::from(None),
+                protocol_versions: Some(vec![130u8, 0u8, 1u8]),
+                node_count: 191,
+            },
+            CensusProtocolVersionsClientsData {
+                client: Client::from("trin".to_string()),
+                protocol_versions: None,
+                node_count: 21,
+            },
+            CensusProtocolVersionsClientsData {
+                client: Client::from(None),
+                protocol_versions: None,
+                node_count: 1,
+            },
+        ];
+
+        let nested = nest_protocol_versions_clients(census);
+
+        let expected_nested = HashMap::from_iter([
+            (
+                "Unknown".to_string(),
+                HashMap::from_iter([("trin".to_string(), 21), ("unknown".to_string(), 1)]),
+            ),
+            (
+                "v0".to_string(),
+                HashMap::from_iter([
+                    ("trin".to_string(), 213),
+                    ("shisui".to_string(), 9),
+                    ("ultralight".to_string(), 7),
+                    ("unknown".to_string(), 191),
+                ]),
+            ),
+            (
+                "v1".to_string(),
+                HashMap::from_iter([
+                    ("trin".to_string(), 213),
+                    ("shisui".to_string(), 8),
+                    ("unknown".to_string(), 191),
+                ]),
+            ),
+        ]);
+
+        assert_eq!(nested, expected_nested);
+    }
 }
