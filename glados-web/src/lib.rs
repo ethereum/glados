@@ -123,6 +123,10 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
             get(routes::weekly_census_operating_systems),
         )
         .route(
+            "/api/census-protocol-versions-clients/",
+            get(routes::census_protocol_versions_clients),
+        )
+        .route(
             "/census/census-node-timeseries-data/",
             get(routes::census_timeseries),
         )

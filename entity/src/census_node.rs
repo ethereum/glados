@@ -109,7 +109,7 @@ pub enum Client {
     Ultralight,
     #[strum(props(color = "#808080", name = "Other", placeholder = "true"))]
     Other,
-    #[strum(props(color = "#DDDDDD", name = "Unknown", placeholder = "true"))]
+    #[strum(props(color = "#BBBBBB", name = "Unknown", placeholder = "true"))]
     Unknown,
 }
 
@@ -195,7 +195,7 @@ pub enum OperatingSystem {
     Windows,
     #[strum(props(color = "#808080", name = "Other"))]
     Other,
-    #[strum(props(color = "#DDDDDD", name = "Unknown"))]
+    #[strum(props(color = "#BBBBBB", name = "Unknown"))]
     Unknown,
 }
 impl From<String> for OperatingSystem {
