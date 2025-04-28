@@ -8,3 +8,6 @@ venv
 
 # ctags files
 rusty-tags.*
+
+# local shell scripts
+*.sh
