@@ -187,6 +187,23 @@
             </div>
         </div>
     </div>
+    <div class="row">
+        <div class="col-lg-12 col-md-12 col-sm-12 margin-bottom">
+            <div class="card pie-box h-100">
+                <div class="card-body">
+                    <button class="question-mark" aria-label="Toggle explanation"></button>
+                    <div class="explanation">
+                        This graph shows the maximum version of the Portal Protocol supported by the nodes that were reachable at each census (every 15 minutes).
+                    </div>
+                    <div class="table-responsive">
+                        <div id="transfer-failures-graph-container">
+                            <div id="transfer-failures-graph"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
   {% if subprotocol == SubProtocol::History %}
     <div class="row">
         <div class="col-lg-12 col-md-12 col-sm-12 margin-bottom">
@@ -269,6 +286,48 @@
         x: [Date.now() - 7 * 24 * 60 * 60 * 1000, Date.now()],
         y: [0, 100],
       }
+    });
+
+    areaGraph({
+        baseName: "transfer-failures",
+        baseUrl: "/api/weekly-transfer-failures/?",
+        graphTitle: "Transfer Failures this week, by client",
+        labelY: "# of failures",
+        kind: "weekly",
+        dataShape: "long",
+        keyAttribute: "client",
+        valueAttribute: "failures",
+        seriesMetadata: [
+          {
+            slug: "f",
+            color: "#3498DB",
+            name: "Fluffy",
+          },
+          {
+            slug: "t",
+            color: "#9B59B6",
+            name: "Trin",
+          },
+          {
+            slug: "s",
+            color: "#DA251D",
+            name: "Shisui",
+          },
+          {
+            slug: "u",
+            color: "#E67E22",
+            name: "Ultralight",
+          },
+          {
+            slug: "unknown",
+            color: "#BBBBBB",
+            name: "Unknown",
+          },
+        ],
+        initialRanges: {
+            x: [Date.now() - 7 * 24 * 60 * 60 * 1000, Date.now()],
+            y: [0, 20],
+        }
     });
 
   {% if subprotocol == SubProtocol::History %}

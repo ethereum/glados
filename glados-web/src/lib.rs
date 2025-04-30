@@ -130,6 +130,10 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
             "/census/census-node-timeseries-data/",
             get(routes::census_timeseries),
         )
+        .route(
+            "/api/weekly-transfer-failures/",
+            get(routes::weekly_transfer_failures),
+        )
         .route("/api/audit-block-status/", get(routes::audit_block_status))
         .nest_service("/static/", serve_dir.clone())
         .fallback_service(serve_dir)
