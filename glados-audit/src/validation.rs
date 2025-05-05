@@ -35,7 +35,7 @@ pub fn content_is_valid(content: &content::Model, content_bytes: &[u8]) -> bool 
     }
 }
 
-fn validate_beacon(content_key: &BeaconContentKey, content_bytes: &[u8]) -> bool {
+pub fn validate_beacon(content_key: &BeaconContentKey, content_bytes: &[u8]) -> bool {
     let content: BeaconContentValue = match BeaconContentValue::decode(content_key, content_bytes) {
         Ok(c) => c,
         Err(e) => {
@@ -72,7 +72,7 @@ fn validate_beacon(content_key: &BeaconContentKey, content_bytes: &[u8]) -> bool
     }
 }
 
-fn validate_history(content_key: &HistoryContentKey, content_bytes: &[u8]) -> bool {
+pub fn validate_history(content_key: &HistoryContentKey, content_bytes: &[u8]) -> bool {
     // check deserialization is valid
     let content: HistoryContentValue = match HistoryContentValue::decode(content_key, content_bytes)
     {
