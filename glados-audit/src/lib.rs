@@ -14,6 +14,7 @@ use std::{
     thread::available_parallelism,
     vec,
 };
+use sync_audit::run_sync_audit;
 
 use tokio::{
     sync::mpsc::{self, Receiver},
@@ -40,6 +41,7 @@ pub mod cli;
 pub(crate) mod selection;
 mod state;
 pub mod stats;
+pub mod sync_audit;
 pub(crate) mod validation;
 
 /// Configuration created from CLI arguments.
@@ -61,6 +63,8 @@ pub struct AuditConfig {
     pub state: bool,
     /// Specific state audit strategies to run.
     pub state_strategies: Vec<StateSelectionStrategy>,
+    /// Run 4444 sync audits.
+    pub sync: bool,
     /// Weight for each strategy.
     pub weights: HashMap<HistorySelectionStrategy, u8>,
     /// Number requests to a Portal node active at the same time.
@@ -114,6 +118,7 @@ impl AuditConfig {
         if args.provider_url.is_empty()
             && args.history
             && strategies.contains(&HistorySelectionStrategy::FourFours)
+            && !args.sync
         {
             return Err(anyhow::anyhow!(
                 "No provider URL provided, required when `four_fours` strategy is enabled."
@@ -138,6 +143,7 @@ impl AuditConfig {
             beacon_strategies: args.beacon_strategy.unwrap_or_default(),
             state: args.state,
             state_strategies: args.state_strategy.unwrap_or_default(),
+            sync: args.sync,
         })
     }
 }
@@ -179,6 +185,10 @@ pub async fn run_glados_command(conn: DatabaseConnection, command: cli::Command)
 }
 
 pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
+    if config.sync {
+        run_sync_audit(config.clone(), &conn).await.unwrap();
+        return ();
+    }
     // if state network is enabled, run state audits
     if config.state {
         spawn_state_audit(conn.clone(), config.clone()).await;

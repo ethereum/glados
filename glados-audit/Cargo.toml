@@ -22,6 +22,7 @@ web3.workspace= true
 ethportal-api.workspace = true
 glados-core.workspace = true
 migration.workspace = true
+futures.workspace = true
 rand.workspace = true
 sea-orm.workspace = true
 serde_json.workspace= true

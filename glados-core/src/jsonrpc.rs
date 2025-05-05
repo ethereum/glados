@@ -247,29 +247,10 @@ impl PortalApi {
     ) -> Result<(Option<Content>, QueryTrace), JsonRpcError> {
         match content.protocol_id {
             content::SubProtocol::History => {
-                match HistoryNetworkApiClient::trace_get_content(
-                    &self.client,
-                    HistoryContentKey::try_from_bytes(&content.content_key)?,
-                )
+                self.get_history_content_with_trace(HistoryContentKey::try_from_bytes(
+                    &content.content_key,
+                )?)
                 .await
-                {
-                    Ok(TraceContentInfo { content, trace, .. }) => Ok((
-                        Some(Content {
-                            raw: content.into(),
-                        }),
-                        trace,
-                    )),
-                    Err(err) => match err.into() {
-                        JsonRpcError::ContentNotFound { trace } => {
-                            if let Some(trace) = trace {
-                                Ok((None, trace))
-                            } else {
-                                Err(JsonRpcError::MissingQueryTrace)
-                            }
-                        }
-                        err => Err(err),
-                    },
-                }
             }
             content::SubProtocol::State => {
                 match StateNetworkApiClient::trace_get_content(
@@ -321,6 +302,30 @@ impl PortalApi {
                     },
                 }
             }
+        }
+    }
+
+    pub async fn get_history_content_with_trace(
+        self,
+        key: HistoryContentKey,
+    ) -> Result<(Option<Content>, QueryTrace), JsonRpcError> {
+        match HistoryNetworkApiClient::trace_get_content(&self.client, key).await {
+            Ok(TraceContentInfo { content, trace, .. }) => Ok((
+                Some(Content {
+                    raw: content.into(),
+                }),
+                trace,
+            )),
+            Err(err) => match err.into() {
+                JsonRpcError::ContentNotFound { trace } => {
+                    if let Some(trace) = trace {
+                        Ok((None, trace))
+                    } else {
+                        Err(JsonRpcError::MissingQueryTrace)
+                    }
+                }
+                err => Err(err),
+            },
         }
     }
 }
