@@ -77,7 +77,16 @@ jobs:
             RUSTFLAGS: '-D warnings'
             RUST_LOG: 'debug'
         steps:
-            - checkout
+            - run:
+                name: Check out code, without lfs files
+                command: |
+                  # add github ssh keys to known_hosts
+                  mkdir -p ~/.ssh
+                  curl -L https://api.github.com/meta | jq -r '.ssh_keys | .[]' | sed -e 's/^/github.com /' >> ~/.ssh/known_hosts
+                  # check out the code, but skip lfs files, to avoid going over our lfs quota
+                  GIT_LFS_SKIP_SMUDGE=1 git clone $CIRCLE_REPOSITORY_URL .
+                  git fetch origin $CIRCLE_BRANCH/head:pr-head
+                  git switch pr-head
             - run:
                 name: Prepare for apt upgrades
                 command: sudo apt update
