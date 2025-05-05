@@ -14,6 +14,7 @@ use axum::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use enr::NodeId;
+use entity::sync_audit::{sync_audit, sync_audit_segment};
 use ethportal_api::{
     jsonrpsee::core::__reexports::serde_json,
     types::{
@@ -37,6 +38,7 @@ use crate::templates::{
     ContentAuditDetailTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
     ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate, HtmlTemplate,
     IndexTemplate, NodeDetailTemplate, PaginatedCensusListTemplate, SingleCensusViewTemplate,
+    SyncAuditTemplate,
 };
 use crate::{state::State, templates::AuditTuple};
 use entity::{
@@ -470,6 +472,11 @@ pub async fn contentaudit_dashboard(
 
 pub async fn census_explorer() -> Result<HtmlTemplate<CensusExplorerTemplate>, StatusCode> {
     let template = CensusExplorerTemplate {};
+    Ok(HtmlTemplate(template))
+}
+
+pub async fn sync_audit() -> Result<HtmlTemplate<SyncAuditTemplate>, StatusCode> {
+    let template = SyncAuditTemplate {};
     Ok(HtmlTemplate(template))
 }
 
@@ -2084,4 +2091,68 @@ mod tests {
 
         assert_eq!(nested, expected_nested);
     }
+}
+#[derive(Serialize)]
+struct SyncAuditSummary {
+    segment_start: i32,
+    segment_end: i32,
+    min_ms: i32,
+    max_ms: i32,
+    mean_ms: i32,
+    median_ms: i32,
+    p99_ms: i32,
+    num_errors: i32,
+}
+
+#[derive(Serialize)]
+struct SyncAuditResponse {
+    started_at: DateTime<Utc>,
+    completed_at: Option<DateTime<Utc>>,
+    records: Vec<SyncAuditSummary>,
+}
+
+pub async fn latest_sync_audit_json(
+    Extension(state): Extension<Arc<State>>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let Some(audit) = sync_audit::Entity::find()
+        .order_by_desc(sync_audit::Column::StartedAt)
+        .one(&state.database_connection)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    else {
+        return Err(StatusCode::NOT_FOUND);
+    };
+
+    let records = match audit
+        .find_related(sync_audit_segment::Entity)
+        .order_by_asc(sync_audit_segment::Column::StartBlock)
+        .all(&state.database_connection)
+        .await
+    {
+        Ok(records) => records,
+        Err(e) => {
+            error!("Failed to fetch sync audit segments: {e}");
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    let summaries = records
+        .into_iter()
+        .map(|r| SyncAuditSummary {
+            segment_start: r.start_block,
+            segment_end: r.end_block,
+            min_ms: r.min_response_ms,
+            max_ms: r.max_response_ms,
+            mean_ms: r.mean_response_ms,
+            median_ms: r.median_response_ms,
+            p99_ms: r.p99_response_ms,
+            num_errors: r.num_errors,
+        })
+        .collect();
+
+    Ok(Json(SyncAuditResponse {
+        started_at: audit.started_at,
+        completed_at: audit.completed_at,
+        records: summaries,
+    }))
 }
