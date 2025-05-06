@@ -9,10 +9,9 @@ use crate::routes::{
     CalculatedRadiusChartData, ClientDiversityResult, PaginatedCensusListResult, RawEnr,
 };
 use entity::{
-    audit_result_latest::ContentType,
     census_node::{Client, OperatingSystem},
     client_info,
-    content::{self, SubProtocol},
+    content::{self, ContentType, SubProtocol},
     content_audit, execution_metadata, key_value, node, record,
 };
 use glados_core::stats::{AuditStats, StrategyFilter};
@@ -103,6 +102,8 @@ pub struct ContentKeyListTemplate {
 #[template(path = "audit_dashboard.html")]
 pub struct AuditDashboardTemplate {
     pub subprotocol: SubProtocol,
+    pub content_types: Vec<ContentType>,
+    pub strategies: Vec<content_audit::SelectionStrategy>,
 }
 
 #[derive(Template)]

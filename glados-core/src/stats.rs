@@ -49,7 +49,7 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
             },
         )),
         StrategyFilter::Oldest => audits.filter(content_audit::Column::StrategyUsed.eq(
-            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited),
+            SelectionStrategy::History(HistorySelectionStrategy::OldestUnaudited),
         )),
         StrategyFilter::FourFours => audits.filter(content_audit::Column::StrategyUsed.eq(
             SelectionStrategy::History(HistorySelectionStrategy::FourFours),

@@ -40,12 +40,11 @@ use crate::templates::{
 };
 use crate::{state::State, templates::AuditTuple};
 use entity::{
-    audit_result_latest::ContentType,
     audit_stats, census, census_node,
     census_node::{Client, OperatingSystem, Version},
     client_info, content,
-    content::SubProtocol,
-    content_audit::{self, AuditResult},
+    content::{ContentType, SubProtocol},
+    content_audit::{self, AuditResult, SelectionStrategy},
     execution_metadata, key_value, node, record,
 };
 use glados_core::stats::{
@@ -144,7 +143,7 @@ pub async fn network_overview(
         average_radius_chart: radius_percentages,
         stats: [hour_stats, day_stats, week_stats],
         new_content: [hour_new, day_new, week_new],
-        content_types: ContentType::iter().collect(),
+        content_types: ContentType::vec_subprotocol(subprotocol),
     };
     HtmlTemplate(template)
 }
@@ -464,7 +463,11 @@ pub async fn contentaudit_dashboard(
     params: HttpQuery<HashMap<String, String>>,
 ) -> Result<HtmlTemplate<AuditDashboardTemplate>, StatusCode> {
     let subprotocol = get_subprotocol_from_params(&params);
-    let template = AuditDashboardTemplate { subprotocol };
+    let template = AuditDashboardTemplate {
+        subprotocol,
+        content_types: ContentType::vec_subprotocol(subprotocol),
+        strategies: SelectionStrategy::vec_subprotocol(subprotocol),
+    };
     Ok(HtmlTemplate(template))
 }
 

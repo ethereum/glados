@@ -103,7 +103,7 @@ impl AuditConfig {
                 HistorySelectionStrategy::Latest => args.latest_strategy_weight,
                 HistorySelectionStrategy::Random => args.random_strategy_weight,
                 HistorySelectionStrategy::Failed => args.failed_strategy_weight,
-                HistorySelectionStrategy::SelectOldestUnaudited => args.oldest_strategy_weight,
+                HistorySelectionStrategy::OldestUnaudited => args.oldest_strategy_weight,
                 HistorySelectionStrategy::FourFours => args.four_fours_strategy_weight,
                 HistorySelectionStrategy::SpecificContentKey => 0,
             };

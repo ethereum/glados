@@ -38,7 +38,7 @@ pub enum HistorySelectionStrategy {
     /// Content that is:
     /// 1. Not yet audited.
     /// 2. Sorted by date entered into glados database (oldest first).
-    SelectOldestUnaudited = 3,
+    OldestUnaudited = 3,
     /// Perform a single audit for a previously audited content key.
     SpecificContentKey = 4,
     /// Perform audits of random fourfours data.
@@ -51,7 +51,7 @@ impl From<i32> for HistorySelectionStrategy {
             0 => HistorySelectionStrategy::Latest,
             1 => HistorySelectionStrategy::Random,
             2 => HistorySelectionStrategy::Failed,
-            3 => HistorySelectionStrategy::SelectOldestUnaudited,
+            3 => HistorySelectionStrategy::OldestUnaudited,
             4 => HistorySelectionStrategy::SpecificContentKey,
             5 => HistorySelectionStrategy::FourFours,
             _ => panic!("Invalid value for HistorySelectionStrategy"),
@@ -66,7 +66,7 @@ impl TryFrom<String> for HistorySelectionStrategy {
             "Latest" => Ok(HistorySelectionStrategy::Latest),
             "Random" => Ok(HistorySelectionStrategy::Random),
             "Failed" => Ok(HistorySelectionStrategy::Failed),
-            "SelectOldestUnaudited" => Ok(HistorySelectionStrategy::SelectOldestUnaudited),
+            "OldestUnaudited" => Ok(HistorySelectionStrategy::OldestUnaudited),
             "SpecificContentKey" => Ok(HistorySelectionStrategy::SpecificContentKey),
             "FourFours" => Ok(HistorySelectionStrategy::FourFours),
             _ => bail!("Invalid value for HistorySelectionStrategy {}", value),
@@ -454,8 +454,8 @@ impl SelectionStrategy {
             SelectionStrategy::History(HistorySelectionStrategy::FourFours) => {
                 "FourFours".to_string()
             }
-            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited) => {
-                "Select Oldest Unaudited".to_string()
+            SelectionStrategy::History(HistorySelectionStrategy::OldestUnaudited) => {
+                "Oldest Unaudited".to_string()
             }
             SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey) => {
                 "Specific Content Key".to_string()
@@ -465,6 +465,20 @@ impl SelectionStrategy {
                 "State Roots".to_string()
             }
             SelectionStrategy::State(StateSelectionStrategy::Latest) => "Latest".to_string(),
+        }
+    }
+
+    pub fn vec_subprotocol(subprotocol: SubProtocol) -> Vec<SelectionStrategy> {
+        match subprotocol {
+            SubProtocol::History => HistorySelectionStrategy::iter()
+                .map(SelectionStrategy::History)
+                .collect(),
+            SubProtocol::State => StateSelectionStrategy::iter()
+                .map(SelectionStrategy::State)
+                .collect(),
+            SubProtocol::Beacon => BeaconSelectionStrategy::iter()
+                .map(SelectionStrategy::Beacon)
+                .collect(),
         }
     }
 }
@@ -513,7 +527,7 @@ mod tests {
             2
         );
         assert_eq!(
-            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited).to_value(),
+            SelectionStrategy::History(HistorySelectionStrategy::OldestUnaudited).to_value(),
             3
         );
         assert_eq!(
@@ -550,7 +564,7 @@ mod tests {
         );
         assert_eq!(
             SelectionStrategy::try_from_value(&3).unwrap(),
-            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited)
+            SelectionStrategy::History(HistorySelectionStrategy::OldestUnaudited)
         );
         assert_eq!(
             SelectionStrategy::try_from_value(&4).unwrap(),
@@ -585,8 +599,8 @@ mod tests {
             "Failed"
         );
         assert_eq!(
-            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited).as_text(),
-            "Select Oldest Unaudited"
+            SelectionStrategy::History(HistorySelectionStrategy::OldestUnaudited).as_text(),
+            "Oldest Unaudited"
         );
         assert_eq!(
             SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey).as_text(),
@@ -621,8 +635,8 @@ mod tests {
             HistorySelectionStrategy::Failed
         );
         assert_eq!(
-            HistorySelectionStrategy::try_from("SelectOldestUnaudited".to_string()).unwrap(),
-            HistorySelectionStrategy::SelectOldestUnaudited
+            HistorySelectionStrategy::try_from("OldestUnaudited".to_string()).unwrap(),
+            HistorySelectionStrategy::OldestUnaudited
         );
         assert_eq!(
             HistorySelectionStrategy::try_from("SpecificContentKey".to_string()).unwrap(),
@@ -658,7 +672,7 @@ mod tests {
         );
         assert_eq!(
             Value::from(SelectionStrategy::History(
-                HistorySelectionStrategy::SelectOldestUnaudited
+                HistorySelectionStrategy::OldestUnaudited
             )),
             Value::Int(Some(3))
         );
