@@ -90,7 +90,7 @@ jobs:
                   if [[ $CIRCLE_BRANCH == refs/pull/* ]]; then
                     export REMOTE_BRANCH="${CIRCLE_BRANCH}/head";
                   else
-                    export REMOTE_BRANCH=$CIRCLE_BRANCH;
+                    export REMOTE_BRANCH="$CIRCLE_BRANCH";
                   fi
                   git fetch origin $REMOTE_BRANCH:pr-head
                   git switch pr-head
