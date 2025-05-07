@@ -88,7 +88,7 @@ jobs:
                   # if this is a PR, fix the remote branch name by appending a /head
                   # otherwise, check out the unmodified branch name
                   if [[ $CIRCLE_BRANCH == refs/pull/* ]]; then
-                    export REMOTE_BRANCH=${CIRCLE_BRANCH}/head;
+                    export REMOTE_BRANCH="${CIRCLE_BRANCH}/head";
                   else
                     export REMOTE_BRANCH=$CIRCLE_BRANCH;
                   fi
