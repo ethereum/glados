@@ -79,6 +79,10 @@ function parseDataHundrethWide(rawData, keys) {
   });
 }
 
+const getByKeyOrDefault = function (obj, key) {
+  return obj[key] ?? obj["other"];
+}
+
 /**
  * Customizes how the series are displayed
  *
@@ -138,6 +142,9 @@ async function loadChart(graphConfig) {
     seriesMetadata = Object.fromEntries(
       graphConfig.seriesMetadata.map((s) => [s.slug, s]),
     );
+    if (!("other" in seriesMetadata)) {
+      seriesMetadata["other"] = { color: "#808080", name: "Other" };
+    }
   }
   let seriesProps = {};
 
@@ -352,11 +359,12 @@ async function loadChart(graphConfig) {
           row.attr("class", "fw-bold");
         }
 
+        let keyProps = getByKeyOrDefault(seriesProps, key);
         row
           .append("td")
           .text("♦")
-          .attr("style", `color:${seriesProps[key].color}`);
-        row.append("td").text(seriesProps[key].name);
+          .attr("style", `color:${keyProps.color}`);
+        row.append("td").text(keyProps.name);
 
         if (stackHundrethPercent) {
           row
@@ -548,7 +556,7 @@ async function loadChart(graphConfig) {
       .data(stackedData)
       .join("path")
       .transition(timedTransition)
-      .attr("fill", (d) => seriesProps[d.key].color)
+      .attr("fill", (d) => getByKeyOrDefault(seriesProps, d.key).color)
       .attr("d", areaGenerator);
 
     if (graphConfig.kind === "weekly") {
