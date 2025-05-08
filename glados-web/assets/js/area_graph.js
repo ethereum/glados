@@ -537,8 +537,9 @@ async function loadChart(graphConfig) {
 
     // If chart is weekly, force the domain to the full week instead of sizing to data
     if (graphConfig.kind === "weekly") {
-      const start = Date.now() - (period.weeksAgo + 1) * 7 * 24 * 60 * 60 * 1000;
-      const end = Date.now() - period.weeksAgo * 7 * 24 * 60 * 60 * 1000;
+      const currentTime = Date.now();
+      const start = currentTime - (period.weeksAgo + 1) * 7 * 24 * 60 * 60 * 1000;
+      const end = currentTime - period.weeksAgo * 7 * 24 * 60 * 60 * 1000;
 
       x.domain([start, end]);
     }
