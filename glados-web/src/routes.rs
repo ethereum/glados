@@ -1562,7 +1562,7 @@ pub async fn weekly_transfer_failures(
         .all(&state.database_connection)
         .await
         .map_err(|e| {
-            error!(err=?e, "Failed to lookup census node timeseries by client protocol versions");
+            error!(err=?e, "Failed to lookup weekly transfer failures");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
     Ok(Json(transfer_failures))
