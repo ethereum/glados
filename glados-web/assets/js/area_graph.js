@@ -89,7 +89,10 @@ function parseDataHundrethWide(rawData, keys) {
  */
 
 /**
+ * Exported as areaGraph()
+ *
  * Fetches data and generates an area graph
+ *
  * @param {Object} graphConfig - Configuration for the graph
  * @param {string} graphConfig.baseName - Base name for the graph, the graph will be appended to a div with the id `${baseName}-graph` which should be found inside another div with id `${baseName}-graph-container`.
  * @param {string} graphConfig.baseUrl - Url to fetch data from, not including any parameters.
@@ -318,7 +321,11 @@ async function loadChart(graphConfig) {
     const y0 = y.invert(relY);
 
     // Get datapoint under the mouse
-    const pointedDatum = data.filter((datapoint) => datapoint.date >= x0)[0];
+    let newerData = data.filter((datapoint) => datapoint.date >= x0);
+    if (newerData.length == 0) {
+      return;
+    }
+    const pointedDatum = newerData[0];
 
     let pointedDateValues = {};
     if (stackHundrethPercent) {
@@ -528,7 +535,17 @@ async function loadChart(graphConfig) {
 
     const timedTransition = d3.transition().duration(transitionDuration);
 
-    x.domain(d3.extent(data, (d) => d.date));
+    // If chart is weekly, force the domain to the full week instead of sizing to data
+    if (graphConfig.kind === "weekly") {
+      const start = Date.now() - (period.weeksAgo + 1) * 7 * 24 * 60 * 60 * 1000;
+      const end = Date.now() - period.weeksAgo * 7 * 24 * 60 * 60 * 1000;
+
+      x.domain([start, end]);
+    }
+    else {
+      x.domain(d3.extent(data, (d) => d.date));
+    }
+
     y.domain([0, d3.max(stackedData, (d) => d3.max(d, (d) => d[1]))]);
 
     // Update axis and area position
