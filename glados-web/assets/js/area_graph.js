@@ -322,7 +322,7 @@ async function loadChart(graphConfig) {
 
     // Get datapoint under the mouse
     let newerData = data.filter((datapoint) => datapoint.date >= x0);
-    if (newerData.length == 0) {
+    if (newerData.length === 0) {
       return;
     }
     const pointedDatum = newerData[0];
