@@ -5,12 +5,32 @@ executors:
   docker-publisher:
     docker:
       - image: cimg/rust:1.85.0
+commands:
+  non_lfs_checkout:
+    steps:
+      - run:
+          name: Check out code, without lfs files
+          command: |
+            # add github ssh keys to known_hosts
+            mkdir -p ~/.ssh
+            curl -L https://api.github.com/meta | jq -r '.ssh_keys | .[]' | sed -e 's/^/github.com /' >> ~/.ssh/known_hosts
+            # check out the code, but skip lfs files, to avoid going over our lfs quota
+            GIT_LFS_SKIP_SMUDGE=1 git clone $CIRCLE_REPOSITORY_URL .
+            # if this is a PR, fix the remote branch name by appending a /head
+            # otherwise, check out the unmodified branch name
+            if [[ $CIRCLE_BRANCH == pull/* ]]; then
+              export REMOTE_BRANCH="${CIRCLE_BRANCH}/head";
+            else
+              export REMOTE_BRANCH="$CIRCLE_BRANCH";
+            fi
+            git fetch origin "$REMOTE_BRANCH":pr-head
+            git switch pr-head
 jobs:
   docker-build-glados-web-and-publish:
     resource_class: xlarge
     executor: docker-publisher
     steps:
-      - checkout
+      - non_lfs_checkout
       - setup_remote_docker
       - run:
           name: Build Docker image
@@ -25,7 +45,7 @@ jobs:
     resource_class: xlarge
     executor: docker-publisher
     steps:
-      - checkout
+      - non_lfs_checkout
       - setup_remote_docker
       - run:
           name: Build Docker image
@@ -40,7 +60,7 @@ jobs:
     resource_class: xlarge
     executor: docker-publisher
     steps:
-      - checkout
+      - non_lfs_checkout
       - setup_remote_docker
       - run:
           name: Build Docker image
@@ -55,7 +75,7 @@ jobs:
     resource_class: xlarge
     executor: docker-publisher
     steps:
-      - checkout
+      - non_lfs_checkout
       - setup_remote_docker
       - run:
           name: Build Docker image
@@ -77,23 +97,7 @@ jobs:
             RUSTFLAGS: '-D warnings'
             RUST_LOG: 'debug'
         steps:
-            - run:
-                name: Check out code, without lfs files
-                command: |
-                  # add github ssh keys to known_hosts
-                  mkdir -p ~/.ssh
-                  curl -L https://api.github.com/meta | jq -r '.ssh_keys | .[]' | sed -e 's/^/github.com /' >> ~/.ssh/known_hosts
-                  # check out the code, but skip lfs files, to avoid going over our lfs quota
-                  GIT_LFS_SKIP_SMUDGE=1 git clone $CIRCLE_REPOSITORY_URL .
-                  # if this is a PR, fix the remote branch name by appending a /head
-                  # otherwise, check out the unmodified branch name
-                  if [[ $CIRCLE_BRANCH == pull/* ]]; then
-                    export REMOTE_BRANCH="${CIRCLE_BRANCH}/head";
-                  else
-                    export REMOTE_BRANCH="$CIRCLE_BRANCH";
-                  fi
-                  git fetch origin "$REMOTE_BRANCH":pr-head
-                  git switch pr-head
+            - non_lfs_checkout
             - run:
                 name: Prepare for apt upgrades
                 command: sudo apt update
