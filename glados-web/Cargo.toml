@@ -10,7 +10,7 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 
 [dependencies]
 alloy-primitives.workspace = true
-alloy = "0.12"
+alloy = "0.15"
 anyhow.workspace = true
 askama = { version = "0.11.1", features = ["serde-json"] }
 axum = "0.6.11"
