@@ -1521,6 +1521,53 @@ pub async fn weekly_census_protocol_versions(
     Ok(Json(census_history_compact))
 }
 
+#[derive(FromQueryResult, Debug, Clone, Serialize)]
+pub struct TransferFailures {
+    start: DateTime<Utc>,
+    client: String,
+    failures: i64,
+}
+
+pub async fn weekly_transfer_failures(
+    http_args: HttpQuery<HashMap<String, String>>,
+    Extension(state): Extension<Arc<State>>,
+) -> Result<Json<Vec<TransferFailures>>, StatusCode> {
+    let weeks_ago: i32 = match http_args.get("weeks-ago") {
+        None => 0,
+        Some(weeks_ago) => weeks_ago.parse::<i32>().unwrap_or(0),
+    };
+
+    let transfer_failures: Vec<TransferFailures> =
+        TransferFailures::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "
+            SELECT
+                DATE_BIN('15 minutes', ca.created_at, TIMESTAMP '2001-01-01') AS start,
+                convert_from(COALESCE(substr(substr(kv.value, 1, 2), length(substr(kv.value, 1, 2)), 1), 'unknown'), 'utf8') AS client,
+                count(*) AS failures
+            FROM audit_internal_failure AS aif
+            LEFT JOIN record AS r ON aif.sender_record_id=r.id
+            LEFT JOIN key_value AS kv ON (r.id=kv.record_id AND kv.key = '\x63') -- hex('c')
+            LEFT JOIN content_audit AS ca ON aif.audit=ca.id
+            WHERE
+                ca.strategy_used = 5 AND -- Only consider 4444s audits now, there are too many History validation failures during current protocol transition
+                ca.created_at IS NOT NULL AND
+                ca.created_at > NOW() - INTERVAL '1 week' * ($1 + 1) AND
+                ca.created_at < NOW() - INTERVAL '1 week' * $1
+            GROUP BY start, client
+            ORDER BY start;
+        ",
+            vec![weeks_ago.into()],
+        ))
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Failed to lookup weekly transfer failures");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    Ok(Json(transfer_failures))
+}
+
 fn nest_protocol_versions_clients(
     census: Vec<CensusProtocolVersionsClientsData>,
 ) -> HashMap<String, HashMap<String, i64>> {
