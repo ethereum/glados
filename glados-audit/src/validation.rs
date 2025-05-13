@@ -145,8 +145,30 @@ fn validate_history(content_key: &HistoryContentKey, content_bytes: &[u8]) -> bo
                 false
             }
         }
-        HistoryContentValue::EphemeralHeaderOffer(_h) => {
-            todo!("implement ephemeral headers validation")
+        HistoryContentValue::EphemeralHeaderOffer(ref offered_content) => {
+            if let HistoryContentKey::EphemeralHeaderOffer(key) = content_key {
+                // Check that the offered header matches the key, by hash
+                let offered_hash = offered_content.header.hash_slow();
+                if offered_hash == key.block_hash {
+                    true
+                } else {
+                    // Log with the headers and the requested hash
+                    warn!(
+                        block_hash = hex_encode(key.block_hash),
+                        offered_hash = ?offered_hash,
+                        offered_content = ?offered_content,
+                        "The returned offered content did not include the requested header hash"
+                    );
+                    false
+                }
+            } else {
+                warn!(
+                    content.key = ?content_key,
+                    content.value = ?content,
+                    "Decoding error, wrong key paired with content value"
+                );
+                false
+            }
         }
     }
 }
