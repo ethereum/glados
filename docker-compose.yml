@@ -54,7 +54,7 @@ services:
     restart: always
 
   glados_audit_beacon:
-    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://host.docker.internal:8545 --beacon --history=false"
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://host.docker.internal:8545 --beacon --history=false --beacon-strategy latest"
     image: portalnetwork/glados-audit:latest
     environment:
       RUST_LOG: warn,glados_audit=info
