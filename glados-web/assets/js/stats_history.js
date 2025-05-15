@@ -326,7 +326,7 @@ function getCurrentSubprotocol() {
         "success_rate_history_four_fours_bodies",
         "success_rate_history_four_fours_receipts",
       ],
-      selectedIndexes: [3],
+      selectedIndexes: [2, 3],
       labels: [
         "All",
         "Latest",
