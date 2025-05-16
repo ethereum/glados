@@ -2765,6 +2765,7 @@ dependencies = [
  "env_logger 0.10.2",
  "eth_trie",
  "ethportal-api",
+ "futures",
  "glados-core",
  "migration",
  "pgtemp",

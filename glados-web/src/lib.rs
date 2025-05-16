@@ -135,6 +135,8 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
             get(routes::weekly_transfer_failures),
         )
         .route("/api/audit-block-status/", get(routes::audit_block_status))
+        .route("/api/sync-audit-json/", get(routes::latest_sync_audit_json))
+        .route("/sync-audit/", get(routes::sync_audit))
         .nest_service("/static/", serve_dir.clone())
         .fallback_service(serve_dir)
         .layer(Extension(config));

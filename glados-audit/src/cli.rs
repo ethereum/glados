@@ -110,6 +110,9 @@ pub struct Args {
     #[arg(long, action(ArgAction::Append))]
     pub portal_client: Vec<String>,
 
+    #[arg(long, default_value = "false")]
+    pub sync: bool,
+
     #[command(subcommand)]
     pub subcommand: Option<Command>,
 }
@@ -141,6 +144,7 @@ impl Default for Args {
             state: false,
             state_strategy: None,
             portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
+            sync: false,
             subcommand: None,
             stats_recording_period: 300,
         }

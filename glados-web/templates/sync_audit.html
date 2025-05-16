@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Glados{% endblock %}
+
+{% block head %}
+    <meta charset="utf-8">
+    <title>Latest 4444s Sync Audit</title>
+    <script src="/static/js/sync_audit.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            
+            background-color: #f8f9fa;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .tooltip {
+            position: absolute;
+            padding: 10px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            pointer-events: none;
+            font-size: 12px;
+            color: #333;
+            box-shadow: 0px 0px 6px rgba(0,0,0,0.1);
+            pointer-events: none;
+        }
+
+        .bar {
+            padding: steelblue 1px solid;
+            fill: white;
+        }
+
+        .bar.error {
+            fill: crimson;
+        }
+
+        .axis-label {
+            font-size: 14px;
+            fill: #555;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+
+    <h1>Latest Sync Audit</h1>
+    <div id="chart-container" style="overflow-x: scroll; width: 100%;">
+  <div id="chart"></div>
+    </div>
+    <div id="tooltip" class="tooltip" style="position: absolute; opacity: 0; background: white; padding: 10px; border: 1px solid #ccc;"></div>
+    <script>
+        syncAudit();
+    </script>
+{% endblock %}
