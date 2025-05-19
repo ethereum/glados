@@ -112,8 +112,11 @@
                                         return 'ultralight';
                                     // ASCII 'f'
                                     case 0x66:
-                                        return 'fluffy';
-                                        // ASCII 's'
+                                        return 'nimbus';
+                                    // ASCII 'n'
+                                    case 0x6E:
+                                        return 'nimbus';
+                                    // ASCII 's'
                                     case 0x73:
                                         return 'shisui';
                                     default:

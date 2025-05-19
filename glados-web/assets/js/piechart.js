@@ -97,7 +97,9 @@ function pie_chart_count(client_diversity_data) {
         if (i.client_name === "t" || i.client_name === "\\x74") {
             char_array.push({ name: "Trin", value: i.client_count, color: purple });
         } else if (i.client_name === "f" || i.client_name === "\\x66") {
-            char_array.push({ name: "Fluffy", value: i.client_count, color: blue });
+            char_array.push({ name: "Nimbus", value: i.client_count, color: blue });
+        } else if (i.client_name === "n" || i.client_name === "\\x6E") {
+            char_array.push({ name: "Nimbus", value: i.client_count, color: blue });
         } else if (i.client_name === "u" || i.client_name === "\\x75") {
             char_array.push({ name: "Ultralight", value: i.client_count, color: orange });
         } else if (i.client_name === "s" || i.client_name === "\\x73"){

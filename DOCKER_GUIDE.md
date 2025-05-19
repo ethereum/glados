@@ -16,7 +16,7 @@ where Postgres should store its data on the host machine.
 - `GLADOS_PROVIDER_URL` to the execution API provider URL.
 
 - `GLADOS_PORTAL_CLIENT` to the Portal client to be used for Portal network
-access. Currently supported values are `trin` and `fluffy`.
+access. Currently supported values are `trin` and `nimbus-portal`.
 
 Then, from the root of this repo, run:
 

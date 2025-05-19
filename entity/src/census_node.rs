@@ -101,8 +101,8 @@ pub async fn create(
 pub enum Client {
     #[strum(props(color = "#9B59B6", name = "Trin", placeholder = "false"))]
     Trin,
-    #[strum(props(color = "#3498DB", name = "Fluffy", placeholder = "false"))]
-    Fluffy,
+    #[strum(props(color = "#3498DB", name = "Nimbus", placeholder = "false"))]
+    Nimbus,
     #[strum(props(color = "#DA251D", name = "Shisui", placeholder = "false"))]
     Shisui,
     #[strum(props(color = "#E67E22", name = "Ultralight", placeholder = "false"))]
@@ -116,7 +116,7 @@ pub enum Client {
 impl From<String> for Client {
     fn from(value: String) -> Self {
         match value.to_lowercase().as_str() {
-            "fluffy" => Client::Fluffy,
+            "nimbus" => Client::Nimbus,
             "shisui" => Client::Shisui,
             "trin" => Client::Trin,
             "ultralight" => Client::Ultralight,

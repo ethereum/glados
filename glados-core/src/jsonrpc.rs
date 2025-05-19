@@ -151,7 +151,7 @@ impl PortalClient {
 
     pub fn supports_trace(&self) -> bool {
         self.client_info.contains("trin")
-            || self.client_info.contains("fluffy")
+            || self.client_info.contains("nimbus")
             || self.client_info.contains("ultralight")
     }
 }
