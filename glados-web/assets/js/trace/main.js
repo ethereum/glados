@@ -292,6 +292,6 @@ function bigLog2(num) {
 }
 
 function supportsTrace(client) {
-  client === 'trin' | client === 'fluffy'
+  client === 'trin' | client === 'nimbus'
 }
 

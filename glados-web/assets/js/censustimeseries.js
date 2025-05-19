@@ -299,8 +299,8 @@ function zipNodesAndCensusData(nodeIdsWithNickNames, censuses, records) {
             let decodedEnr = decodeEnrCached(enrString);
             let fullClientString = decodedEnr.client;
             if (fullClientString !== null) {
-                if (fullClientString[0] === 'f') {
-                    clientName = "fluffy ";
+                if (fullClientString[0] === 'f' || fullClientString[0] === 'n') {
+                    clientName = "nimbus ";
                 } else if (fullClientString[0] === 't') {
                     clientName = "trin ";
                     clientName += fullClientString.substring(2);

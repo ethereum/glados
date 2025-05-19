@@ -262,7 +262,7 @@ function radius_node_id_scatter_chart(data) {
             let red = '#DA251D'
             let grey = '#808080'
             const clientString = getClientStringFromDecodedEnr(d.raw_enr);
-                if (clientString[0] === "f") {
+                if (clientString[0] === "f" || clientString[0] === "n") {
                     return blue;
                 } else if (clientString[0] === "t") {
                     return purple; 
@@ -285,8 +285,8 @@ function getClientStringFromDecodedEnr(enr) {
 
         if (key === "c") {
             let fullClientString = String.fromCharCode.apply(null, value);
-            if (fullClientString[0] === 'f') {
-                return "fluffy";
+            if (fullClientString[0] === 'f' || fullClientString[0] === 'n') {
+                return "nimbus";
             }
             else if (fullClientString[0] === 'u') {
                 return "ultralight";
