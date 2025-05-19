@@ -1,9 +1,10 @@
 use chrono::Utc;
-use entity::{audit_stats, content::SubProtocol};
-use glados_core::stats::{
-    filter_audits, get_audit_stats, AuditFilters, ContentTypeFilter, Period, StrategyFilter,
-    SuccessFilter,
+use entity::{
+    audit_stats,
+    content::{ContentType, SubProtocol},
+    content_audit::{BeaconSelectionStrategy, HistorySelectionStrategy, StateSelectionStrategy},
 };
+use glados_core::stats::{filter_audits, get_audit_stats, AuditFilters, Period};
 use sea_orm::{DatabaseConnection, DbErr};
 use tokio::time::{interval, Duration};
 use tracing::{debug, error};
@@ -54,9 +55,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
     ) = tokio::join!(
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::All,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
+                strategy: None,
+                content_type: None,
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -64,9 +65,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Latest,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::Latest.into()),
+                content_type: None,
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -74,9 +75,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Random,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::Random.into()),
+                content_type: None,
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -84,9 +85,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::FourFours,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::FourFours.into()),
+                content_type: None,
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -94,9 +95,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::All,
-                content_type: ContentTypeFilter::Headers,
-                success: SuccessFilter::All,
+                strategy: None,
+                content_type: Some(ContentType::BlockHeadersByHash),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -104,9 +105,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::All,
-                content_type: ContentTypeFilter::HeadersByNumber,
-                success: SuccessFilter::All,
+                strategy: None,
+                content_type: Some(ContentType::BlockHeadersByNumber),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -114,9 +115,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::All,
-                content_type: ContentTypeFilter::Bodies,
-                success: SuccessFilter::All,
+                strategy: None,
+                content_type: Some(ContentType::BlockBodies),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -124,9 +125,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::All,
-                content_type: ContentTypeFilter::Receipts,
-                success: SuccessFilter::All,
+                strategy: None,
+                content_type: Some(ContentType::BlockReceipts),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -134,9 +135,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Latest,
-                content_type: ContentTypeFilter::Headers,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::Latest.into()),
+                content_type: Some(ContentType::BlockHeadersByHash),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -144,9 +145,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Latest,
-                content_type: ContentTypeFilter::HeadersByNumber,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::Latest.into()),
+                content_type: Some(ContentType::BlockHeadersByNumber),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -154,9 +155,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Latest,
-                content_type: ContentTypeFilter::Bodies,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::Latest.into()),
+                content_type: Some(ContentType::BlockBodies),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -164,9 +165,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Latest,
-                content_type: ContentTypeFilter::Receipts,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::Latest.into()),
+                content_type: Some(ContentType::BlockReceipts),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -174,9 +175,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Random,
-                content_type: ContentTypeFilter::Headers,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::Random.into()),
+                content_type: Some(ContentType::BlockHeadersByHash),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -184,9 +185,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Random,
-                content_type: ContentTypeFilter::HeadersByNumber,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::Random.into()),
+                content_type: Some(ContentType::BlockHeadersByNumber),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -194,9 +195,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Random,
-                content_type: ContentTypeFilter::Bodies,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::Random.into()),
+                content_type: Some(ContentType::BlockBodies),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -204,9 +205,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Random,
-                content_type: ContentTypeFilter::Receipts,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::Random.into()),
+                content_type: Some(ContentType::BlockReceipts),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -214,9 +215,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::FourFours,
-                content_type: ContentTypeFilter::Headers,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::FourFours.into()),
+                content_type: Some(ContentType::BlockHeadersByHash),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -224,9 +225,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::FourFours,
-                content_type: ContentTypeFilter::HeadersByNumber,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::FourFours.into()),
+                content_type: Some(ContentType::BlockHeadersByNumber),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -234,9 +235,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::FourFours,
-                content_type: ContentTypeFilter::Bodies,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::FourFours.into()),
+                content_type: Some(ContentType::BlockBodies),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -244,9 +245,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::FourFours,
-                content_type: ContentTypeFilter::Receipts,
-                success: SuccessFilter::All,
+                strategy: Some(HistorySelectionStrategy::FourFours.into()),
+                content_type: Some(ContentType::BlockReceipts),
+                audit_result: None,
                 network: SubProtocol::History
             },),
             Period::Hour,
@@ -254,9 +255,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::All,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
+                strategy: None,
+                content_type: None,
+                audit_result: None,
                 network: SubProtocol::State
             },),
             Period::Hour,
@@ -264,9 +265,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Latest,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
+                strategy: Some(StateSelectionStrategy::Latest.into()),
+                content_type: None,
+                audit_result: None,
                 network: SubProtocol::State
             },),
             Period::Hour,
@@ -274,9 +275,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::StateRoots,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
+                strategy: Some(StateSelectionStrategy::StateRoots.into()),
+                content_type: None,
+                audit_result: None,
                 network: SubProtocol::State
             },),
             Period::Hour,
@@ -284,9 +285,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::All,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
+                strategy: None,
+                content_type: None,
+                audit_result: None,
                 network: SubProtocol::Beacon
             },),
             Period::Hour,
@@ -294,9 +295,9 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Latest,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
+                strategy: Some(BeaconSelectionStrategy::Latest.into()),
+                content_type: None,
+                audit_result: None,
                 network: SubProtocol::Beacon
             },),
             Period::Hour,

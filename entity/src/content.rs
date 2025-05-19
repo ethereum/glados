@@ -15,20 +15,41 @@ use serde::Deserialize;
 use crate::utils;
 
 /// Portal network sub-protocol. History, state, transactions etc.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumIter, DeriveActiveEnum, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    EnumIter,
+    EnumString,
+    EnumMessage,
+    DeriveActiveEnum,
+    Deserialize,
+)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
+#[strum(ascii_case_insensitive)]
+#[serde(rename_all = "snake_case")]
 pub enum SubProtocol {
+    #[strum(message = "History")]
     History = 0,
+    #[strum(message = "State")]
     State = 1,
+    #[strum(message = "Beacon")]
     Beacon = 2,
 }
 
-impl SubProtocol {
-    pub fn as_text(&self) -> String {
-        match self {
-            SubProtocol::History => "History".to_string(),
-            SubProtocol::State => "State".to_string(),
-            SubProtocol::Beacon => "Beacon".to_string(),
+#[derive(Debug, PartialEq)]
+pub struct InvalidSubProtocolError;
+
+impl TryFrom<u8> for SubProtocol {
+    type Error = InvalidSubProtocolError;
+    fn try_from(value: u8) -> std::result::Result<Self, InvalidSubProtocolError> {
+        match value {
+            0 => Ok(SubProtocol::History),
+            1 => Ok(SubProtocol::State),
+            2 => Ok(SubProtocol::Beacon),
+            _ => Err(InvalidSubProtocolError),
         }
     }
 }
@@ -46,9 +67,12 @@ impl SubProtocol {
     EnumMessage,
     EnumString,
     EnumProperty,
+    Copy,
+    Deserialize,
 )]
-#[sea_orm(rs_type = "u8", db_type = "Integer")]
+#[sea_orm(rs_type = "i32", db_type = "Integer")]
 #[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum ContentType {
     #[strum(message = "Headers by hash", props(subprotocol = "0"))]
     BlockHeadersByHash = 0,
@@ -72,22 +96,6 @@ impl ContentType {
                     == (subprotocol as usize).to_string()
             })
             .collect()
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct InvalidSubProtocolError;
-
-impl TryFrom<&String> for SubProtocol {
-    type Error = InvalidSubProtocolError;
-
-    fn try_from(value: &String) -> Result<Self, Self::Error> {
-        match value.to_lowercase().as_str() {
-            "history" => Ok(SubProtocol::History),
-            "state" => Ok(SubProtocol::State),
-            "beacon" => Ok(SubProtocol::Beacon),
-            _ => Err(InvalidSubProtocolError),
-        }
     }
 }
 

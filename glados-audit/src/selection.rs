@@ -135,7 +135,7 @@ async fn select_latest_content_for_audit(
             strategy = "latest",
             item_count, "Adding content keys to the audit queue."
         );
-        add_to_queue(tx.clone(), strategy.clone(), content_key_db_entries).await;
+        add_to_queue(tx.clone(), strategy, content_key_db_entries).await;
     }
 }
 
@@ -211,7 +211,7 @@ async fn add_to_queue(
     );
     for content_key_model in items {
         let task = AuditTask {
-            strategy: strategy.clone(),
+            strategy,
             content: content_key_model,
         };
         if let Err(e) = tx.send(task).await {

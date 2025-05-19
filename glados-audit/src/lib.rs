@@ -107,7 +107,7 @@ impl AuditConfig {
                 HistorySelectionStrategy::FourFours => args.four_fours_strategy_weight,
                 HistorySelectionStrategy::SpecificContentKey => 0,
             };
-            weights.insert(strat.clone(), weight);
+            weights.insert(*strat, weight);
         }
         let mut portal_clients: Vec<PortalClient> = vec![];
         for client_url in args.portal_client {
@@ -178,10 +178,7 @@ pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
             .beacon_strategies
             .iter()
             .map(|strats| {
-                (
-                    SelectionStrategy::Beacon(strats.clone()),
-                    /* weight= */ 1,
-                )
+                (SelectionStrategy::Beacon(*strats), /* weight= */ 1)
             })
             .collect();
         start_audit(conn.clone(), config.clone(), strategies).await;
@@ -192,7 +189,7 @@ pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
             .history_strategies
             .iter()
             .filter_map(|strats| {
-                let strategy = SelectionStrategy::History(strats.clone());
+                let strategy = SelectionStrategy::History(*strats);
                 match config.weights.get(strats) {
                     Some(weight) => Some((strategy, *weight)),
                     None => {
@@ -224,17 +221,13 @@ async fn start_audit(
         // Each strategy sends tasks to a separate channel.
         let (tx, rx) = mpsc::channel::<AuditTask>(100);
         let task_channel = TaskChannel {
-            strategy: strategy.clone(),
+            strategy,
             weight,
             rx,
         };
         task_channels.push(task_channel);
         // Strategies generate tasks in their own thread for their own channel.
-        tokio::spawn(start_audit_selection_task(
-            strategy.clone(),
-            tx,
-            conn.clone(),
-        ));
+        tokio::spawn(start_audit_selection_task(strategy, tx, conn.clone()));
     }
     // Collation of generated tasks, taken proportional to weights.
     let (collation_tx, collation_rx) = mpsc::channel::<AuditTask>(100);

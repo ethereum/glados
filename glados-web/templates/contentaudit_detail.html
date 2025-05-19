@@ -23,7 +23,7 @@
                 </li>
                 {% endif %}
                 <li>Started: {{ audit.created_at }}</li>
-                <li>Result: {{ audit.result.as_text() }}</li>
+                <li>Result: {{ audit.result.get_message().unwrap() }}</li>
                 <li>Strategy: {{ audit.strategy_as_text() }}</li>
             </ul>
         </div>

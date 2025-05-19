@@ -12,15 +12,20 @@ use entity::{
     census_node::{Client, OperatingSystem},
     client_info,
     content::{self, ContentType, SubProtocol},
-    content_audit, execution_metadata, key_value, node, record,
+    content_audit,
+    content_audit::{
+        AuditResult, BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy,
+        StateSelectionStrategy,
+    },
+    execution_metadata, key_value, node, record,
 };
-use glados_core::stats::{AuditStats, StrategyFilter};
+use glados_core::stats::AuditStats;
 
 #[derive(Template)]
 #[template(path = "index.html")]
 pub struct IndexTemplate {
     pub subprotocol: SubProtocol,
-    pub strategy: StrategyFilter,
+    pub strategy: SelectionStrategy,
     pub client_diversity_data: Vec<ClientDiversityResult>,
     pub average_radius_chart: Vec<CalculatedRadiusChartData>,
     pub stats: [AuditStats; 3],
@@ -103,14 +108,8 @@ pub struct ContentKeyListTemplate {
 pub struct AuditDashboardTemplate {
     pub subprotocol: SubProtocol,
     pub content_types: Vec<ContentType>,
-    pub strategies: Vec<content_audit::SelectionStrategy>,
-}
-
-#[derive(Template)]
-#[template(path = "audit_table.html")]
-pub struct AuditTableTemplate {
-    pub stats: [AuditStats; 3],
-    pub audits: Vec<AuditTuple>,
+    pub strategies: Vec<SelectionStrategy>,
+    pub audit_results: Vec<AuditResult>,
 }
 
 #[derive(Template)]

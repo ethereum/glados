@@ -83,7 +83,6 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
         )
         .route("/audit/id/:audit_id", get(routes::contentaudit_detail))
         .route("/audits/", get(routes::contentaudit_dashboard))
-        .route("/audits/filter/", get(routes::contentaudit_filter))
         .route(
             "/api/hourly-success-rate/",
             get(routes::hourly_success_rate),
@@ -135,6 +134,8 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
             get(routes::weekly_transfer_failures),
         )
         .route("/api/audit-block-status/", get(routes::audit_block_status))
+        .route("/api/audits/", get(routes::audits_filter_api))
+        .route("/api/audits-stats/", get(routes::audits_filter_stats_api))
         .nest_service("/static/", serve_dir.clone())
         .fallback_service(serve_dir)
         .layer(Extension(config));

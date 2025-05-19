@@ -1,19 +1,17 @@
-use std::fmt::Display;
+use std::fmt;
 
 use chrono::{DateTime, Utc};
 use sea_orm::{
     sea_query::{Expr, IntoCondition},
+    strum::EnumMessage,
     ColumnTrait, DatabaseConnection, DbErr, EntityTrait, JoinType, PaginatorTrait, QueryFilter,
-    QuerySelect, RelationTrait, Select,
+    QuerySelect, QueryTrait, RelationTrait, Select,
 };
-use serde::Deserialize;
+use serde::{de, Deserialize, Serialize};
 
 use entity::{
-    content::{self, SubProtocol},
-    content_audit::{
-        self, AuditResult, BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy,
-        StateSelectionStrategy,
-    },
+    content::{self, ContentType, SubProtocol},
+    content_audit::{self, serialize_selection_strategy, AuditResult, SelectionStrategy},
 };
 
 /// Generates a SeaORM select query for audits based on the provided filters.
@@ -21,76 +19,35 @@ use entity::{
 /// TODO: add support for filtering by portal client
 pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
     // This base query will have filters added to it
-    let audits = content_audit::Entity::find();
-    let audits = audits.join(
-        JoinType::Join,
-        content_audit::Relation::Content
-            .def()
-            .on_condition(move |_left, _right| {
-                content::Column::ProtocolId
-                    .eq(filters.network)
-                    .into_condition()
-            }),
-    );
-    // Strategy filters
-    let audits = match filters.strategy {
-        StrategyFilter::All => audits,
-        StrategyFilter::Random => audits.filter(
-            content_audit::Column::StrategyUsed
-                .eq(SelectionStrategy::History(HistorySelectionStrategy::Random)),
-        ),
-        StrategyFilter::Latest => audits.filter(content_audit::Column::StrategyUsed.eq(
-            match filters.network {
-                SubProtocol::History => {
-                    SelectionStrategy::History(HistorySelectionStrategy::Latest)
-                }
-                SubProtocol::State => SelectionStrategy::State(StateSelectionStrategy::Latest),
-                SubProtocol::Beacon => SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest),
-            },
-        )),
-        StrategyFilter::Oldest => audits.filter(content_audit::Column::StrategyUsed.eq(
-            SelectionStrategy::History(HistorySelectionStrategy::OldestUnaudited),
-        )),
-        StrategyFilter::FourFours => audits.filter(content_audit::Column::StrategyUsed.eq(
-            SelectionStrategy::History(HistorySelectionStrategy::FourFours),
-        )),
-        StrategyFilter::StateRoots => audits.filter(
-            content_audit::Column::StrategyUsed
-                .eq(SelectionStrategy::State(StateSelectionStrategy::StateRoots)),
-        ),
-    };
-    // Success filters
-    let audits = match filters.success {
-        SuccessFilter::All => audits,
-        SuccessFilter::Success => {
-            audits.filter(content_audit::Column::Result.eq(AuditResult::Success))
-        }
-        SuccessFilter::Failure => {
-            audits.filter(content_audit::Column::Result.eq(AuditResult::Failure))
-        }
-    };
-    // Content type filters
-    match filters.content_type {
-        ContentTypeFilter::All => audits,
-        ContentTypeFilter::Headers => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x00").into_condition())
-        }
-        ContentTypeFilter::Bodies => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x01").into_condition())
-        }
-        ContentTypeFilter::Receipts => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x02").into_condition())
-        }
-        ContentTypeFilter::HeadersByNumber => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x03").into_condition())
-        }
-        ContentTypeFilter::AccountTrieNodes => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x20").into_condition())
-        }
-        ContentTypeFilter::BlockRoots => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x10").into_condition())
-        }
-    }
+    content_audit::Entity::find()
+        .join(
+            JoinType::Join,
+            content_audit::Relation::Content
+                .def()
+                .on_condition(move |_left, _right| {
+                    content::Column::ProtocolId
+                        .eq(filters.network)
+                        .into_condition()
+                }),
+        )
+        // Strategy filters
+        .apply_if(filters.strategy, |query, audit_strategy| {
+            query.filter(content_audit::Column::StrategyUsed.eq(audit_strategy))
+        })
+        // Success filters
+        .apply_if(filters.audit_result, |query, audit_result| {
+            query.filter(content_audit::Column::Result.eq(audit_result))
+        })
+        // Content type filters
+        .apply_if(filters.content_type, |query, content_type| {
+            query.filter(
+                Expr::cust(
+                    &("get_byte(content.content_key, 0) = ".to_string()
+                        + &content_type.to_string()),
+                )
+                .into_condition(),
+            )
+        })
 }
 
 /// Counts new content items for the given subprotocol and period
@@ -117,24 +74,22 @@ pub async fn get_audit_stats(
 ) -> Result<AuditStats, DbErr> {
     let cutoff = period.cutoff_time();
 
-    let total_audits = filtered
+    let (total_audits, total_passes): (i64, i64) = (filtered
         .clone()
         .filter(content_audit::Column::CreatedAt.gt(cutoff))
-        .count(conn)
-        .await? as u32;
-
-    let total_passes = filtered
-        .filter(content_audit::Column::CreatedAt.gt(cutoff))
-        .filter(content_audit::Column::Result.eq(AuditResult::Success))
-        .count(conn)
-        .await? as u32;
-
-    // In case the numbers change in between queries, make sure passes don't exceed total audits
-    let total_passes = std::cmp::min(total_passes, total_audits);
+        .select_only()
+        .column_as(Expr::cust("COUNT(1)"), "total_audits")
+        .column_as(
+            Expr::cust("COALESCE(SUM(CASE WHEN result = 1 THEN 1 ELSE 0 END),0)"),
+            "total_passes",
+        )
+        .into_tuple()
+        .all(conn)
+        .await?)[0];
 
     let total_failures = total_audits - total_passes;
 
-    let audits_per_minute = (60 * total_audits)
+    let audits_per_minute = (60 * total_audits as u32)
         .checked_div(period.total_seconds())
         .unwrap_or(0);
 
@@ -150,15 +105,16 @@ pub async fn get_audit_stats(
 
     Ok(AuditStats {
         period,
-        total_audits,
-        total_passes,
+        total_audits: total_audits as u32,
+        total_passes: total_passes as u32,
         pass_percent,
-        total_failures,
+        total_failures: total_failures as u32,
         fail_percent,
         audits_per_minute,
     })
 }
 
+#[derive(Serialize)]
 pub struct AuditStats {
     pub period: Period,
     pub total_audits: u32,
@@ -169,14 +125,15 @@ pub struct AuditStats {
     pub audits_per_minute: u32,
 }
 
+#[derive(Serialize)]
 pub enum Period {
     Hour,
     Day,
     Week,
 }
 
-impl Display for Period {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Period {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let time_period = match self {
             Period::Hour => "hour",
             Period::Day => "day",
@@ -205,52 +162,52 @@ impl Period {
     }
 }
 
-#[derive(Deserialize, Copy, Clone)]
+#[derive(Clone, Copy)]
 pub struct AuditFilters {
-    pub strategy: StrategyFilter,
-    pub content_type: ContentTypeFilter,
-    pub success: SuccessFilter,
     pub network: SubProtocol,
+    pub strategy: Option<SelectionStrategy>,
+    pub content_type: Option<ContentType>,
+    pub audit_result: Option<AuditResult>,
 }
 
-#[derive(Deserialize, Copy, Clone)]
-pub enum StrategyFilter {
-    All,
-    Random,
-    Latest,
-    Oldest,
-    FourFours,
-    StateRoots,
-}
+impl<'de> de::Deserialize<'de> for AuditFilters {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct IntermediateAuditFilters {
+            network: SubProtocol,
+            content_type: Option<ContentType>,
+            audit_result: Option<AuditResult>,
+            strategy: Option<String>,
+        }
 
-impl Display for StrategyFilter {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let name = match &self {
-            StrategyFilter::All => "All",
-            StrategyFilter::Random => "Random",
-            StrategyFilter::Latest => "Latest",
-            StrategyFilter::Oldest => "Oldest",
-            StrategyFilter::FourFours => "4444s",
-            StrategyFilter::StateRoots => "State Roots",
+        let intermediate_filter = IntermediateAuditFilters::deserialize(deserializer)?;
+
+        let strategy = match intermediate_filter.strategy {
+            Some(strat) => Some(
+                serialize_selection_strategy(intermediate_filter.network, &strat).map_err(
+                    |_| {
+                        de::Error::custom(format!(
+                            "unknown variant for {}: {}",
+                            intermediate_filter
+                                .network
+                                .get_message()
+                                .expect("Subprotocol missing message"),
+                            strat
+                        ))
+                    },
+                )?,
+            ),
+            None => None,
         };
-        write!(f, "{}", name)
+
+        Ok(AuditFilters {
+            network: intermediate_filter.network,
+            content_type: intermediate_filter.content_type,
+            audit_result: intermediate_filter.audit_result,
+            strategy,
+        })
     }
-}
-
-#[derive(Deserialize, Copy, Clone)]
-pub enum SuccessFilter {
-    All,
-    Success,
-    Failure,
-}
-
-#[derive(Deserialize, Copy, Clone)]
-pub enum ContentTypeFilter {
-    All,
-    Headers,
-    Bodies,
-    Receipts,
-    AccountTrieNodes,
-    BlockRoots,
-    HeadersByNumber,
 }
