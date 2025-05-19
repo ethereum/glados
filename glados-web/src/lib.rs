@@ -140,7 +140,11 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
         .layer(Extension(config));
 
     let socket: SocketAddr = SOCKET.parse()?;
-    info!("Serving glados-web at {}", socket);
+    info!(
+        "Serving glados-web at {}, open at http://localhost:{}/",
+        socket,
+        socket.port()
+    );
     Ok(axum::Server::bind(&socket)
         .serve(app.into_make_service())
         .await?)
