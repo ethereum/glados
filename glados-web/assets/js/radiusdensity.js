@@ -260,6 +260,7 @@ function radius_node_id_scatter_chart(data) {
             let purple = '#9B59B6'
             let orange = '#E67E22'
             let red = '#DA251D'
+            let green = '#2E8C47'
             let grey = '#808080'
             const clientString = getClientStringFromDecodedEnr(d.raw_enr);
                 if (clientString[0] === "f" || clientString[0] === "n") {
@@ -268,6 +269,8 @@ function radius_node_id_scatter_chart(data) {
                     return purple; 
                 } else if (clientString[0] === "u") {
                     return orange; 
+                } else if (clientString[0] === "a") {
+                    return green; 
                 } else if (clientString[0] === "s") {
                   return red; 
                 } else {
@@ -287,11 +290,13 @@ function getClientStringFromDecodedEnr(enr) {
             let fullClientString = String.fromCharCode.apply(null, value);
             if (fullClientString[0] === 'f' || fullClientString[0] === 'n') {
                 return "nimbus";
-            }
-            else if (fullClientString[0] === 'u') {
+            } else if (fullClientString[0] === 'u') {
                 return "ultralight";
-            }
-            else if (fullClientString[0] === 't') {
+            } else if (fullClientString[0] === 'a') {
+                return "samba";
+            } else if (fullClientString[0] === 's') {
+                return "shisui";
+            } else if (fullClientString[0] === 't') {
                 clientName = "trin ";
                 clientName += fullClientString.substring(2);
                 return clientName;

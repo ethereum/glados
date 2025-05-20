@@ -301,7 +301,11 @@ function zipNodesAndCensusData(nodeIdsWithNickNames, censuses, records) {
             if (fullClientString !== null) {
                 if (fullClientString[0] === 'f' || fullClientString[0] === 'n') {
                     clientName = "nimbus ";
-                } else if (fullClientString[0] === 't') {
+                } else if (fullClientString[0] === 'a') {
+                    clientName = "samba ";
+                } else if (fullClientString[0] === 's') {
+                    clientName = "shisui ";
+                } if (fullClientString[0] === 't') {
                     clientName = "trin ";
                     clientName += fullClientString.substring(2);
                 } else if (fullClientString[0] === 'u') {
