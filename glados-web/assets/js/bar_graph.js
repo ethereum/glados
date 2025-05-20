@@ -146,8 +146,6 @@ async function loadChart(graphConfig) {
     y.domain(groups);
     ySubscale.domain(subgroups).range([0, y.bandwidth()]);
 
-    console.log(ySubscale.bandwidth());
-
     // Update axis
     xAxis.transition(timedTransition).call(d3.axisBottom(x)).call(xTicks);
     yAxis.transition(timedTransition).call(d3.axisLeft(y)).call(yTicks);

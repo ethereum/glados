@@ -81,7 +81,7 @@ function parseDataHundrethWide(rawData, keys) {
 
 const getByKeyOrDefault = function (obj, key) {
   return obj[key] ?? obj["other"];
-}
+};
 
 /**
  * Customizes how the series are displayed
@@ -145,9 +145,6 @@ async function loadChart(graphConfig) {
     seriesMetadata = Object.fromEntries(
       graphConfig.seriesMetadata.map((s) => [s.slug, s]),
     );
-    if (!("other" in seriesMetadata)) {
-      seriesMetadata["other"] = { color: "#808080", name: "Other" };
-    }
   }
   let seriesProps = {};
 
@@ -367,10 +364,7 @@ async function loadChart(graphConfig) {
         }
 
         let keyProps = getByKeyOrDefault(seriesProps, key);
-        row
-          .append("td")
-          .text("♦")
-          .attr("style", `color:${keyProps.color}`);
+        row.append("td").text("♦").attr("style", `color:${keyProps.color}`);
         row.append("td").text(keyProps.name);
 
         if (stackHundrethPercent) {
@@ -521,7 +515,6 @@ async function loadChart(graphConfig) {
         keys.reverse();
       }
     } else if (dataShape === "wide") {
-      //      keys = graphConfig.seriesMetadata.map((s) => s.slug);
       keys = Object.keys(seriesMetadata);
     }
 
@@ -529,6 +522,14 @@ async function loadChart(graphConfig) {
       "customSeriesDisplayFn" in graphConfig
         ? graphConfig.customSeriesDisplayFn(seriesMetadata, keys, select)
         : seriesMetadata;
+
+    // Add `other` only if data contains a key not found in seriesMetadata
+    if (
+      !("other" in seriesMetadata) &&
+      keys.some((k) => !(k in seriesMetadata))
+    ) {
+      seriesProps["other"] = { color: "#808080", name: "Other" };
+    }
 
     if (graphConfig.kind === "zoom") {
       context.call(brush.clear);
@@ -546,12 +547,12 @@ async function loadChart(graphConfig) {
     // If chart is weekly, force the domain to the full week instead of sizing to data
     if (graphConfig.kind === "weekly") {
       const currentTime = Date.now();
-      const start = currentTime - (period.weeksAgo + 1) * 7 * 24 * 60 * 60 * 1000;
+      const start =
+        currentTime - (period.weeksAgo + 1) * 7 * 24 * 60 * 60 * 1000;
       const end = currentTime - period.weeksAgo * 7 * 24 * 60 * 60 * 1000;
 
       x.domain([start, end]);
-    }
-    else {
+    } else {
       x.domain(d3.extent(data, (d) => d.date));
     }
 
