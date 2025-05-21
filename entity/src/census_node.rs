@@ -103,7 +103,7 @@ pub enum Client {
     Trin,
     #[strum(props(color = "#3498DB", name = "Nimbus", placeholder = "false"))]
     Nimbus,
-    #[strum(props(color = "#2E8C47", name = "Shisui", placeholder = "false"))]
+    #[strum(props(color = "#2E8C47", name = "Samba", placeholder = "false"))]
     Samba,
     #[strum(props(color = "#DA251D", name = "Shisui", placeholder = "false"))]
     Shisui,
