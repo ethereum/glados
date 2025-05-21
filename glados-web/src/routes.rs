@@ -25,32 +25,35 @@ use ethportal_api::{
     BeaconContentKey, HistoryContentKey, OverlayContentKey, StateContentKey,
 };
 use sea_orm::{
-    sea_query::{Expr, Query, SimpleExpr},
+    sea_query::{Expr, JoinType, Query, SimpleExpr},
+    strum::EnumMessage,
     ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult,
-    Iterable, LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, Statement,
+    Iterable, LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+    Statement,
 };
-use serde::Serialize;
+use serde::{ser, ser::SerializeStruct, Serialize};
 use tracing::{debug, error, info, warn};
 
 use crate::templates::{
-    AuditDashboardTemplate, AuditTableTemplate, CensusExplorerTemplate, ClientsTemplate,
-    ContentAuditDetailTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
-    ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate, HtmlTemplate,
-    IndexTemplate, NodeDetailTemplate, PaginatedCensusListTemplate, SingleCensusViewTemplate,
+    AuditDashboardTemplate, CensusExplorerTemplate, ClientsTemplate, ContentAuditDetailTemplate,
+    ContentIdDetailTemplate, ContentIdListTemplate, ContentKeyDetailTemplate,
+    ContentKeyListTemplate, EnrDetailTemplate, HtmlTemplate, IndexTemplate, NodeDetailTemplate,
+    PaginatedCensusListTemplate, SingleCensusViewTemplate,
 };
 use crate::{state::State, templates::AuditTuple};
 use entity::{
-    audit_result_latest::ContentType,
     audit_stats, census, census_node,
     census_node::{Client, OperatingSystem, Version},
     client_info, content,
-    content::SubProtocol,
-    content_audit::{self, AuditResult},
+    content::{ContentType, SubProtocol},
+    content_audit::{
+        self, AuditResult, BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy,
+        StateSelectionStrategy,
+    },
     execution_metadata, key_value, node, record,
 };
 use glados_core::stats::{
-    filter_audits, get_audit_stats, get_new_content_count, AuditFilters, ContentTypeFilter, Period,
-    StrategyFilter, SuccessFilter,
+    filter_audits, get_audit_stats, get_new_content_count, AuditFilters, Period,
 };
 use migration::{Alias, Order};
 
@@ -63,13 +66,8 @@ pub async fn handle_error(_err: io::Error) -> impl IntoResponse {
 
 // Get the subprotocol from the query parameters, defaulting to History
 pub fn get_subprotocol_from_params(params: &HashMap<String, String>) -> SubProtocol {
-    match params.get("network") {
-        None => SubProtocol::History,
-        Some(subprotocol) => match subprotocol.try_into().ok() {
-            Some(subprotocol) => subprotocol,
-            None => SubProtocol::History,
-        },
-    }
+    SubProtocol::from_str(params.get("network").unwrap_or(&"".to_string()))
+        .unwrap_or(SubProtocol::History)
 }
 
 pub async fn network_overview(
@@ -87,10 +85,10 @@ pub async fn network_overview(
 
     let radius_percentages = generate_radius_graph_data(&state, subprotocol).await;
 
-    let strategy: StrategyFilter = match subprotocol {
-        SubProtocol::History => StrategyFilter::FourFours,
-        SubProtocol::State => StrategyFilter::StateRoots,
-        SubProtocol::Beacon => StrategyFilter::Latest,
+    let strategy: SelectionStrategy = match subprotocol {
+        SubProtocol::History => HistorySelectionStrategy::Latest.into(),
+        SubProtocol::State => StateSelectionStrategy::StateRoots.into(),
+        SubProtocol::Beacon => BeaconSelectionStrategy::Latest.into(),
     };
 
     // Run queries for content dashboard data concurrently
@@ -98,9 +96,9 @@ pub async fn network_overview(
         get_new_content_count(subprotocol, Period::Hour, &state.database_connection,),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
+                strategy: Some(strategy),
+                content_type: None,
+                audit_result: None,
                 network: subprotocol,
             },),
             Period::Hour,
@@ -109,9 +107,9 @@ pub async fn network_overview(
         get_new_content_count(subprotocol, Period::Day, &state.database_connection,),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
+                strategy: Some(strategy),
+                content_type: None,
+                audit_result: None,
                 network: subprotocol,
             },),
             Period::Day,
@@ -120,9 +118,9 @@ pub async fn network_overview(
         get_new_content_count(subprotocol, Period::Week, &state.database_connection,),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
+                strategy: Some(strategy),
+                content_type: None,
+                audit_result: None,
                 network: subprotocol,
             },),
             Period::Week,
@@ -144,7 +142,7 @@ pub async fn network_overview(
         average_radius_chart: radius_percentages,
         stats: [hour_stats, day_stats, week_stats],
         new_content: [hour_new, day_new, week_new],
-        content_types: ContentType::iter().collect(),
+        content_types: ContentType::vec_subprotocol(subprotocol),
     };
     HtmlTemplate(template)
 }
@@ -464,7 +462,12 @@ pub async fn contentaudit_dashboard(
     params: HttpQuery<HashMap<String, String>>,
 ) -> Result<HtmlTemplate<AuditDashboardTemplate>, StatusCode> {
     let subprotocol = get_subprotocol_from_params(&params);
-    let template = AuditDashboardTemplate { subprotocol };
+    let template = AuditDashboardTemplate {
+        subprotocol,
+        content_types: ContentType::vec_subprotocol(subprotocol),
+        strategies: SelectionStrategy::vec_subprotocol(subprotocol),
+        audit_results: AuditResult::iter().collect(),
+    };
     Ok(HtmlTemplate(template))
 }
 
@@ -691,27 +694,94 @@ pub struct NodeWithRadius {
     pub data_radius: Vec<u8>,
 }
 
+#[derive(FromQueryResult, Debug, Clone)]
+pub struct AuditWide {
+    id: i32,
+    has_trace: bool,
+    is_success: bool,
+    content_type: ContentType,
+    strategy: SelectionStrategy,
+    protocol: SubProtocol,
+    content_key: Vec<u8>,
+    content_id: Vec<u8>,
+    content_available_at: DateTime<Utc>,
+    audited_at: DateTime<Utc>,
+    client_version_info: String,
+}
+
+impl ser::Serialize for AuditWide {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        let mut s = serializer.serialize_struct("AuditWide", 9)?;
+        s.serialize_field("id", &self.id)?;
+        s.serialize_field("has_trace", &self.has_trace)?;
+        s.serialize_field("is_success", &self.is_success)?;
+        s.serialize_field("content_type", &self.content_type.get_message())?;
+        s.serialize_field("strategy", &self.strategy.get_message())?;
+        s.serialize_field("protocol", &self.protocol.get_message())?;
+        s.serialize_field("content_key", &hex_encode(&self.content_key))?;
+        s.serialize_field("content_id", &hex_encode(&self.content_id))?;
+        s.serialize_field("content_available_at", &self.content_available_at)?;
+        s.serialize_field("audited_at", &self.audited_at)?;
+        s.serialize_field("client_version_info", &self.client_version_info)?;
+        s.end()
+    }
+}
+
 /// Takes an AuditFilter object generated from http query params
 /// Conditionally creates a query based on the filters
-pub async fn contentaudit_filter(
+pub async fn audits_filter_api(
     Extension(state): Extension<Arc<State>>,
     filters: HttpQuery<AuditFilters>,
-) -> Result<HtmlTemplate<AuditTableTemplate>, StatusCode> {
+) -> Result<Json<Vec<AuditWide>>, StatusCode> {
     let audits = filter_audits(filters.0);
-    let (hour_stats, day_stats, week_stats, filtered_audits) = tokio::join!(
+    let filtered_audits = audits
+        .join(JoinType::Join, content_audit::Relation::ClientInfo.def())
+        .order_by_desc(content_audit::Column::CreatedAt)
+        .select_only()
+        .column_as(content_audit::Column::Id, "id")
+        .column_as(Expr::col(content_audit::Column::Trace).ne(""), "has_trace")
+        .column_as(
+            Expr::col(content_audit::Column::Result).eq(AuditResult::Success),
+            "is_success",
+        )
+        .column_as(
+            Expr::cust("GET_BYTE(content.content_key, 0)"),
+            "content_type",
+        )
+        .column_as(content_audit::Column::StrategyUsed, "strategy")
+        .column_as(content::Column::ProtocolId, "protocol")
+        .column(content::Column::ContentKey)
+        .column(content::Column::ContentId)
+        .column_as(content::Column::FirstAvailableAt, "content_available_at")
+        .column_as(content_audit::Column::CreatedAt, "audited_at")
+        .column_as(client_info::Column::VersionInfo, "client_version_info")
+        .limit(30)
+        .into_model::<AuditWide>()
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Could not look up audits");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    Ok(Json(filtered_audits))
+}
+
+/// Takes an AuditFilter object generated from http query params
+/// Conditionally creates a query based on the filters
+pub async fn audits_filter_stats_api(
+    Extension(state): Extension<Arc<State>>,
+    filters: HttpQuery<AuditFilters>,
+) -> Result<Json<[glados_core::stats::AuditStats; 3]>, StatusCode> {
+    let audits = filter_audits(filters.0);
+    let (hour_stats, day_stats, week_stats) = tokio::join!(
         get_audit_stats(audits.clone(), Period::Hour, &state.database_connection),
         get_audit_stats(audits.clone(), Period::Day, &state.database_connection),
         get_audit_stats(audits.clone(), Period::Week, &state.database_connection),
-        audits
-            .order_by_desc(content_audit::Column::CreatedAt)
-            .limit(30)
-            .all(&state.database_connection),
     );
 
-    let filtered_audits = filtered_audits.map_err(|e| {
-        error!(err=?e, "Could not look up audits");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
     let hour_stats = hour_stats.map_err(|e| {
         error!(err=?e, "Could not look up audit hourly stats");
         StatusCode::INTERNAL_SERVER_ERROR
@@ -725,17 +795,8 @@ pub async fn contentaudit_filter(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    let filtered_audits: Vec<AuditTuple> =
-        get_audit_tuples_from_audit_models(filtered_audits, &state.database_connection).await?;
-
-    let template = AuditTableTemplate {
-        stats: [hour_stats, day_stats, week_stats],
-        audits: filtered_audits,
-    };
-
-    Ok(HtmlTemplate(template))
+    Ok(Json([hour_stats, day_stats, week_stats]))
 }
-
 #[derive(FromQueryResult, Serialize, Debug)]
 pub struct DeadZoneData {
     pub data_radius: Vec<u8>,

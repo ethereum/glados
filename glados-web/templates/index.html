@@ -24,21 +24,21 @@
                     <button class="question-mark" aria-label="Toggle explanation"></button>
                     <div class="explanation">
                     {% match strategy %}
-                        {% when StrategyFilter::FourFours %}
+                        {% when SelectionStrategy::History(HistorySelectionStrategy::FourFours) %}
                             Glados continuously queries the Portal network for random 4444s headers, blocks, and receipts.
                             Statistical results of these audits are displayed here and can be viewed in more granular detail on the Audit Dashboard.
-                        {% when StrategyFilter::StateRoots %}
+                        {% when SelectionStrategy::State(StateSelectionStrategy::StateRoots) %}
                             Glados continuously queries the Portal network for random state roots.
                             Statistical results of these audits are displayed here and can be viewed in more granular detail on the Audit Dashboard.
-                        {% when StrategyFilter::Latest %}
+                        {% when SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest) %}
                             Glados continuously queries the Portal network recent beacon block roots.
                             Statistical results of these audits are displayed here and can be viewed in more granular detail on the Audit Dashboard.
                         {% else %}
-                            No explanation available for {{ strategy }}
+                            No explanation available for {{ strategy.get_message().expect("Strategy missing message") }}
                     {% endmatch %}
 
                     </div>
-                    <h2>{{ strategy }} stats</h2>
+                    <h2>{{ strategy.get_message().expect("Strategy missing message") }} stats</h2>
                     <div class="table-responsive">
                         <table class="table">
                             <thead>
@@ -220,7 +220,7 @@
                             style="width: auto"
                         >
                         {% for content_type in content_types %}
-                            <option value = "{{content_type.get_serializations()[0]}}">{{content_type.get_message().unwrap()}}</option>
+                            <option value = "{{content_type.get_serializations()[0]}}">{{content_type.get_message().expect("ContentType missing message")}}</option>
                         {% endfor %}
                         </select>
                         <div id="audit-block-status-graph-container" style="position: relative">

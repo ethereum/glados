@@ -43,7 +43,7 @@ pub async fn start_audit_selection_task(
         SelectionStrategy::History(HistorySelectionStrategy::Failed) => {
             warn!("Need to implement SelectionStrategy::Failed")
         }
-        SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited) => {
+        SelectionStrategy::History(HistorySelectionStrategy::OldestUnaudited) => {
             select_oldest_unaudited_content_for_audit(tx, conn).await
         }
         SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey) => {
@@ -135,7 +135,7 @@ async fn select_latest_content_for_audit(
             strategy = "latest",
             item_count, "Adding content keys to the audit queue."
         );
-        add_to_queue(tx.clone(), strategy.clone(), content_key_db_entries).await;
+        add_to_queue(tx.clone(), strategy, content_key_db_entries).await;
     }
 }
 
@@ -211,7 +211,7 @@ async fn add_to_queue(
     );
     for content_key_model in items {
         let task = AuditTask {
-            strategy: strategy.clone(),
+            strategy,
             content: content_key_model,
         };
         if let Err(e) = tx.send(task).await {
@@ -302,7 +302,7 @@ pub struct MaxContentId {
     pub id: i32,
 }
 
-/// Finds and sends audit tasks for [SelectionStrategy::SelectOldestUnaudited].
+/// Finds and sends audit tasks for [SelectionStrategy::OldestUnaudited].
 ///
 /// Strategy achieved by:
 /// 1. Find oldest content
@@ -370,7 +370,7 @@ async fn select_oldest_unaudited_content_for_audit(
         );
         add_to_queue(
             tx.clone(),
-            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited),
+            SelectionStrategy::History(HistorySelectionStrategy::OldestUnaudited),
             content_key_db_entries,
         )
         .await;
@@ -551,7 +551,7 @@ mod tests {
         assert_eq!(checked_ids.len(), expected_key_ids.len());
     }
 
-    /// Tests that the `SelectionStrategy::SelectOldestUnaudited` selects the correct values
+    /// Tests that the `SelectionStrategy::OldestUnaudited` selects the correct values
     /// from the test database.
     #[tokio::test]
     async fn test_select_oldest_unaudited_strategy() {

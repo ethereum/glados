@@ -3,6 +3,7 @@
 {% block title %}Audit Dashboard{% endblock %}
 {% block head %}
 <link href="/static/css/glados_pages.css" rel="stylesheet">
+<link href="/static/css/spin.css" rel="stylesheet" />
 {% endblock %}
 {% block content %}
 <div class="row">
@@ -10,77 +11,93 @@
         <br />
         <h1 class="header text-center">Audit Dashboard</h1>
         <div class="d-flex justify-content-center flex-wrap">
-            {% if subprotocol == SubProtocol::History %}
-
-                <div id="content-buttons" class="btn-group mx-1" role="group">
-                    <button id="all-content-button" filter="All" class="btn btn-outline-secondary"
-                        type="button">All</button>
-                    <button id="headers-button" filter="Headers" class="btn btn-outline-secondary"
-                        type="button">Headers</button>
-                    <button id="bodies-button" filter="Bodies" class="btn btn-outline-secondary"
-                        type="button">Bodies</button>
-                    <button id="receipts-button" filter="Receipts" class="btn btn-outline-secondary"
-                        type="button">Receipts</button>
-                </div>
-                <div id="strategy-buttons" class="btn-group mx-1" role="group">
-                    <button id="all-strategy-button" filter="All" class="btn btn-outline-secondary"
-                        type="button">All</button>
-                    <button id="latest-button" filter="Latest" class="btn btn-outline-secondary"
-                        type="button">Latest</button>
-                    <button id="random-button" filter="Random" class="btn btn-outline-secondary"
-                        type="button">Random</button>
-                    <button id="oldest-button" filter="Oldest" class="btn btn-outline-secondary" type="button">Oldest
-                        Unaudited</button>
-                    <button id="fourfours-button" filter="FourFours" class="btn btn-outline-secondary"
-                        type="button">4444s</button>
-                </div>
-
-            {% elseif subprotocol == SubProtocol::State %} 
-
-                <div id="content-buttons" class="btn-group mx-1" role="group">
-                    <button id="all-content-button" filter="All" class="btn btn-outline-secondary"
-                        type="button">All</button>
-                    <button id="random-button" filter="Random" class="btn btn-outline-secondary"
-                        type="button">Random</button>
-                </div>
-
-                <div id="strategy-buttons" class="btn-group mx-1" role="group">
-                    <button id="all-strategy-button" filter="All" class="btn btn-outline-secondary"
-                        type="button">All</button>
-                    <button id="account-trie-button" filter="AccountTrieNodes" class="btn btn-outline-secondary"
-                        type="button">Account Trie Nodes</button>
-                </div>
-
-            {% elseif subprotocol == SubProtocol::Beacon %}
-
-                <div id="content-buttons" class="btn-group mx-1" role="group">
-                    <button id="all-content-button" filter="All" class="btn btn-outline-secondary"
-                        type="button">All</button>
-                    <button id="block-root-button" filter="BlockRoots" class="btn btn-outline-secondary"
-                        type="button">Block Root</button>
-                </div>
-
-                <div id="strategy-buttons" class="btn-group mx-1" role="group">
-                    <button id="all-strategy-button" filter="All" class="btn btn-outline-secondary"
-                        type="button">All</button>
-                    <button id="latest-button" filter="Latest" class="btn btn-outline-secondary"
-                        type="button">Latest</button>
-                </div>
-
-            {% endif %}
-            <div id="success-buttons" class="btn-group mx-1 " role="group">
-                <button id="all-success-button" filter="All" class="btn btn-outline-secondary"
+            <div id="content-buttons" class="btn-group mx-1" role="group">
+                <button id="all-content-button" filter="" class="btn btn-outline-secondary"
                     type="button">All</button>
-                <button id="success-button" filter="Success" class="btn btn-outline-secondary"
-                    type="button">Success</button>
-                <button id="failure-button" filter="Failure" class="btn btn-outline-secondary"
-                    type="button">Failure</button>
+                {% for content_type in content_types %}
+                <button
+                    class="btn btn-outline-secondary"
+                    id="{{content_type.get_serializations()[0]}}-content-button"
+                    type="button"
+                    filter="{{content_type.get_serializations()[0]}}">
+                        {{content_type.get_message().expect("Subprotocol missing message")}}
+                </button>
+                {% endfor %}
+            </div>
+            <div id="strategy-buttons" class="btn-group mx-1" role="group">
+                <button id="all-strategy-button" filter="" class="btn btn-outline-secondary"
+                    type="button">All</button>
+                {% for strategy in strategies %}
+                <button
+                    class="btn btn-outline-secondary"
+                    id="{{strategy.get_serializations()[0]}}-strategy-button"
+                    type="button"
+                    filter="{{strategy.get_serializations()[0]}}">
+                      {{strategy.get_message().expect("Strategy missing message")}}
+                </button>
+                {% endfor %}
+            </div>
+            <div id="audit-result-buttons" class="btn-group mx-1 " role="group">
+                <button id="all-audit-result-button" filter="" class="btn btn-outline-secondary"
+                    type="button">All</button>
+                {% for audit_result in audit_results %}
+                <button
+                    class="btn btn-outline-secondary"
+                    id="{{audit_result.get_serializations()[0]}}-audit-result-button"
+                    type="button"
+                    filter="{{audit_result.get_serializations()[0]}}">
+                      {{audit_result.get_message().expect("Audit Result missing message")}}
+                </button>
+                {% endfor %}
             </div>
         </div>
     </div>
 </div>
 <br />
-<div id="audit-table"></div>
+
+<div class="container">
+    <div class="card shadow-sm content-card bx-2 mb-3">
+        <div class="table-responsive">
+            <table class="table" id="audit-summary">
+                <thead>
+                <tr>
+                    <th scope="col">Period</th>
+                    <th scope="col">Total audits</th>
+                    <th scope="col">Total audit passes</th>
+                    <th scope="col">Total audit failures</th>
+                    <th scope="col"><span class="badge text-bg-success">Pass rate</span> (%)</th>
+                    <th scope="col"><span class="badge text-bg-danger">Failure rate</span> (%)</th>
+                    <th scope="col">Audits per minute</th>
+                </tr>
+                </thead>
+                <tbody>
+               </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card shadow-sm content-card">
+        <div class="table-responsive">
+            <table class="table" id="audit-list">
+                <thead>
+                    <tr>
+                        <th scope="col">Audit</th>
+                        <th scope="col">Result</th>
+                        <th scope="col">Content Type</th>
+                        <th scope="col">Strategy</th>
+                        <th scope="col">Content Key</th>
+                        <th scope="col">Content ID</th>
+                        <th scope="col">Content first available</th>
+                        <th scope="col">Audited</th>
+                        <th scope="col">Client</th>
+                    </tr>
+                    </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <style>
     .btn-outline-secondary.active {
         background-color: #474747;
@@ -93,98 +110,13 @@
         right: 10px;
         top: 10px;
     }
-</style>
-<script>
-
-    $(document).ready(function () {
-
-        const contentGroup = document.querySelector('#content-buttons');
-        const strategyGroup = document.querySelector('#strategy-buttons');
-        const successGroup = document.querySelector('#success-buttons');
-
-        const activateButton = (btn, group) => {
-            // Deactivate all buttons in the group
-            group.querySelectorAll('.btn').forEach(button => {
-                button.classList.remove('active');
-            });
-            // Activate the clicked button
-            btn.classList.add('active');
-        };
-
-        const handleButtonClick = (event, group) => {
-            if (event.target.classList.contains('btn')) {
-                activateButton(event.target, group);
-            }
-
-            // Store the active button in each group in session storage
-            sessionStorage.setItem('content-filter', `#${contentGroup.querySelector('.active').id}`);
-            sessionStorage.setItem('strategy-filter', `#${strategyGroup.querySelector('.active').id}`);
-            sessionStorage.setItem('success-filter', `#${successGroup.querySelector('.active').id}`);
-
-            // Get the active button's filter string in each group
-            const selectedContent = contentGroup.querySelector('.active').getAttribute('filter');
-            const selectedStrategy = strategyGroup.querySelector('.active').getAttribute('filter');
-            const selectedSuccess = successGroup.querySelector('.active').getAttribute('filter');
-
-            updateDashboard(selectedStrategy, selectedContent, selectedSuccess);
-
-        };
-
-        // Check whether the browser's session storage contains a filter for the given group, otherwise use default
-        const setInitialButton = (filter, defaultButton, group) => {
-            if (sessionStorage.getItem(filter) !== null) {
-                activateButton(document.querySelector(`${sessionStorage.getItem(filter)}`), group);
-            } else {
-                activateButton(document.querySelector(defaultButton), group);
-            }
-        }
-
-        // Attach event listeners to each button group
-        contentGroup.addEventListener('click', (event) => handleButtonClick(event, contentGroup));
-        strategyGroup.addEventListener('click', (event) => handleButtonClick(event, strategyGroup));
-        successGroup.addEventListener('click', (event) => handleButtonClick(event, successGroup));
-
-        setInitialButton('content-filter', '#all-content-button', contentGroup);
-        setInitialButton('strategy-filter', '#all-strategy-button', strategyGroup);
-        setInitialButton('success-filter', '#all-success-button', successGroup);
-
-        const selectedContent = contentGroup.querySelector('.active').getAttribute('filter');
-        const selectedStrategy = strategyGroup.querySelector('.active').getAttribute('filter');
-        const selectedSuccess = successGroup.querySelector('.active').getAttribute('filter');
-
-        updateDashboard(selectedStrategy, selectedContent, selectedSuccess);
-
-    });
-
-    function updateDashboard(strategy, content_type, success) {
-
-        const baseUrl = "filter/";
-        const url = new URL(window.location);
-        subprotocol = url.searchParams.get('network');
-        const params = {
-            network: subprotocol,
-            strategy: strategy,
-            content_type: content_type,
-            success: success,
-        };
-
-        const queryString = new URLSearchParams(params).toString();
-
-        fetch(`${baseUrl}?${queryString}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.text();
-            })
-            .then(data => {
-                document.getElementById('audit-table').innerHTML = data;
-            })
-            .catch(error => {
-                console.log('There was a problem with the fetch operation:', error.message);
-            });
+    .table {
+        min-height: 150px;
     }
-
+</style>
+<script type="module">
+    import {initAuditDashboard} from "../static/js/audit_dashboard.js";
+    initAuditDashboard();
 </script>
 
 
