@@ -103,6 +103,8 @@ pub enum Client {
     Trin,
     #[strum(props(color = "#3498DB", name = "Nimbus", placeholder = "false"))]
     Nimbus,
+    #[strum(props(color = "#2E8C47", name = "Shisui", placeholder = "false"))]
+    Samba,
     #[strum(props(color = "#DA251D", name = "Shisui", placeholder = "false"))]
     Shisui,
     #[strum(props(color = "#E67E22", name = "Ultralight", placeholder = "false"))]
@@ -117,6 +119,7 @@ impl From<String> for Client {
     fn from(value: String) -> Self {
         match value.to_lowercase().as_str() {
             "nimbus" => Client::Nimbus,
+            "samba" => Client::Samba,
             "shisui" => Client::Shisui,
             "trin" => Client::Trin,
             "ultralight" => Client::Ultralight,

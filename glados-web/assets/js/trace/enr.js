@@ -112,10 +112,12 @@
                                         return 'ultralight';
                                     // ASCII 'f'
                                     case 0x66:
-                                        return 'nimbus';
                                     // ASCII 'n'
-                                    case 0x6E:
+                                    case 0x6E:                                        
                                         return 'nimbus';
+                                    // ASCII 'a'
+                                    case 0x61:
+                                        return 'samba';                                    
                                     // ASCII 's'
                                     case 0x73:
                                         return 'shisui';
