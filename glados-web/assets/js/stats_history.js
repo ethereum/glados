@@ -352,13 +352,9 @@ function getCurrentSubprotocol() {
     },
     state: {
       baseUrl: "api/stats-state/?weeks-ago=",
-      keys: [
-        "success_rate_state_all",
-        "success_rate_state_latest",
-        "success_rate_state_state_roots",
-      ],
-      selectedIndexes: [2],
-      labels: ["All", "Latest", "State Roots"],
+      keys: ["success_rate_state_all", "success_rate_state_state_roots"],
+      selectedIndexes: [1],
+      labels: ["All", "State Roots"],
     },
     beacon: {
       baseUrl: "api/stats-beacon/?weeks-ago=",

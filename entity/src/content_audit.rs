@@ -164,15 +164,12 @@ pub enum StateSelectionStrategy {
     /// Does a random walk of the state at a random walk.
     #[strum(message = "State Roots", props(subprotocol = "2"))]
     StateRoots = 0,
-    #[strum(message = "Latest", props(subprotocol = "2"))]
-    Latest = 1,
 }
 
 impl From<i32> for StateSelectionStrategy {
     fn from(value: i32) -> Self {
         match value {
             0 => StateSelectionStrategy::StateRoots,
-            1 => StateSelectionStrategy::Latest,
             _ => panic!("Invalid value for StateSelectionStrategy"),
         }
     }

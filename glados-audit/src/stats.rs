@@ -48,7 +48,6 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         history_fourfours_bodies,
         history_fourfours_receipts,
         state_all,
-        state_latest,
         state_state_roots,
         beacon_all,
         beacon_latest,
@@ -265,16 +264,6 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: Some(StateSelectionStrategy::Latest.into()),
-                content_type: None,
-                audit_result: None,
-                network: SubProtocol::State
-            },),
-            Period::Hour,
-            conn
-        ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
                 strategy: Some(StateSelectionStrategy::StateRoots.into()),
                 content_type: None,
                 audit_result: None,
@@ -331,7 +320,6 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
     let success_rate_history_fourfours_bodies = history_fourfours_bodies?.pass_percent;
     let success_rate_history_fourfours_receipts = history_fourfours_receipts?.pass_percent;
     let success_rate_state_all = state_all?.pass_percent;
-    let success_rate_state_latest = state_latest?.pass_percent;
     let success_rate_state_state_roots = state_state_roots?.pass_percent;
     let success_rate_beacon_all = beacon_all?.pass_percent;
     let success_rate_beacon_latest = beacon_latest?.pass_percent;
@@ -361,7 +349,6 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         success_rate_history_fourfours_bodies,
         success_rate_history_fourfours_receipts,
         success_rate_state_all,
-        success_rate_state_latest,
         success_rate_state_state_roots,
         success_rate_beacon_all,
         success_rate_beacon_latest,
