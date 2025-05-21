@@ -26,6 +26,7 @@ mod m20250311_115816_create_blocks;
 mod m20250311_121724_create_audit_result_latest;
 mod m20250314_144135_add_history_headers_by_number_audit_stats;
 mod m20250317_183352_refactor_history_audit_stats;
+mod m20250317_193433_create_sync_audit;
 mod m20250404_202958_internal_failures_replace_node_with_record;
 mod m20250404_220628_add_client_info_to_census_node;
 
@@ -59,6 +60,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250317_183352_refactor_history_audit_stats::Migration),
             Box::new(m20250404_202958_internal_failures_replace_node_with_record::Migration),
             Box::new(m20250404_220628_add_client_info_to_census_node::Migration),
+            Box::new(m20250317_193433_create_sync_audit::Migration),
         ]
     }
 }

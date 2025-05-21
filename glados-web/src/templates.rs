@@ -53,6 +53,10 @@ pub struct SingleCensusViewTemplate {
 pub struct CensusExplorerTemplate {}
 
 #[derive(Template)]
+#[template(path = "sync_audit.html")]
+pub struct SyncAuditTemplate {}
+
+#[derive(Template)]
 #[template(path = "node_detail.html")]
 pub struct NodeDetailTemplate {
     pub node: node::Model,
