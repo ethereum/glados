@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Diagnostics{% endblock %}
+
+{% block head %}
+<script src="/static/js/explanations.js"></script>
+
+<link rel="stylesheet" href="/static/css/trace.css">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Diagnostics</h1>
+    <div class="row">
+        <div class="col-lg-12 col-md-12 col-sm-12 margin-bottom">
+            <div class="card pie-box h-100">
+                <div class="card-body">
+                    <button class="question-mark" aria-label="Toggle explanation"></button>
+                    <div class="explanation">
+                        This table shows the 20 most recent internal transfer failures that occurred during content audits.
+                    </div>
+                    <h2>Recent Transfer Failures</h2>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Client</th>
+                                    <th scope="col">Audit ID</th>
+                                    <th scope="col">Failure Type</th>
+                                    <th scope="col">Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for failure in failures %}
+                                <tr>
+                                    <td>{{ failure.client }}</td>
+                                    <td><a href="/audit/id/{{ failure.audit }}">{{ failure.audit }}</a></td>
+                                    <td>{{ failure.failure_type }}</td>
+                                    <td>{{ failure.created_at }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

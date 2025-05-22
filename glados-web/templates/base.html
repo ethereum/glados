@@ -36,6 +36,9 @@
                 <li class="nav-item">
                     <a class="nav-link active" aria-current="page" style="margin-left: 20px;" href="/clients">Clients</a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link active" aria-current="page" style="margin-left: 20px;" href="/diagnostics">Diagnostics</a>
+                </li>
             </ul>
             <select name="network-selector" id="network-selector" class="form-select" style="width: auto;">
                 <option value="History">History</option>
@@ -49,7 +52,7 @@
         // Logic for managing syncing network selector & URL parameter
         document.addEventListener('DOMContentLoaded', function() {
             const networkSelector = document.getElementById('network-selector');
-            
+
             function syncSelectorWithUrl() {
                 const urlParams = new URLSearchParams(window.location.search);
                 const networkParam = urlParams.get('network');
