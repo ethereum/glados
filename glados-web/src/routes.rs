@@ -14,6 +14,8 @@ use axum::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use enr::NodeId;
+use entity::audit_internal_failure::TransferFailureType;
+use entity::census_node::client_from_short_name;
 use ethportal_api::{
     jsonrpsee::core::__reexports::serde_json,
     types::{
@@ -2059,12 +2061,20 @@ async fn generate_client_diversity_data(
     )
 }
 
-#[derive(FromQueryResult, Debug, Clone, Serialize)]
-pub struct TransferFailures {
+#[derive(FromQueryResult, Debug, Clone)]
+pub struct TransferFailurePrimitive {
     pub audit: i32,
     pub client: String,
     pub created_at: DateTime<Utc>,
     pub failure_type: i32,
+}
+
+#[derive(FromQueryResult, Debug, Clone)]
+pub struct TransferFailure {
+    pub audit: i32,
+    pub client: Client,
+    pub created_at: DateTime<Utc>,
+    pub failure_type: String,
 }
 
 pub async fn diagnostics(
@@ -2072,8 +2082,8 @@ pub async fn diagnostics(
 ) -> Result<HtmlTemplate<DiagnosticsTemplate>, StatusCode> {
     // Query to get the 20 most recent internal failures joined with audits for timestamps
     // TODO: include more than 4444 errors (or maybe a dropdown to select which kind of error)
-    let transfer_failures: Vec<TransferFailures> =
-        TransferFailures::find_by_statement(Statement::from_sql_and_values(
+    let transfer_failures: Vec<TransferFailurePrimitive> =
+        TransferFailurePrimitive::find_by_statement(Statement::from_sql_and_values(
             DbBackend::Postgres,
             "
             SELECT
@@ -2096,6 +2106,22 @@ pub async fn diagnostics(
             error!(err=?e, "Failed to lookup weekly transfer failures");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
+
+    let transfer_failures: Vec<TransferFailure> = transfer_failures
+        .into_iter()
+        .map(|f| {
+            let failure_type = TransferFailureType::try_from(f.failure_type).map_err(|e| {
+                error!(err=?e, "Failed to convert transfer failure: {}", f.failure_type);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+            Ok::<TransferFailure, StatusCode>(TransferFailure {
+                audit: f.audit,
+                client: client_from_short_name(f.client),
+                created_at: f.created_at,
+                failure_type: format!("{failure_type:?}"),
+            })
+        })
+        .collect::<Result<Vec<_>, StatusCode>>()?;
 
     let template = DiagnosticsTemplate {
         failures: transfer_failures,

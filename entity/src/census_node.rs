@@ -128,6 +128,19 @@ impl From<String> for Client {
     }
 }
 
+pub fn client_from_short_name(short: String) -> Client {
+    match short.to_lowercase().as_str() {
+        // The old name for Nimbus was "Fluffy" so we include "f" here
+        "n" | "f" => Client::Nimbus,
+        "a" => Client::Samba,
+        "s" => Client::Shisui,
+        "t" => Client::Trin,
+        "u" => Client::Ultralight,
+        "unknown" => Client::Unknown,
+        _ => Client::Other,
+    }
+}
+
 impl From<Option<String>> for Client {
     fn from(value: Option<String>) -> Self {
         match value {

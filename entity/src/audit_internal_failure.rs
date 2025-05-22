@@ -61,6 +61,19 @@ pub enum TransferFailureType {
     UtpTransferFailed = 2,
 }
 
+impl TryFrom<i32> for TransferFailureType {
+    type Error = String;
+    fn try_from(fail_id: i32) -> Result<Self, String> {
+        let fail_type = match fail_id {
+            0 => TransferFailureType::InvalidContent,
+            1 => TransferFailureType::UtpConnectionFailed,
+            2 => TransferFailureType::UtpTransferFailed,
+            _ => return Err(format!("Unrecognized failure type id: {fail_id}")),
+        };
+        Ok(fail_type)
+    }
+}
+
 impl From<QueryFailureKind> for TransferFailureType {
     fn from(kind: QueryFailureKind) -> Self {
         match kind {
