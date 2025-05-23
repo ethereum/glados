@@ -618,16 +618,22 @@ pub async fn contentaudit_detail(
                 "
                 SELECT DISTINCT ON (n.node_id)
                     n.node_id,
-                    cn.data_radius
+                    closest_cn.data_radius
                 FROM
                     node n
                     JOIN record r ON r.node_id = n.id
-                    JOIN census_node cn ON cn.record_id = r.id
+                    CROSS JOIN LATERAL (
+                        SELECT cn.data_radius, cn.surveyed_at
+                        FROM census_node cn
+                        WHERE cn.record_id = r.id AND cn.surveyed_at <= $2::timestamp + INTERVAL '15 minutes'
+                        ORDER BY cn.surveyed_at DESC
+                        LIMIT 1
+                    ) closest_cn
                 WHERE
                     n.node_id = ANY($1::bytea[])
                 ORDER BY
                     n.node_id,
-                    ABS(EXTRACT(EPOCH FROM (cn.surveyed_at - $2::timestamp)))
+                    closest_cn.surveyed_at DESC
                 ",
                 vec![node_ids_str.into(), timestamp.into()],
             ))
