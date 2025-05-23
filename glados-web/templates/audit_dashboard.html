@@ -35,7 +35,7 @@
                         type="button">4444s</button>
                 </div>
 
-            {% elseif subprotocol == SubProtocol::State %} 
+            {% elseif subprotocol == SubProtocol::State %}
 
                 <div id="content-buttons" class="btn-group mx-1" role="group">
                     <button id="all-content-button" filter="All" class="btn btn-outline-secondary"
@@ -160,7 +160,7 @@
 
         const baseUrl = "filter/";
         const url = new URL(window.location);
-        subprotocol = url.searchParams.get('network');
+        subprotocol = url.searchParams.get('network') || document.getElementById('network-selector').value;
         const params = {
             network: subprotocol,
             strategy: strategy,
