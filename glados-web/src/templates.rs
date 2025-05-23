@@ -7,6 +7,7 @@ use sea_orm::strum::{EnumMessage, EnumProperty};
 
 use crate::routes::{
     CalculatedRadiusChartData, ClientDiversityResult, PaginatedCensusListResult, RawEnr,
+    TransferFailure,
 };
 use entity::{
     audit_result_latest::ContentType,
@@ -129,6 +130,12 @@ pub struct ClientsTemplate {
     pub subprotocol: SubProtocol,
     pub clients: Vec<Client>,
     pub operating_systems: Vec<OperatingSystem>,
+}
+
+#[derive(Template)]
+#[template(path = "diagnostics.html")]
+pub struct DiagnosticsTemplate {
+    pub failures: Vec<TransferFailure>,
 }
 
 pub struct HtmlTemplate<T: Template>(pub T);

@@ -14,6 +14,8 @@ use axum::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use enr::NodeId;
+use entity::audit_internal_failure::TransferFailureType;
+use entity::census_node::client_from_short_name;
 use ethportal_api::{
     jsonrpsee::core::__reexports::serde_json,
     types::{
@@ -35,8 +37,9 @@ use tracing::{debug, error, info, warn};
 use crate::templates::{
     AuditDashboardTemplate, AuditTableTemplate, CensusExplorerTemplate, ClientsTemplate,
     ContentAuditDetailTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
-    ContentKeyDetailTemplate, ContentKeyListTemplate, EnrDetailTemplate, HtmlTemplate,
-    IndexTemplate, NodeDetailTemplate, PaginatedCensusListTemplate, SingleCensusViewTemplate,
+    ContentKeyDetailTemplate, ContentKeyListTemplate, DiagnosticsTemplate, EnrDetailTemplate,
+    HtmlTemplate, IndexTemplate, NodeDetailTemplate, PaginatedCensusListTemplate,
+    SingleCensusViewTemplate,
 };
 use crate::{state::State, templates::AuditTuple};
 use entity::{
@@ -1528,7 +1531,7 @@ pub async fn weekly_census_protocol_versions(
 }
 
 #[derive(FromQueryResult, Debug, Clone, Serialize)]
-pub struct TransferFailures {
+pub struct TransferFailureBatches {
     start: DateTime<Utc>,
     client: String,
     failures: i64,
@@ -1537,14 +1540,14 @@ pub struct TransferFailures {
 pub async fn weekly_transfer_failures(
     http_args: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
-) -> Result<Json<Vec<TransferFailures>>, StatusCode> {
+) -> Result<Json<Vec<TransferFailureBatches>>, StatusCode> {
     let weeks_ago: i32 = match http_args.get("weeks-ago") {
         None => 0,
         Some(weeks_ago) => weeks_ago.parse::<i32>().unwrap_or(0),
     };
 
-    let transfer_failures: Vec<TransferFailures> =
-        TransferFailures::find_by_statement(Statement::from_sql_and_values(
+    let transfer_failures: Vec<TransferFailureBatches> =
+        TransferFailureBatches::find_by_statement(Statement::from_sql_and_values(
             DbBackend::Postgres,
             "
             SELECT
@@ -2062,6 +2065,75 @@ async fn generate_client_diversity_data(
             ", vec![census_id.into()])
         ).all(&state.database_connection).await.unwrap(),
     )
+}
+
+#[derive(FromQueryResult, Debug, Clone)]
+pub struct TransferFailurePrimitive {
+    pub audit: i32,
+    pub client: String,
+    pub created_at: DateTime<Utc>,
+    pub failure_type: i32,
+}
+
+#[derive(FromQueryResult, Debug, Clone)]
+pub struct TransferFailure {
+    pub audit: i32,
+    pub client: Client,
+    pub created_at: DateTime<Utc>,
+    pub failure_type: String,
+}
+
+pub async fn diagnostics(
+    Extension(state): Extension<Arc<State>>,
+) -> Result<HtmlTemplate<DiagnosticsTemplate>, StatusCode> {
+    // Query to get the 20 most recent internal failures joined with audits for timestamps
+    // TODO: include more than 4444 errors (or maybe a dropdown to select which kind of error)
+    let transfer_failures: Vec<TransferFailurePrimitive> =
+        TransferFailurePrimitive::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "
+            SELECT
+                aif.audit,
+                convert_from(COALESCE(substr(substr(kv.value, 1, 2), length(substr(kv.value, 1, 2)), 1), 'unknown'), 'utf8') AS client,
+                ca.created_at,
+                aif.failure_type
+            FROM audit_internal_failure AS aif
+            LEFT JOIN record AS r ON aif.sender_record_id=r.id
+            LEFT JOIN key_value AS kv ON (r.id=kv.record_id AND kv.key = '\x63') -- hex('c')
+            LEFT JOIN content_audit AS ca ON aif.audit=ca.id
+            WHERE ca.strategy_used = 5 AND ca.created_at IS NOT NULL
+            ORDER BY created_at DESC
+            LIMIT 20;",
+            vec![],
+        ))
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Failed to lookup weekly transfer failures");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let transfer_failures: Vec<TransferFailure> = transfer_failures
+        .into_iter()
+        .map(|f| {
+            let failure_type = TransferFailureType::try_from(f.failure_type).map_err(|e| {
+                error!(err=?e, "Failed to convert transfer failure: {}", f.failure_type);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+            Ok::<TransferFailure, StatusCode>(TransferFailure {
+                audit: f.audit,
+                client: client_from_short_name(f.client),
+                created_at: f.created_at,
+                failure_type: format!("{failure_type:?}"),
+            })
+        })
+        .collect::<Result<Vec<_>, StatusCode>>()?;
+
+    let template = DiagnosticsTemplate {
+        failures: transfer_failures,
+    };
+
+    Ok(HtmlTemplate(template))
 }
 
 #[cfg(test)]
