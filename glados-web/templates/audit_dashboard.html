@@ -160,7 +160,7 @@
 
         const baseUrl = "filter/";
         const url = new URL(window.location);
-        subprotocol = url.searchParams.get('network') || document.getElementById('network-selector').value;
+        const subprotocol = url.searchParams.get('network') || document.getElementById('network-selector').value;
         const params = {
             network: subprotocol,
             strategy: strategy,
