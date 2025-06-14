@@ -18,7 +18,7 @@ use tokio::time::sleep;
 use tracing::{debug, error, info};
 
 /// Nimbus node to retrieve beacon data from.
-pub const PANDA_OPS_BEACON: &str = "https://nimbus.mainnet.ethpandaops.io";
+pub const PANDA_OPS_BEACON: &str = "";
 /// How often the provider will be queried for a new block hash.
 const POLL_PERIOD_SECONDS: u64 = 1;
 // Beacon chain mainnet genesis time: Tue Dec 01 2020 12:00:23 GMT+0000
