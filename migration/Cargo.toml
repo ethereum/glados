@@ -30,4 +30,4 @@ features = [
 ]
 
 [dev-dependencies]
-testcontainers-modules = {version = "0.12.1", features = ["postgres"] }
+pgtemp.workspace = true
