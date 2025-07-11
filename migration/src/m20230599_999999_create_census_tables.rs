@@ -89,16 +89,18 @@ impl MigrationTrait for Migration {
                     )
                     .to_owned(),
             )
-            .await
+            .await?;
+        Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Census::Table).to_owned())
+            .drop_table(Table::drop().table(CensusNode::Table).to_owned())
             .await?;
         manager
-            .drop_table(Table::drop().table(CensusNode::Table).to_owned())
-            .await
+            .drop_table(Table::drop().table(Census::Table).to_owned())
+            .await?;
+        Ok(())
     }
 }
 

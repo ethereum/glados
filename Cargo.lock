@@ -4058,6 +4058,7 @@ dependencies = [
  "anyhow",
  "async-std",
  "futures",
+ "pgtemp",
  "reqwest 0.11.27",
  "sea-orm",
  "sea-orm-migration",

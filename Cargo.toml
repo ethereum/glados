@@ -6,7 +6,16 @@ rust-version = "1.85.0"
 authors = ["Piper Merriam <piper@pipermerriam.com>"]
 
 [workspace]
-members = [".", "glados-cartographer", "glados-core", "glados-web", "glados-monitor", "entity", "migration"]
+members = [
+    ".",
+    "entity",
+    "glados-audit",
+    "glados-cartographer",
+    "glados-core",
+    "glados-monitor",
+    "glados-web",
+    "migration",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

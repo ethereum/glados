@@ -28,3 +28,6 @@ features = [
   "runtime-tokio-native-tls",  # `ASYNC_RUNTIME` feature
   "sqlx-postgres",         # `DATABASE_DRIVER` feature
 ]
+
+[dev-dependencies]
+pgtemp.workspace = true
