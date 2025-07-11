@@ -159,3 +159,58 @@ impl SeedTrait for Migrator {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use sea_orm::Database;
+    use testcontainers_modules::{
+        postgres::Postgres,
+        testcontainers::{runners::AsyncRunner, ContainerAsync},
+    };
+
+    use super::*;
+
+    async fn setup_test_database() -> anyhow::Result<(ContainerAsync<Postgres>, DatabaseConnection)>
+    {
+        let postgres = Postgres::default().start().await?;
+
+        let db_url = format!(
+            "postgres://postgres:postgres@{}:{}/postgres",
+            postgres.get_host().await?,
+            postgres.get_host_port_ipv4(5432).await?
+        );
+
+        Ok((postgres, Database::connect(db_url).await?))
+    }
+
+    #[async_std::test]
+    async fn fresh() -> anyhow::Result<()> {
+        let (_postgres, db) = setup_test_database().await?;
+        Migrator::fresh(&db).await?;
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn up() -> anyhow::Result<()> {
+        let (_postgres, db) = setup_test_database().await?;
+        Migrator::up(&db, None).await?;
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn reset() -> anyhow::Result<()> {
+        let (_postgres, db) = setup_test_database().await?;
+        Migrator::fresh(&db).await?;
+        Migrator::reset(&db).await?;
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn refresh() -> anyhow::Result<()> {
+        let (_postgres, db) = setup_test_database().await?;
+        Migrator::fresh(&db).await?;
+        Migrator::refresh(&db).await?;
+        Ok(())
+    }
+}

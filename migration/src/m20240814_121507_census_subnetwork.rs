@@ -33,7 +33,7 @@ impl MigrationTrait for Migration {
         let _ = manager
             .alter_table(
                 Table::alter()
-                    .table(Census::Table)
+                    .table(CensusNode::Table)
                     .drop_column(Census::SubNetwork)
                     .to_owned(),
             )

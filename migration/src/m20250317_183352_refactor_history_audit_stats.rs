@@ -198,9 +198,6 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .alter_table(Table::alter().table(AuditStats::Table).to_owned())
-            .await?;
-        manager
             .alter_table(
                 Table::alter()
                     .table(AuditStats::Table)
