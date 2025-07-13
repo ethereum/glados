@@ -751,20 +751,17 @@ pub async fn is_content_in_deadzone(
     Path(content_key): Path<String>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<Vec<String>>, StatusCode> {
-    let content_id = if let Ok(content_key) =
+    let (sub_protocol, content_id) = if let Ok(content_key) =
         serde_json::from_value::<HistoryContentKey>(serde_json::json!(content_key))
     {
-        content_key.content_id()
+        (SubProtocol::History, content_key.content_id())
     } else if let Ok(content_key) =
         serde_json::from_value::<BeaconContentKey>(serde_json::json!(content_key))
     {
-        content_key.content_id()
+        (SubProtocol::Beacon, content_key.content_id())
     } else {
         return Err(StatusCode::BAD_REQUEST);
     };
-
-    // First byte can be extracted from content_key, since it is already sanitized
-    let sub_protocol: i32 = (content_key[2..4]).parse().unwrap();
 
     let dead_zone_data_vec = DeadZoneData::find_by_statement(Statement::from_sql_and_values(
         DbBackend::Postgres,
