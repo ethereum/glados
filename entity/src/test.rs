@@ -294,6 +294,26 @@ async fn test_content_table_unique_constraints() {
 
     assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 1);
 
+    // DB=1. Add different content_key, different content_id, same protocol (accepts). DB=2.
+    let action_b = content::ActiveModel {
+        id: NotSet,
+        content_id: Set(id_b.clone()),
+        content_key: Set(key_b.clone()),
+        protocol_id: Set(protocol_a),
+        first_available_at: Set(Utc::now()),
+    };
+    action_b.clone().insert(&conn).await.unwrap();
+    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
+
+    // DB=2. Repeat addition (rejects). DB=2.
+    assert!(action_b
+        .insert(&conn)
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("violates unique constraint"));
+    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
+
     // DB=2. Add same content_key, different content_id, same protocol (rejects). DB=2.
     let action_c = content::ActiveModel {
         id: NotSet,
@@ -304,15 +324,6 @@ async fn test_content_table_unique_constraints() {
     };
     assert!(action_c
         .clone()
-        .insert(&conn)
-        .await
-        .unwrap_err()
-        .to_string()
-        .contains("violates unique constraint"));
-    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
-
-    // DB=2. Repeat addition (rejects). DB=2.
-    assert!(action_c
         .insert(&conn)
         .await
         .unwrap_err()
