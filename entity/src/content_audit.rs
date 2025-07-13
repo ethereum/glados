@@ -144,19 +144,12 @@ impl ActiveEnum for SelectionStrategy {
 
     fn to_value(&self) -> Self::Value {
         match self {
-            SelectionStrategy::History(h) => 0 << 16 + h.to_value(),
+            SelectionStrategy::History(h) => h.to_value(),
         }
     }
 
     fn try_from_value(v: &Self::Value) -> std::prelude::v1::Result<Self, DbErr> {
-        match v >> 16 {
-            0 => Ok(SelectionStrategy::History(HistorySelectionStrategy::from(
-                v & 0xFFFF,
-            ))),
-            _ => Err(DbErr::Type(
-                "Invalid value for SelectionStrategy".to_string(),
-            )),
-        }
+        HistorySelectionStrategy::try_from_value(v).map(SelectionStrategy::History)
     }
 
     fn db_type() -> ColumnDef {
