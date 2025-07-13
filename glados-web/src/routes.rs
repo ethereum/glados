@@ -24,7 +24,7 @@ use ethportal_api::{
         query_trace::QueryTrace,
     },
     utils::bytes::{hex_decode, hex_encode},
-    BeaconContentKey, HistoryContentKey, OverlayContentKey,
+    HistoryContentKey, OverlayContentKey,
 };
 use sea_orm::{
     sea_query::{Expr, Query, SimpleExpr},
@@ -92,7 +92,6 @@ pub async fn network_overview(
 
     let strategy: StrategyFilter = match subprotocol {
         SubProtocol::History => StrategyFilter::FourFours,
-        SubProtocol::Beacon => StrategyFilter::Latest,
     };
 
     // Run queries for content dashboard data concurrently
@@ -528,10 +527,6 @@ pub async fn contentkey_detail(
             let content_id = hex_encode(content_key.content_id());
             let content_kind = content_key.to_string();
             (content_id, content_kind)
-        } else if let Ok(content_key) = BeaconContentKey::try_from_hex(&content_key_hex) {
-            let content_id = hex_encode(content_key.content_id());
-            let content_kind = content_key.to_string();
-            (content_id, content_kind)
         } else {
             error!(
                 content.key = content_key_hex,
@@ -755,10 +750,6 @@ pub async fn is_content_in_deadzone(
         serde_json::from_value::<HistoryContentKey>(serde_json::json!(content_key))
     {
         (SubProtocol::History, content_key.content_id())
-    } else if let Ok(content_key) =
-        serde_json::from_value::<BeaconContentKey>(serde_json::json!(content_key))
-    {
-        (SubProtocol::Beacon, content_key.content_id())
     } else {
         return Err(StatusCode::BAD_REQUEST);
     };
@@ -819,25 +810,6 @@ pub async fn get_history_audit_stats_handler(
     Ok(Json(stats))
 }
 
-pub async fn get_beacon_audit_stats_handler(
-    http_args: HttpQuery<HashMap<String, String>>,
-    Extension(state): Extension<Arc<State>>,
-) -> Result<Json<Vec<audit_stats::BeaconStats>>, StatusCode> {
-    let weeks_ago: i32 = match http_args.get("weeks-ago") {
-        None => 0,
-        Some(days_ago) => days_ago.parse::<i32>().unwrap_or(0),
-    };
-    let stats = audit_stats::get_weekly_beacon_stats(&state.database_connection, weeks_ago)
-        .await
-        .map_err(|e| {
-            error!(err=?e, "Could not look up audit stat history");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })
-        .unwrap();
-
-    Ok(Json(stats))
-}
-
 pub async fn get_failed_keys_handler(
     http_args: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
@@ -848,7 +820,6 @@ pub async fn get_failed_keys_handler(
         // Set a default for each subprotocol
         None => match subprotocol {
             SubProtocol::History => "FourFours".to_string(),
-            SubProtocol::Beacon => "Latest".to_string(),
         },
         Some(strategy) => strategy.to_string(),
     };

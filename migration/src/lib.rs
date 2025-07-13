@@ -29,6 +29,7 @@ mod m20250317_183352_refactor_history_audit_stats;
 mod m20250404_202958_internal_failures_replace_node_with_record;
 mod m20250404_220628_add_client_info_to_census_node;
 mod m20250713_130007_remove_state;
+mod m20250713_191500_remove_beacon_audit_stats;
 
 pub struct Migrator;
 
@@ -61,6 +62,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250404_202958_internal_failures_replace_node_with_record::Migration),
             Box::new(m20250404_220628_add_client_info_to_census_node::Migration),
             Box::new(m20250713_130007_remove_state::Migration),
+            Box::new(m20250713_191500_remove_beacon_audit_stats::Migration),
         ]
     }
 }

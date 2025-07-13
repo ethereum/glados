@@ -33,8 +33,6 @@ pub struct Model {
     pub success_rate_history_four_fours_headers_by_number: f32,
     pub success_rate_history_four_fours_bodies: f32,
     pub success_rate_history_four_fours_receipts: f32,
-    pub success_rate_beacon_all: f32,
-    pub success_rate_beacon_latest: f32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -67,8 +65,6 @@ pub async fn create(
     success_rate_history_four_fours_headers_by_number: f32,
     success_rate_history_four_fours_bodies: f32,
     success_rate_history_four_fours_receipts: f32,
-    success_rate_beacon_all: f32,
-    success_rate_beacon_latest: f32,
     conn: &DatabaseConnection,
 ) -> Result<Model> {
     let audit_stats = ActiveModel {
@@ -102,8 +98,6 @@ pub async fn create(
         ),
         success_rate_history_four_fours_bodies: Set(success_rate_history_four_fours_bodies),
         success_rate_history_four_fours_receipts: Set(success_rate_history_four_fours_receipts),
-        success_rate_beacon_all: Set(success_rate_beacon_all),
-        success_rate_beacon_latest: Set(success_rate_beacon_latest),
     };
     Ok(audit_stats.insert(conn).await?)
 }
@@ -134,14 +128,6 @@ pub struct HistoryStats {
     success_rate_history_latest_headers_by_number: f32,
     success_rate_history_random_headers_by_number: f32,
     success_rate_history_four_fours_headers_by_number: f32,
-}
-
-#[derive(Clone, Debug, Serialize, FromQueryResult)]
-pub struct BeaconStats {
-    id: i32,
-    timestamp: DateTime<Utc>,
-    success_rate_beacon_all: f32,
-    success_rate_beacon_latest: f32,
 }
 
 fn compute_week_period(weeks_ago: i32) -> (DateTime<Utc>, DateTime<Utc>) {
@@ -194,29 +180,6 @@ pub async fn get_weekly_history_stats(
         .filter(Column::Timestamp.lt(end))
         .order_by_asc(Column::Timestamp)
         .into_model::<HistoryStats>()
-        .all(conn)
-        .await
-}
-
-/// Get 7 days of beacon audit stat series.
-pub async fn get_weekly_beacon_stats(
-    conn: &DatabaseConnection,
-    weeks_ago: i32,
-) -> Result<Vec<BeaconStats>, DbErr> {
-    let (beginning, end) = compute_week_period(weeks_ago);
-
-    Entity::find()
-        .select_only()
-        .columns([
-            Column::Id,
-            Column::Timestamp,
-            Column::SuccessRateBeaconAll,
-            Column::SuccessRateBeaconLatest,
-        ])
-        .filter(Column::Timestamp.gt(beginning))
-        .filter(Column::Timestamp.lt(end))
-        .order_by_asc(Column::Timestamp)
-        .into_model::<BeaconStats>()
         .all(conn)
         .await
 }

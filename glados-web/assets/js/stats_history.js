@@ -350,12 +350,6 @@ function getCurrentSubprotocol() {
         "4444s Receipts",
       ],
     },
-    beacon: {
-      baseUrl: "api/stats-beacon/?weeks-ago=",
-      keys: ["success_rate_beacon_all", "success_rate_beacon_latest"],
-      selectedIndexes: [1],
-      labels: ["All", "Latest"],
-    },
   };
 
   return subprotocols[subprotocolName];
