@@ -18,10 +18,6 @@ pub fn content_is_valid(content: &content::Model, content_bytes: &[u8]) -> bool 
             };
             validate_history(&content_key, content_bytes)
         }
-        content::SubProtocol::State => {
-            warn!("State content validation not yet implemented.");
-            true
-        }
         content::SubProtocol::Beacon => {
             let content_key = match BeaconContentKey::try_from_bytes(&content.content_key) {
                 Ok(key) => key,

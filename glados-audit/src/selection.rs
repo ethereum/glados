@@ -49,9 +49,6 @@ pub async fn start_audit_selection_task(
         SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey) => {
             error!("SpecificContentKey is not a valid audit strategy")
         }
-        _ => {
-            error!("Strategy not implemented")
-        }
     }
 }
 
@@ -74,7 +71,6 @@ async fn select_latest_content_for_audit(
     let protocol_id = match &strategy {
         SelectionStrategy::History(_) => SubProtocol::History as i32,
         SelectionStrategy::Beacon(_) => SubProtocol::Beacon as i32,
-        SelectionStrategy::State(_) => SubProtocol::State as i32,
     };
     loop {
         interval.tick().await;

@@ -1,24 +1,14 @@
-use anyhow::{Error, Result};
+use anyhow::Error;
 use chrono::{DateTime, Utc};
 use entity::{
     content::{self, SubProtocol},
-    execution_metadata, state_roots,
+    execution_metadata,
 };
 use ethportal_api::{
     utils::bytes::hex_encode, BlockBodyKey, BlockReceiptsKey, HistoryContentKey, OverlayContentKey,
 };
 use sea_orm::DatabaseConnection;
 use tracing::{debug, error};
-
-/// Stores the state root for the given block number.
-pub async fn store_state_root(
-    block_number: i32,
-    state_root: Vec<u8>,
-    available_at: DateTime<Utc>,
-    conn: &DatabaseConnection,
-) -> Result<state_roots::Model> {
-    state_roots::get_or_create(block_number, state_root, available_at, conn).await
-}
 
 /// Stores the content keys and block metadata for the given block.
 ///

@@ -33,9 +33,6 @@ pub struct Model {
     pub success_rate_history_four_fours_headers_by_number: f32,
     pub success_rate_history_four_fours_bodies: f32,
     pub success_rate_history_four_fours_receipts: f32,
-    pub success_rate_state_all: f32,
-    pub success_rate_state_latest: f32,
-    pub success_rate_state_state_roots: f32,
     pub success_rate_beacon_all: f32,
     pub success_rate_beacon_latest: f32,
 }
@@ -70,9 +67,6 @@ pub async fn create(
     success_rate_history_four_fours_headers_by_number: f32,
     success_rate_history_four_fours_bodies: f32,
     success_rate_history_four_fours_receipts: f32,
-    success_rate_state_all: f32,
-    success_rate_state_latest: f32,
-    success_rate_state_state_roots: f32,
     success_rate_beacon_all: f32,
     success_rate_beacon_latest: f32,
     conn: &DatabaseConnection,
@@ -108,9 +102,6 @@ pub async fn create(
         ),
         success_rate_history_four_fours_bodies: Set(success_rate_history_four_fours_bodies),
         success_rate_history_four_fours_receipts: Set(success_rate_history_four_fours_receipts),
-        success_rate_state_all: Set(success_rate_state_all),
-        success_rate_state_latest: Set(success_rate_state_latest),
-        success_rate_state_state_roots: Set(success_rate_state_state_roots),
         success_rate_beacon_all: Set(success_rate_beacon_all),
         success_rate_beacon_latest: Set(success_rate_beacon_latest),
     };
@@ -143,15 +134,6 @@ pub struct HistoryStats {
     success_rate_history_latest_headers_by_number: f32,
     success_rate_history_random_headers_by_number: f32,
     success_rate_history_four_fours_headers_by_number: f32,
-}
-
-#[derive(Clone, Debug, Serialize, FromQueryResult)]
-pub struct StateStats {
-    id: i32,
-    timestamp: DateTime<Utc>,
-    success_rate_state_all: f32,
-    success_rate_state_latest: f32,
-    success_rate_state_state_roots: f32,
 }
 
 #[derive(Clone, Debug, Serialize, FromQueryResult)]
@@ -215,29 +197,7 @@ pub async fn get_weekly_history_stats(
         .all(conn)
         .await
 }
-/// Get 7 days of state audit stat series.
-pub async fn get_weekly_state_stats(
-    conn: &DatabaseConnection,
-    weeks_ago: i32,
-) -> Result<Vec<StateStats>, DbErr> {
-    let (beginning, end) = compute_week_period(weeks_ago);
 
-    Entity::find()
-        .select_only()
-        .columns([
-            Column::Id,
-            Column::Timestamp,
-            Column::SuccessRateStateAll,
-            Column::SuccessRateStateLatest,
-            Column::SuccessRateStateStateRoots,
-        ])
-        .filter(Column::Timestamp.gt(beginning))
-        .filter(Column::Timestamp.lt(end))
-        .order_by_asc(Column::Timestamp)
-        .into_model::<StateStats>()
-        .all(conn)
-        .await
-}
 /// Get 7 days of beacon audit stat series.
 pub async fn get_weekly_beacon_stats(
     conn: &DatabaseConnection,

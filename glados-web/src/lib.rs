@@ -98,10 +98,6 @@ pub async fn run_glados_web(config: Arc<State>) -> Result<()> {
             get(routes::get_history_audit_stats_handler),
         )
         .route(
-            "/api/stats-state/",
-            get(routes::get_state_audit_stats_handler),
-        )
-        .route(
             "/api/stats-beacon/",
             get(routes::get_beacon_audit_stats_handler),
         )
