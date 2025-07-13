@@ -104,42 +104,10 @@ impl TryFrom<String> for BeaconSelectionStrategy {
     }
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq, EnumIter, DeriveActiveEnum, ValueEnum)]
-#[clap(rename_all = "snake_case")]
-#[sea_orm(rs_type = "i32", db_type = "Integer")]
-/// Each strategy is responsible for selecting which content key(s) to begin audits for.
-pub enum StateSelectionStrategy {
-    /// Does a random walk of the state at a random walk.
-    StateRoots = 0,
-    Latest = 1,
-}
-
-impl From<i32> for StateSelectionStrategy {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => StateSelectionStrategy::StateRoots,
-            1 => StateSelectionStrategy::Latest,
-            _ => panic!("Invalid value for StateSelectionStrategy"),
-        }
-    }
-}
-
-impl TryFrom<String> for StateSelectionStrategy {
-    type Error = anyhow::Error;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.as_str() {
-            "StateRoots" => Ok(StateSelectionStrategy::StateRoots),
-            "Latest" => Ok(StateSelectionStrategy::Latest),
-            _ => bail!("Invalid value for StateSelectionStrategy {}", value),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum SelectionStrategy {
     History(HistorySelectionStrategy),
     Beacon(BeaconSelectionStrategy),
-    State(StateSelectionStrategy),
 }
 
 impl From<SelectionStrategy> for Value {
@@ -147,7 +115,6 @@ impl From<SelectionStrategy> for Value {
         match value {
             SelectionStrategy::History(h) => Value::Int(Some(h as i32)),
             SelectionStrategy::Beacon(b) => Value::Int(Some(0x10000 + b as i32)),
-            SelectionStrategy::State(s) => Value::Int(Some(0x20000 + s as i32)),
         }
     }
 }
@@ -166,9 +133,6 @@ impl ValueType for SelectionStrategy {
                     value & 0xFFFF,
                 ))),
                 1 => Ok(SelectionStrategy::Beacon(BeaconSelectionStrategy::from(
-                    value & 0xFFFF,
-                ))),
-                2 => Ok(SelectionStrategy::State(StateSelectionStrategy::from(
                     value & 0xFFFF,
                 ))),
                 _ => Err(ValueTypeErr),
@@ -201,9 +165,6 @@ impl IntoEnumIterator for SelectionStrategy {
             BeaconSelectionStrategy::iter()
                 .map(SelectionStrategy::Beacon)
                 .collect::<Vec<_>>(),
-            StateSelectionStrategy::iter()
-                .map(SelectionStrategy::State)
-                .collect::<Vec<_>>(),
         ]
         .concat()
         .into_iter()
@@ -227,7 +188,6 @@ impl ActiveEnum for SelectionStrategy {
         match self {
             SelectionStrategy::History(h) => h.to_value(),
             SelectionStrategy::Beacon(b) => 0x10000 + b.to_value(),
-            SelectionStrategy::State(s) => 0x20000 + s.to_value(),
         }
     }
 
@@ -237,9 +197,6 @@ impl ActiveEnum for SelectionStrategy {
                 v & 0xFFFF,
             ))),
             1 => Ok(SelectionStrategy::Beacon(BeaconSelectionStrategy::from(
-                v & 0xFFFF,
-            ))),
-            2 => Ok(SelectionStrategy::State(StateSelectionStrategy::from(
                 v & 0xFFFF,
             ))),
             _ => Err(DbErr::Type(
@@ -389,7 +346,6 @@ pub async fn get_failed_keys(
 
     let subprotocol_strategy: SelectionStrategy = match subprotocol {
         SubProtocol::History => SelectionStrategy::History(strategy_used.try_into()?),
-        SubProtocol::State => SelectionStrategy::State(strategy_used.try_into()?),
         SubProtocol::Beacon => SelectionStrategy::Beacon(strategy_used.try_into()?),
     };
 
@@ -461,10 +417,6 @@ impl SelectionStrategy {
                 "Specific Content Key".to_string()
             }
             SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest) => "Latest".to_string(),
-            SelectionStrategy::State(StateSelectionStrategy::StateRoots) => {
-                "State Roots".to_string()
-            }
-            SelectionStrategy::State(StateSelectionStrategy::Latest) => "Latest".to_string(),
         }
     }
 }
@@ -493,8 +445,6 @@ impl Model {
 #[cfg(test)]
 mod tests {
     use sea_orm::{ActiveEnum, Value};
-
-    use crate::content_audit::StateSelectionStrategy;
 
     use super::{BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy};
 
@@ -528,10 +478,6 @@ mod tests {
             SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest).to_value(),
             0x10000
         );
-        assert_eq!(
-            SelectionStrategy::State(StateSelectionStrategy::StateRoots).to_value(),
-            0x20000
-        );
     }
 
     #[test]
@@ -563,10 +509,6 @@ mod tests {
         assert_eq!(
             SelectionStrategy::try_from_value(&0x10000).unwrap(),
             SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest)
-        );
-        assert_eq!(
-            SelectionStrategy::try_from_value(&0x20000).unwrap(),
-            SelectionStrategy::State(StateSelectionStrategy::StateRoots)
         );
     }
 
@@ -600,10 +542,6 @@ mod tests {
             SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest).as_text(),
             "Latest"
         );
-        assert_eq!(
-            SelectionStrategy::State(StateSelectionStrategy::StateRoots).as_text(),
-            "State Roots"
-        );
     }
 
     #[test]
@@ -635,10 +573,6 @@ mod tests {
         assert_eq!(
             BeaconSelectionStrategy::try_from("Latest".to_string()).unwrap(),
             BeaconSelectionStrategy::Latest
-        );
-        assert_eq!(
-            StateSelectionStrategy::try_from("StateRoots".to_string()).unwrap(),
-            StateSelectionStrategy::StateRoots
         );
     }
 
@@ -677,10 +611,6 @@ mod tests {
         assert_eq!(
             Value::from(SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest)),
             Value::Int(Some(0x10000))
-        );
-        assert_eq!(
-            Value::from(SelectionStrategy::State(StateSelectionStrategy::StateRoots)),
-            Value::Int(Some(0x20000))
         );
     }
 }

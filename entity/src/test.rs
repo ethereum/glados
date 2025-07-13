@@ -271,7 +271,7 @@ async fn test_content_table_unique_constraints() {
     let key_a = vec![3; 32];
     let key_b = vec![4; 32];
     let protocol_a = SubProtocol::History;
-    let protocol_b = SubProtocol::State;
+    let protocol_b = SubProtocol::Beacon;
     // DB=0. Add one key (accepts). DB==1.
     let action_a = content::ActiveModel {
         id: NotSet,

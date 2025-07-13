@@ -12,7 +12,6 @@ use entity::{
     content::{self, SubProtocol},
     content_audit::{
         self, AuditResult, BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy,
-        StateSelectionStrategy,
     },
 };
 
@@ -44,7 +43,6 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
                 SubProtocol::History => {
                     SelectionStrategy::History(HistorySelectionStrategy::Latest)
                 }
-                SubProtocol::State => SelectionStrategy::State(StateSelectionStrategy::Latest),
                 SubProtocol::Beacon => SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest),
             },
         )),
@@ -54,10 +52,6 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
         StrategyFilter::FourFours => audits.filter(content_audit::Column::StrategyUsed.eq(
             SelectionStrategy::History(HistorySelectionStrategy::FourFours),
         )),
-        StrategyFilter::StateRoots => audits.filter(
-            content_audit::Column::StrategyUsed
-                .eq(SelectionStrategy::State(StateSelectionStrategy::StateRoots)),
-        ),
     };
     // Success filters
     let audits = match filters.success {
@@ -220,7 +214,6 @@ pub enum StrategyFilter {
     Latest,
     Oldest,
     FourFours,
-    StateRoots,
 }
 
 impl Display for StrategyFilter {
@@ -231,7 +224,6 @@ impl Display for StrategyFilter {
             StrategyFilter::Latest => "Latest",
             StrategyFilter::Oldest => "Oldest",
             StrategyFilter::FourFours => "4444s",
-            StrategyFilter::StateRoots => "State Roots",
         };
         write!(f, "{}", name)
     }

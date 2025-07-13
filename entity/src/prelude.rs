@@ -9,4 +9,3 @@ pub use super::execution_metadata::Entity as ExecutionMetadata;
 pub use super::key_value::Entity as KeyValue;
 pub use super::node::Entity as Node;
 pub use super::record::Entity as Record;
-pub use super::state_roots::Entity as StateRoots;

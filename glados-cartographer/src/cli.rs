@@ -42,7 +42,6 @@ pub enum TransportType {
 pub enum PortalSubnet {
     History,
     Beacon,
-    State,
 }
 
 impl From<PortalSubnet> for SubProtocol {
@@ -50,7 +49,6 @@ impl From<PortalSubnet> for SubProtocol {
         match value {
             PortalSubnet::History => SubProtocol::History,
             PortalSubnet::Beacon => SubProtocol::Beacon,
-            PortalSubnet::State => SubProtocol::State,
         }
     }
 }

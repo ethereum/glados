@@ -57,33 +57,7 @@ pub enum Commands {
         concurrency: u32,
     },
 
-    /// Follows the head of the chain and stores state roots for each block
-    FollowHeadState {
-        // HTTP web3 provider
-        #[arg(short, long)]
-        provider_url: String,
-    },
-
-    /// Takes a range and populates the state roots table with the state roots for that range
-    PopulateStateRootsRange {
-        #[arg(
-            short,
-            long,
-            help = "The block number with which the download will begin"
-        )]
-        start_block_number: u64,
-        #[arg(
-            short,
-            long,
-            help = "The block number (exclusive) with which the download will end"
-        )]
-        end_block_number: u64,
-        #[arg(short, long)]
-        provider_url: String,
-        // 100 is chosen because it is Postgres' default max connections
-        #[arg(short, long, default_value = "100")]
-        concurrency: u32,
-    },
+    /// Seed the content to the table
     Seed {
         #[arg(short, long, help = "The name of the table to seed")]
         table_name: String,

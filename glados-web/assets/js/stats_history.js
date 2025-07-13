@@ -350,16 +350,6 @@ function getCurrentSubprotocol() {
         "4444s Receipts",
       ],
     },
-    state: {
-      baseUrl: "api/stats-state/?weeks-ago=",
-      keys: [
-        "success_rate_state_all",
-        "success_rate_state_latest",
-        "success_rate_state_state_roots",
-      ],
-      selectedIndexes: [2],
-      labels: ["All", "Latest", "State Roots"],
-    },
     beacon: {
       baseUrl: "api/stats-beacon/?weeks-ago=",
       keys: ["success_rate_beacon_all", "success_rate_beacon_latest"],

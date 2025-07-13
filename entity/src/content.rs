@@ -8,12 +8,11 @@ use ethportal_api::OverlayContentKey;
 use sea_orm::{entity::prelude::*, ActiveValue::NotSet, Set};
 use serde::Deserialize;
 
-/// Portal network sub-protocol. History, state, transactions etc.
+/// Portal network sub-protocol
 #[derive(Debug, Clone, Copy, Eq, PartialEq, EnumIter, DeriveActiveEnum, Deserialize)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum SubProtocol {
     History = 0,
-    State = 1,
     Beacon = 2,
 }
 
@@ -21,7 +20,6 @@ impl SubProtocol {
     pub fn as_text(&self) -> String {
         match self {
             SubProtocol::History => "History".to_string(),
-            SubProtocol::State => "State".to_string(),
             SubProtocol::Beacon => "Beacon".to_string(),
         }
     }
@@ -36,7 +34,6 @@ impl TryFrom<&String> for SubProtocol {
     fn try_from(value: &String) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             "history" => Ok(SubProtocol::History),
-            "state" => Ok(SubProtocol::State),
             "beacon" => Ok(SubProtocol::Beacon),
             _ => Err(InvalidSubProtocolError),
         }

@@ -23,7 +23,6 @@ use url::Url;
 
 pub mod beacon;
 pub mod cli;
-pub mod state;
 
 pub async fn run_glados_monitor(conn: DatabaseConnection, w3: web3::Web3<web3::transports::Http>) {
     let (tx, rx) = mpsc::channel(100);
