@@ -28,14 +28,6 @@ pub enum Commands {
         provider_url: String,
     },
 
-    FollowBeacon {
-        // Beacon node base URL
-        #[arg(short, long)]
-        beacon_base_url: String,
-    },
-
-    FollowBeaconPandaops {},
-
     /// Imports blocks from a remote provider
     BulkDownloadBlockData {
         #[arg(

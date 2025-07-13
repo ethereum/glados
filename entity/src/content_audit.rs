@@ -74,48 +74,14 @@ impl TryFrom<String> for HistorySelectionStrategy {
     }
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq, EnumIter, DeriveActiveEnum, ValueEnum)]
-#[clap(rename_all = "snake_case")]
-#[sea_orm(rs_type = "i32", db_type = "Integer")]
-/// Each strategy is responsible for selecting which content key(s) to begin audits for.
-pub enum BeaconSelectionStrategy {
-    /// Content that is:
-    /// 1. Not yet audited
-    /// 2. Sorted by date entered into glados database (newest first).
-    Latest = 0,
-}
-
-impl From<i32> for BeaconSelectionStrategy {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => BeaconSelectionStrategy::Latest,
-            _ => panic!("Invalid value for BeaconSelectionStrategy"),
-        }
-    }
-}
-
-impl TryFrom<String> for BeaconSelectionStrategy {
-    type Error = anyhow::Error;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.as_str() {
-            "Latest" => Ok(BeaconSelectionStrategy::Latest),
-            _ => bail!("Invalid value for BeaconSelectionStrategy {}", value),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum SelectionStrategy {
     History(HistorySelectionStrategy),
-    Beacon(BeaconSelectionStrategy),
 }
 
 impl From<SelectionStrategy> for Value {
-    fn from(value: SelectionStrategy) -> Self {
-        match value {
-            SelectionStrategy::History(h) => Value::Int(Some(h as i32)),
-            SelectionStrategy::Beacon(b) => Value::Int(Some(0x10000 + b as i32)),
-        }
+    fn from(strategy: SelectionStrategy) -> Self {
+        Value::Int(Some(strategy.to_value()))
     }
 }
 
@@ -130,9 +96,6 @@ impl ValueType for SelectionStrategy {
         match v {
             Value::Int(Some(value)) => match value >> 16 {
                 0 => Ok(SelectionStrategy::History(HistorySelectionStrategy::from(
-                    value & 0xFFFF,
-                ))),
-                1 => Ok(SelectionStrategy::Beacon(BeaconSelectionStrategy::from(
                     value & 0xFFFF,
                 ))),
                 _ => Err(ValueTypeErr),
@@ -158,14 +121,9 @@ impl IntoEnumIterator for SelectionStrategy {
     type Iterator = std::vec::IntoIter<Self>;
 
     fn iter() -> Self::Iterator {
-        [
-            HistorySelectionStrategy::iter()
-                .map(SelectionStrategy::History)
-                .collect::<Vec<_>>(),
-            BeaconSelectionStrategy::iter()
-                .map(SelectionStrategy::Beacon)
-                .collect::<Vec<_>>(),
-        ]
+        [HistorySelectionStrategy::iter()
+            .map(SelectionStrategy::History)
+            .collect::<Vec<_>>()]
         .concat()
         .into_iter()
     }
@@ -186,17 +144,13 @@ impl ActiveEnum for SelectionStrategy {
 
     fn to_value(&self) -> Self::Value {
         match self {
-            SelectionStrategy::History(h) => h.to_value(),
-            SelectionStrategy::Beacon(b) => 0x10000 + b.to_value(),
+            SelectionStrategy::History(h) => 0 << 16 + h.to_value(),
         }
     }
 
     fn try_from_value(v: &Self::Value) -> std::prelude::v1::Result<Self, DbErr> {
         match v >> 16 {
             0 => Ok(SelectionStrategy::History(HistorySelectionStrategy::from(
-                v & 0xFFFF,
-            ))),
-            1 => Ok(SelectionStrategy::Beacon(BeaconSelectionStrategy::from(
                 v & 0xFFFF,
             ))),
             _ => Err(DbErr::Type(
@@ -346,7 +300,6 @@ pub async fn get_failed_keys(
 
     let subprotocol_strategy: SelectionStrategy = match subprotocol {
         SubProtocol::History => SelectionStrategy::History(strategy_used.try_into()?),
-        SubProtocol::Beacon => SelectionStrategy::Beacon(strategy_used.try_into()?),
     };
 
     let keys_result = FailedKeysResult::find_by_statement(Statement::from_sql_and_values(
@@ -416,7 +369,6 @@ impl SelectionStrategy {
             SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey) => {
                 "Specific Content Key".to_string()
             }
-            SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest) => "Latest".to_string(),
         }
     }
 }
@@ -446,7 +398,7 @@ impl Model {
 mod tests {
     use sea_orm::{ActiveEnum, Value};
 
-    use super::{BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy};
+    use super::{HistorySelectionStrategy, SelectionStrategy};
 
     #[test]
     fn test_selection_strategy_to_value() {
@@ -473,10 +425,6 @@ mod tests {
         assert_eq!(
             SelectionStrategy::History(HistorySelectionStrategy::FourFours).to_value(),
             5
-        );
-        assert_eq!(
-            SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest).to_value(),
-            0x10000
         );
     }
 
@@ -506,10 +454,6 @@ mod tests {
             SelectionStrategy::try_from_value(&5).unwrap(),
             SelectionStrategy::History(HistorySelectionStrategy::FourFours)
         );
-        assert_eq!(
-            SelectionStrategy::try_from_value(&0x10000).unwrap(),
-            SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest)
-        );
     }
 
     #[test]
@@ -538,10 +482,6 @@ mod tests {
             SelectionStrategy::History(HistorySelectionStrategy::FourFours).as_text(),
             "FourFours"
         );
-        assert_eq!(
-            SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest).as_text(),
-            "Latest"
-        );
     }
 
     #[test]
@@ -569,10 +509,6 @@ mod tests {
         assert_eq!(
             HistorySelectionStrategy::try_from("FourFours".to_string()).unwrap(),
             HistorySelectionStrategy::FourFours
-        );
-        assert_eq!(
-            BeaconSelectionStrategy::try_from("Latest".to_string()).unwrap(),
-            BeaconSelectionStrategy::Latest
         );
     }
 
@@ -607,10 +543,6 @@ mod tests {
                 HistorySelectionStrategy::FourFours
             )),
             Value::Int(Some(5))
-        );
-        assert_eq!(
-            Value::from(SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest)),
-            Value::Int(Some(0x10000))
         );
     }
 }

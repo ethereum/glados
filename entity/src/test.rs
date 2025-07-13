@@ -262,7 +262,9 @@ async fn test_audit_crud() -> Result<(), DbErr> {
 }
 
 /// Tests that the content table unique constraints prevent duplicate entries.
+///
 /// No two keys should have the same protocol_id, content_key and content_id combination.
+/// Note: we can't test different protocol_id as we currently only support one.
 #[tokio::test]
 async fn test_content_table_unique_constraints() {
     let (conn, _db) = setup_database().await.unwrap();
@@ -271,7 +273,6 @@ async fn test_content_table_unique_constraints() {
     let key_a = vec![3; 32];
     let key_b = vec![4; 32];
     let protocol_a = SubProtocol::History;
-    let protocol_b = SubProtocol::Beacon;
     // DB=0. Add one key (accepts). DB==1.
     let action_a = content::ActiveModel {
         id: NotSet,
@@ -292,26 +293,6 @@ async fn test_content_table_unique_constraints() {
         .contains("violates unique constraint"));
 
     assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 1);
-
-    // DB=1. Add same content_key, same content_id, different protocol (accepts). DB=2.
-    let action_b = content::ActiveModel {
-        id: NotSet,
-        content_id: Set(id_a.clone()),
-        content_key: Set(key_a.clone()),
-        protocol_id: Set(protocol_b),
-        first_available_at: Set(Utc::now()),
-    };
-    action_b.clone().insert(&conn).await.unwrap();
-    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
-
-    // DB=2. Repeat addition (rejects). DB=2.
-    assert!(action_b
-        .insert(&conn)
-        .await
-        .unwrap_err()
-        .to_string()
-        .contains("violates unique constraint"));
-    assert_eq!(content::Entity::find().count(&conn).await.unwrap(), 2);
 
     // DB=2. Add same content_key, different content_id, same protocol (rejects). DB=2.
     let action_c = content::ActiveModel {

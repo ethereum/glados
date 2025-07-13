@@ -13,15 +13,11 @@ use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
 use tokio::{sync::mpsc, time::sleep};
 use tracing::{debug, error, info, warn};
+use url::Url;
 use web3::transports::Http;
 use web3::types::BlockId;
 use web3::Web3;
 
-use crate::beacon::follow_beacon_head;
-use reqwest::Client as HttpClient;
-use url::Url;
-
-pub mod beacon;
 pub mod cli;
 
 pub async fn run_glados_monitor(conn: DatabaseConnection, w3: web3::Web3<web3::transports::Http>) {
@@ -29,21 +25,6 @@ pub async fn run_glados_monitor(conn: DatabaseConnection, w3: web3::Web3<web3::t
 
     tokio::spawn(follow_chain_head(w3.clone(), tx));
     tokio::spawn(retrieve_new_blocks(w3.clone(), rx, conn));
-
-    debug!("setting up CTRL+C listener");
-    tokio::signal::ctrl_c()
-        .await
-        .expect("failed to pause until ctrl-c");
-
-    info!("got CTRL+C. shutting down...");
-}
-
-pub async fn run_glados_monitor_beacon(
-    conn: DatabaseConnection,
-    client: HttpClient,
-    beacon_url: String,
-) {
-    tokio::spawn(follow_beacon_head(conn, client, beacon_url));
 
     debug!("setting up CTRL+C listener");
     tokio::signal::ctrl_c()

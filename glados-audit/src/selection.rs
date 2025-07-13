@@ -17,7 +17,7 @@ use tracing::{debug, error, warn};
 use entity::{
     block,
     content::{self, SubProtocol},
-    content_audit::{self, BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy},
+    content_audit::{self, HistorySelectionStrategy, SelectionStrategy},
 };
 
 use crate::AuditTask;
@@ -30,8 +30,7 @@ pub async fn start_audit_selection_task(
     conn: DatabaseConnection,
 ) {
     match &strategy {
-        SelectionStrategy::History(HistorySelectionStrategy::Latest)
-        | SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest) => {
+        SelectionStrategy::History(HistorySelectionStrategy::Latest) => {
             select_latest_content_for_audit(tx, conn, strategy).await
         }
         SelectionStrategy::History(HistorySelectionStrategy::Random) => {
@@ -70,7 +69,6 @@ async fn select_latest_content_for_audit(
     let mut interval = interval(Duration::from_secs(10));
     let protocol_id = match &strategy {
         SelectionStrategy::History(_) => SubProtocol::History as i32,
-        SelectionStrategy::Beacon(_) => SubProtocol::Beacon as i32,
     };
     loop {
         interval.tick().await;

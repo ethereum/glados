@@ -13,7 +13,7 @@ use ethportal_api::{
         decode::PingExtension,
         extensions::type_0::{ClientInfo, ClientInfoRadiusCapabilities},
     },
-    BeaconNetworkApiClient, HistoryNetworkApiClient,
+    HistoryNetworkApiClient,
 };
 use sea_orm::DatabaseConnection;
 use std::collections::{HashMap, HashSet};
@@ -267,7 +267,6 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
 
     // Initialize our search with a random-ish set of ENRs
     let find_nodes = match config.subnetwork {
-        PortalSubnet::Beacon => BeaconNetworkApiClient::recursive_find_nodes(&client, target),
         PortalSubnet::History => HistoryNetworkApiClient::recursive_find_nodes(&client, target),
     };
 
@@ -471,7 +470,6 @@ async fn do_liveliness_check(
 
     let ping = match config.subnetwork {
         PortalSubnet::History => HistoryNetworkApiClient::ping(&client, enr.to_owned(), None, None),
-        PortalSubnet::Beacon => BeaconNetworkApiClient::ping(&client, enr.to_owned(), None, None),
     };
     match ping.await {
         Ok(pong_info) => {
@@ -573,9 +571,6 @@ async fn do_routing_table_enumeration(
         let find_nodes = match config.subnetwork {
             PortalSubnet::History => {
                 HistoryNetworkApiClient::find_nodes(&client, enr.to_owned(), vec![distance])
-            }
-            PortalSubnet::Beacon => {
-                BeaconNetworkApiClient::find_nodes(&client, enr.to_owned(), vec![distance])
             }
         };
         let enrs_at_distance = match find_nodes.await {

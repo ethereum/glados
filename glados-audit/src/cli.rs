@@ -1,7 +1,7 @@
 use std::vec;
 
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
-use entity::content_audit::{BeaconSelectionStrategy, HistorySelectionStrategy};
+use entity::content_audit::HistorySelectionStrategy;
 
 const DEFAULT_STATS_PERIOD: &str = "300";
 
@@ -34,22 +34,6 @@ pub struct Args {
         help = "Specific strategy to use. Default is to use all available strategies. May be passed multiple times for multiple strategies (--strategy latest --strategy random). Duplicates are permitted (--strategy random --strategy random)."
     )]
     pub history_strategy: Option<Vec<HistorySelectionStrategy>>,
-
-    #[arg(
-        long = "beacon",
-        help = "Run audits for beacon subnetwork. Default is false."
-    )]
-    pub beacon: bool,
-
-    #[arg(
-        long,
-        action(ArgAction::Append),
-        value_enum,
-        default_value = None,
-        requires = "beacon",
-        help = "Specific strategy to use. Default is to use all available strategies. May be passed multiple times for multiple strategies (--strategy latest --strategy random). Duplicates are permitted (--strategy random --strategy random)."
-    )]
-    pub beacon_strategy: Option<Vec<BeaconSelectionStrategy>>,
 
     #[arg(
         short,
@@ -118,8 +102,6 @@ impl Default for Args {
             four_fours_strategy_weight: 1,
             history: true,
             history_strategy: None,
-            beacon: false,
-            beacon_strategy: None,
             portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
             subcommand: None,
             stats_recording_period: 300,

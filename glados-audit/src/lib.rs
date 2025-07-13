@@ -24,7 +24,7 @@ use tracing::{debug, error, info, warn};
 use entity::{
     audit_internal_failure, client_info,
     content::{self, SubProtocol},
-    content_audit::{self, BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy},
+    content_audit::{self, HistorySelectionStrategy, SelectionStrategy},
     execution_metadata, node,
 };
 use glados_core::jsonrpc::PortalClient;
@@ -45,10 +45,6 @@ pub struct AuditConfig {
     pub history: bool,
     /// Specific history audit strategies to run.
     pub history_strategies: Vec<HistorySelectionStrategy>,
-    /// Audit Beacon
-    pub beacon: bool,
-    /// Specific beacon audit strategies to run.
-    pub beacon_strategies: Vec<BeaconSelectionStrategy>,
     /// Weight for each strategy.
     pub weights: HashMap<HistorySelectionStrategy, u8>,
     /// Number requests to a Portal node active at the same time.
@@ -113,8 +109,6 @@ impl AuditConfig {
             stats_recording_period: args.stats_recording_period,
             history: args.history,
             history_strategies: strategies,
-            beacon: args.beacon,
-            beacon_strategies: args.beacon_strategy.unwrap_or_default(),
         })
     }
 }
@@ -156,20 +150,6 @@ pub async fn run_glados_command(conn: DatabaseConnection, command: cli::Command)
 }
 
 pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
-    if config.beacon {
-        let strategies = config
-            .beacon_strategies
-            .iter()
-            .map(|strats| {
-                (
-                    SelectionStrategy::Beacon(strats.clone()),
-                    /* weight= */ 1,
-                )
-            })
-            .collect();
-        start_audit(conn.clone(), config.clone(), strategies).await;
-    }
-
     if config.history {
         let strategies = config
             .history_strategies
@@ -409,13 +389,6 @@ async fn perform_single_audit(
     match task.content.protocol_id {
         SubProtocol::History => {
             display_history_audit_result(task.content, audit_result, &conn).await;
-        }
-        SubProtocol::Beacon => {
-            info!(
-                content.key = hex_encode(task.content.content_key),
-                audit.pass = audit_result,
-                content.protocol = "Beacon",
-            );
         }
     }
 

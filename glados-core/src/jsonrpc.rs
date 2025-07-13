@@ -7,8 +7,8 @@ use ethportal_api::types::portal::TraceContentInfo;
 use ethportal_api::types::query_trace::QueryTrace;
 use ethportal_api::utils::bytes::ByteUtilsError;
 use ethportal_api::{
-    BeaconContentKey, BeaconNetworkApiClient, ContentKeyError, Discv5ApiClient, HistoryContentKey,
-    HistoryNetworkApiClient, NodeInfo, OverlayContentKey, RoutingTableInfo, Web3ApiClient,
+    ContentKeyError, Discv5ApiClient, HistoryContentKey, HistoryNetworkApiClient, NodeInfo,
+    OverlayContentKey, RoutingTableInfo, Web3ApiClient,
 };
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use thiserror::Error;
@@ -205,22 +205,6 @@ impl PortalApi {
                     },
                 }
             }
-            content::SubProtocol::Beacon => {
-                match BeaconNetworkApiClient::get_content(
-                    &self.client,
-                    BeaconContentKey::try_from_bytes(&content.content_key)?,
-                )
-                .await
-                {
-                    Ok(content_info) => Ok(Some(Content {
-                        raw: content_info.content.into(),
-                    })),
-                    Err(err) => match err.into() {
-                        JsonRpcError::ContentNotFound { trace: _ } => Ok(None),
-                        err => Err(err),
-                    },
-                }
-            }
         }
     }
 
@@ -233,31 +217,6 @@ impl PortalApi {
                 match HistoryNetworkApiClient::trace_get_content(
                     &self.client,
                     HistoryContentKey::try_from_bytes(&content.content_key)?,
-                )
-                .await
-                {
-                    Ok(TraceContentInfo { content, trace, .. }) => Ok((
-                        Some(Content {
-                            raw: content.into(),
-                        }),
-                        trace,
-                    )),
-                    Err(err) => match err.into() {
-                        JsonRpcError::ContentNotFound { trace } => {
-                            if let Some(trace) = trace {
-                                Ok((None, trace))
-                            } else {
-                                Err(JsonRpcError::MissingQueryTrace)
-                            }
-                        }
-                        err => Err(err),
-                    },
-                }
-            }
-            content::SubProtocol::Beacon => {
-                match BeaconNetworkApiClient::trace_get_content(
-                    &self.client,
-                    BeaconContentKey::try_from_bytes(&content.content_key)?,
                 )
                 .await
                 {

@@ -46,8 +46,6 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         history_fourfours_headers_by_number,
         history_fourfours_bodies,
         history_fourfours_receipts,
-        beacon_all,
-        beacon_latest,
     ) = tokio::join!(
         get_audit_stats(
             filter_audits(AuditFilters {
@@ -249,26 +247,6 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             Period::Hour,
             conn
         ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::All,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
-                network: SubProtocol::Beacon
-            },),
-            Period::Hour,
-            conn
-        ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::Latest,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
-                network: SubProtocol::Beacon
-            },),
-            Period::Hour,
-            conn
-        ),
     );
 
     // Handle errors and get success rates.
@@ -296,8 +274,6 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         history_fourfours_headers_by_number?.pass_percent;
     let success_rate_history_fourfours_bodies = history_fourfours_bodies?.pass_percent;
     let success_rate_history_fourfours_receipts = history_fourfours_receipts?.pass_percent;
-    let success_rate_beacon_all = beacon_all?.pass_percent;
-    let success_rate_beacon_latest = beacon_latest?.pass_percent;
     // Record the values.
     match audit_stats::create(
         Utc::now(),
@@ -323,8 +299,6 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         success_rate_history_fourfours_headers_by_number,
         success_rate_history_fourfours_bodies,
         success_rate_history_fourfours_receipts,
-        success_rate_beacon_all,
-        success_rate_beacon_latest,
         conn,
     )
     .await

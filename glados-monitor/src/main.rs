@@ -1,10 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
 use glados_monitor::{
-    beacon::{panda_ops_http, PANDA_OPS_BEACON},
     bulk_download_block_data,
     cli::{Cli, Commands},
-    panda_ops_web3, run_glados_monitor, run_glados_monitor_beacon,
+    panda_ops_web3, run_glados_monitor,
 };
 use migration::{Migrator, MigratorTrait, SeedTrait};
 use sea_orm::{Database, DatabaseConnection};
@@ -51,15 +50,8 @@ async fn main() -> Result<()> {
             task::spawn(follow_head_command(conn, provider_url.to_string()))
         }
         Some(Commands::FollowHeadPandaops { provider_url }) => {
-            info!("Running follow head beacon");
+            info!("Running follow head");
             task::spawn(follow_head_command_pandaops(conn, provider_url.to_string()))
-        }
-        Some(Commands::FollowBeacon { beacon_base_url }) => {
-            info!("Running follow beacon");
-            task::spawn(follow_beacon_command(conn, beacon_base_url.to_string()))
-        }
-        Some(Commands::FollowBeaconPandaops {}) => {
-            task::spawn(follow_beacon_command_pandaops(conn))
         }
         Some(Commands::BulkDownloadBlockData {
             start_block_number,
@@ -128,18 +120,6 @@ async fn follow_head_command(conn: DatabaseConnection, provider_url: String) -> 
     );
 
     run_glados_monitor(conn, w3).await;
-    Ok(())
-}
-
-async fn follow_beacon_command(conn: DatabaseConnection, beacon_url: String) -> Result<()> {
-    let http_client = reqwest::Client::builder().build().unwrap();
-    run_glados_monitor_beacon(conn, http_client, beacon_url).await;
-    Ok(())
-}
-
-async fn follow_beacon_command_pandaops(conn: DatabaseConnection) -> Result<()> {
-    let http_client = panda_ops_http()?;
-    run_glados_monitor_beacon(conn, http_client, PANDA_OPS_BEACON.to_string()).await;
     Ok(())
 }
 

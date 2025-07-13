@@ -41,14 +41,12 @@ pub enum TransportType {
 #[clap(rename_all = "snake_case")]
 pub enum PortalSubnet {
     History,
-    Beacon,
 }
 
 impl From<PortalSubnet> for SubProtocol {
     fn from(value: PortalSubnet) -> Self {
         match value {
             PortalSubnet::History => SubProtocol::History,
-            PortalSubnet::Beacon => SubProtocol::Beacon,
         }
     }
 }

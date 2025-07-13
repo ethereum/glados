@@ -10,9 +10,7 @@ use serde::Deserialize;
 
 use entity::{
     content::{self, SubProtocol},
-    content_audit::{
-        self, AuditResult, BeaconSelectionStrategy, HistorySelectionStrategy, SelectionStrategy,
-    },
+    content_audit::{self, AuditResult, HistorySelectionStrategy, SelectionStrategy},
 };
 
 /// Generates a SeaORM select query for audits based on the provided filters.
@@ -38,14 +36,10 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
             content_audit::Column::StrategyUsed
                 .eq(SelectionStrategy::History(HistorySelectionStrategy::Random)),
         ),
-        StrategyFilter::Latest => audits.filter(content_audit::Column::StrategyUsed.eq(
-            match filters.network {
-                SubProtocol::History => {
-                    SelectionStrategy::History(HistorySelectionStrategy::Latest)
-                }
-                SubProtocol::Beacon => SelectionStrategy::Beacon(BeaconSelectionStrategy::Latest),
-            },
-        )),
+        StrategyFilter::Latest => audits.filter(
+            content_audit::Column::StrategyUsed
+                .eq(SelectionStrategy::History(HistorySelectionStrategy::Latest)),
+        ),
         StrategyFilter::Oldest => audits.filter(content_audit::Column::StrategyUsed.eq(
             SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited),
         )),
