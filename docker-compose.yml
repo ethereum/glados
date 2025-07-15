@@ -26,7 +26,7 @@ services:
     restart: always
 
   glados_audit:
-    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://host.docker.internal:8545 --concurrency 8 --latest-strategy-weight 6 --four-fours-strategy-weight 80"
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --portal-client http://host.docker.internal:8545 --concurrency 8 --strategy latest:6 --strategy four_fours:80"
     image: portalnetwork/glados-audit:latest
     environment:
       RUST_LOG: warn,glados_audit=info

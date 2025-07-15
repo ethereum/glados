@@ -48,7 +48,20 @@ pub async fn start_audit_selection_task(
         SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey) => {
             error!("SpecificContentKey is not a valid audit strategy")
         }
+        SelectionStrategy::History(HistorySelectionStrategy::Sync) => {
+            select_sync_content_for_audit(tx, conn).await
+        }
     }
+}
+
+/// Creates and sends audit tasks for [HistorySelectionStrategy::Sync].
+///
+/// It does following steps:
+/// 1. Finds the block number of the latest Sync strategy audit
+/// 2. Creates audit task for the following block number
+/// 3. Keeps going until the merge block, then restarts from genesis
+async fn select_sync_content_for_audit(_tx: mpsc::Sender<AuditTask>, _conn: DatabaseConnection) {
+    todo!("Sync strategy is not yet impelemnted");
 }
 
 /// Finds and sends audit tasks for [Strategy::Latest].

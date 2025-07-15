@@ -43,6 +43,8 @@ pub enum HistorySelectionStrategy {
     SpecificContentKey = 4,
     /// Perform audits of random fourfours data.
     FourFours = 5,
+    /// Fetches content in order, from genesis, up to the latest available block.
+    Sync = 6,
 }
 
 impl From<i32> for HistorySelectionStrategy {
@@ -54,6 +56,7 @@ impl From<i32> for HistorySelectionStrategy {
             3 => HistorySelectionStrategy::SelectOldestUnaudited,
             4 => HistorySelectionStrategy::SpecificContentKey,
             5 => HistorySelectionStrategy::FourFours,
+            6 => HistorySelectionStrategy::Sync,
             _ => panic!("Invalid value for HistorySelectionStrategy"),
         }
     }
@@ -69,6 +72,7 @@ impl TryFrom<String> for HistorySelectionStrategy {
             "SelectOldestUnaudited" => Ok(HistorySelectionStrategy::SelectOldestUnaudited),
             "SpecificContentKey" => Ok(HistorySelectionStrategy::SpecificContentKey),
             "FourFours" => Ok(HistorySelectionStrategy::FourFours),
+            "Sync" => Ok(HistorySelectionStrategy::Sync),
             _ => bail!("Invalid value for HistorySelectionStrategy {}", value),
         }
     }
@@ -362,6 +366,7 @@ impl SelectionStrategy {
             SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey) => {
                 "Specific Content Key".to_string()
             }
+            SelectionStrategy::History(HistorySelectionStrategy::Sync) => "Sync".to_string(),
         }
     }
 }
@@ -419,6 +424,10 @@ mod tests {
             SelectionStrategy::History(HistorySelectionStrategy::FourFours).to_value(),
             5
         );
+        assert_eq!(
+            SelectionStrategy::History(HistorySelectionStrategy::Sync).to_value(),
+            6
+        );
     }
 
     #[test]
@@ -446,6 +455,10 @@ mod tests {
         assert_eq!(
             SelectionStrategy::try_from_value(&5).unwrap(),
             SelectionStrategy::History(HistorySelectionStrategy::FourFours)
+        );
+        assert_eq!(
+            SelectionStrategy::try_from_value(&6).unwrap(),
+            SelectionStrategy::History(HistorySelectionStrategy::Sync)
         );
     }
 
@@ -475,6 +488,10 @@ mod tests {
             SelectionStrategy::History(HistorySelectionStrategy::FourFours).as_text(),
             "FourFours"
         );
+        assert_eq!(
+            SelectionStrategy::History(HistorySelectionStrategy::Sync).as_text(),
+            "Sync"
+        );
     }
 
     #[test]
@@ -502,6 +519,10 @@ mod tests {
         assert_eq!(
             HistorySelectionStrategy::try_from("FourFours".to_string()).unwrap(),
             HistorySelectionStrategy::FourFours
+        );
+        assert_eq!(
+            HistorySelectionStrategy::try_from("Sync".to_string()).unwrap(),
+            HistorySelectionStrategy::Sync
         );
     }
 
@@ -536,6 +557,10 @@ mod tests {
                 HistorySelectionStrategy::FourFours
             )),
             Value::Int(Some(5))
+        );
+        assert_eq!(
+            Value::from(SelectionStrategy::History(HistorySelectionStrategy::Sync)),
+            Value::Int(Some(6))
         );
     }
 }

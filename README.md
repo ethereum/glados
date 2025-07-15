@@ -91,7 +91,7 @@ cargo run -p glados-cartographer -- --database-url postgres://postgres:password@
 
 First, launch a portal client, like trin, with an HTTP endpoint. Assuming you already launched postgres using Docker, the audit command would look like:
 ```sh
-cargo run -p glados-audit -- --database-url postgres://postgres:password@localhost:5432/glados --history-strategy latest --portal-client http://localhost:8545
+cargo run -p glados-audit -- --database-url postgres://postgres:password@localhost:5432/glados --strategy random --portal-client http://localhost:8545
 ```
 
 ## Running Tests Locally

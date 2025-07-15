@@ -38,7 +38,8 @@ checks if `trin` has it, then records the outcome in the glados database.
 ```command
 ~/glados$ RUST_LOG=debug cargo run -p glados-audit -- \
     --portal-client http://127.0.0.1:8545 \
-    --database-url postgres://<user>:<password>@localhost:5432/<database>
+    --database-url postgres://<user>:<password>@localhost:5432/<database> \
+    --strategy random
 ```
 Start `glados-web`, which takes audit data from the glados database and serves
 that for viewing.
