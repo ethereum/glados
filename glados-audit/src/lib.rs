@@ -41,12 +41,8 @@ pub(crate) mod validation;
 pub struct AuditConfig {
     /// For Glados-related data.
     pub database_url: String,
-    /// Audit History
-    pub history: bool,
-    /// Specific history audit strategies to run.
-    pub history_strategies: Vec<HistorySelectionStrategy>,
-    /// Weight for each strategy.
-    pub weights: HashMap<HistorySelectionStrategy, u8>,
+    /// Specific audit strategies to run, and their weights.
+    pub strategies: HashMap<SelectionStrategy, u8>,
     /// Number requests to a Portal node active at the same time.
     pub concurrency: u8,
     /// Portal Clients
@@ -72,29 +68,17 @@ impl AuditConfig {
             )
         }
 
-        let strategies = match args.history_strategy {
-            Some(s) => s,
-            None => {
-                vec![
-                    HistorySelectionStrategy::Latest,
-                    HistorySelectionStrategy::Random,
-                    HistorySelectionStrategy::Failed,
-                    HistorySelectionStrategy::FourFours,
-                ]
-            }
-        };
-        let mut weights: HashMap<HistorySelectionStrategy, u8> = HashMap::new();
-        for strat in &strategies {
-            let weight = match strat {
-                HistorySelectionStrategy::Latest => args.latest_strategy_weight,
-                HistorySelectionStrategy::Random => args.random_strategy_weight,
-                HistorySelectionStrategy::Failed => args.failed_strategy_weight,
-                HistorySelectionStrategy::SelectOldestUnaudited => args.oldest_strategy_weight,
-                HistorySelectionStrategy::FourFours => args.four_fours_strategy_weight,
-                HistorySelectionStrategy::SpecificContentKey => 0,
-            };
-            weights.insert(strat.clone(), weight);
-        }
+        let strategies = args
+            .strategy
+            .iter()
+            .map(|strategy_with_weight| {
+                (
+                    strategy_with_weight.strategy.clone(),
+                    strategy_with_weight.weight,
+                )
+            })
+            .collect();
+
         let mut portal_clients: Vec<PortalClient> = vec![];
         for client_url in args.portal_client {
             let client = PortalClient::from(client_url).await?;
@@ -103,12 +87,10 @@ impl AuditConfig {
         }
         Ok(AuditConfig {
             database_url: args.database_url,
-            weights,
+            strategies,
             concurrency: args.concurrency,
             portal_clients,
             stats_recording_period: args.stats_recording_period,
-            history: args.history,
-            history_strategies: strategies,
         })
     }
 }
@@ -150,23 +132,7 @@ pub async fn run_glados_command(conn: DatabaseConnection, command: cli::Command)
 }
 
 pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
-    if config.history {
-        let strategies = config
-            .history_strategies
-            .iter()
-            .filter_map(|strats| {
-                let strategy = SelectionStrategy::History(strats.clone());
-                match config.weights.get(strats) {
-                    Some(weight) => Some((strategy, *weight)),
-                    None => {
-                        error!(strategy=?strategy, "no weight for strategy");
-                        None
-                    }
-                }
-            })
-            .collect();
-        start_audit(conn.clone(), config.clone(), strategies).await;
-    }
+    start_audit(conn.clone(), config).await;
 
     debug!("setting up CTRL+C listener");
     tokio::signal::ctrl_c()
@@ -177,13 +143,9 @@ pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
     std::process::exit(0);
 }
 
-async fn start_audit(
-    conn: DatabaseConnection,
-    config: AuditConfig,
-    strategies: Vec<(SelectionStrategy, u8)>,
-) {
+async fn start_audit(conn: DatabaseConnection, config: AuditConfig) {
     let mut task_channels: Vec<TaskChannel> = vec![];
-    for (strategy, weight) in strategies {
+    for (strategy, weight) in config.strategies.clone() {
         // Each strategy sends tasks to a separate channel.
         let (tx, rx) = mpsc::channel::<AuditTask>(100);
         let task_channel = TaskChannel {
@@ -193,11 +155,7 @@ async fn start_audit(
         };
         task_channels.push(task_channel);
         // Strategies generate tasks in their own thread for their own channel.
-        tokio::spawn(start_audit_selection_task(
-            strategy.clone(),
-            tx,
-            conn.clone(),
-        ));
+        tokio::spawn(start_audit_selection_task(strategy, tx, conn.clone()));
     }
     // Collation of generated tasks, taken proportional to weights.
     let (collation_tx, collation_rx) = mpsc::channel::<AuditTask>(100);

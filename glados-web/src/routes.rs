@@ -13,6 +13,7 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, TimeZone, Utc};
+use clap::ValueEnum;
 use enr::NodeId;
 use entity::audit_internal_failure::TransferFailureType;
 use entity::census_node::client_from_short_name;
@@ -66,13 +67,10 @@ pub async fn handle_error(_err: io::Error) -> impl IntoResponse {
 
 // Get the subprotocol from the query parameters, defaulting to History
 pub fn get_subprotocol_from_params(params: &HashMap<String, String>) -> SubProtocol {
-    match params.get("network") {
-        None => SubProtocol::History,
-        Some(subprotocol) => match subprotocol.try_into().ok() {
-            Some(subprotocol) => subprotocol,
-            None => SubProtocol::History,
-        },
-    }
+    params
+        .get("network")
+        .and_then(|network| SubProtocol::from_str(network, /* ignore_case= */ true).ok())
+        .unwrap_or(SubProtocol::History)
 }
 
 pub async fn network_overview(

@@ -1,7 +1,7 @@
-use std::vec;
+use std::str::FromStr;
 
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
-use entity::content_audit::HistorySelectionStrategy;
+use entity::content_audit::{HistorySelectionStrategy, SelectionStrategy};
 
 const DEFAULT_STATS_PERIOD: &str = "300";
 
@@ -15,60 +15,11 @@ pub struct Args {
     pub concurrency: u8,
 
     #[arg(
-        long = "history",
-        default_missing_value("true"),
-        default_value("true"),
-        num_args(0..=1),
-        require_equals(true),
-        action = ArgAction::Set,
-        help = "Run audits for history subnetwork. Default is true."
-    )]
-    pub history: bool,
-
-    #[arg(
         long,
         action(ArgAction::Append),
-        value_enum,
-        default_value = None,
-        requires_if("false", "history"),
-        help = "Specific strategy to use. Default is to use all available strategies. May be passed multiple times for multiple strategies (--strategy latest --strategy random). Duplicates are permitted (--strategy random --strategy random)."
+        help = "Specific strategy to use. Strategy can be selected by name and weight (--strategy random:10) or by name only (--strategy random) which assumes weight 1. May be passed multiple times for multiple strategies (--strategy random --strategy sync:5)"
     )]
-    pub history_strategy: Option<Vec<HistorySelectionStrategy>>,
-
-    #[arg(
-        short,
-        long,
-        default_value = "1",
-        help = "relative weight of the 'latest' strategy"
-    )]
-    pub latest_strategy_weight: u8,
-    #[arg(
-        short,
-        long,
-        default_value = "1",
-        help = "relative weight of the 'failed' strategy"
-    )]
-    pub failed_strategy_weight: u8,
-    #[arg(
-        short,
-        long,
-        default_value = "1",
-        help = "relative weight of the 'select oldest unaudited' strategy"
-    )]
-    pub oldest_strategy_weight: u8,
-    #[arg(
-        short,
-        long,
-        default_value = "1",
-        help = "relative weight of the 'random' strategy"
-    )]
-    pub random_strategy_weight: u8,
-    #[arg(
-        long,
-        default_value = "1",
-        help = "relative weight of the 'four_fours' strategy"
-    )]
-    pub four_fours_strategy_weight: u8,
+    pub strategy: Vec<StrategyWithWeight>,
 
     #[arg(long, default_value = DEFAULT_STATS_PERIOD, help = "stats recording period (seconds)")]
     pub stats_recording_period: u64,
@@ -78,6 +29,44 @@ pub struct Args {
 
     #[command(subcommand)]
     pub subcommand: Option<Command>,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct StrategyWithWeight {
+    pub strategy: SelectionStrategy,
+    pub weight: u8,
+}
+
+impl FromStr for StrategyWithWeight {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts = s.split(':').collect::<Vec<_>>();
+
+        match parts.len() {
+            1 => {
+                // assuming weight 1
+                let strategy =
+                    HistorySelectionStrategy::from_str(parts[0], /* ignore_case= */ true)?;
+                Ok(Self {
+                    strategy: SelectionStrategy::History(strategy),
+                    weight: 1,
+                })
+            }
+            2 => {
+                let strategy =
+                    HistorySelectionStrategy::from_str(parts[0], /* ignore_case= */ true)?;
+                let weight: u8 = parts[1]
+                    .parse()
+                    .map_err(|_| format!("Invalid strategy weight: {}", parts[1]))?;
+                Ok(Self {
+                    strategy: SelectionStrategy::History(strategy),
+                    weight,
+                })
+            }
+            _ => Err(format!("Unknown strategy: {s}")),
+        }
+    }
 }
 
 #[derive(Subcommand, Debug, Eq, PartialEq, Clone)]
@@ -90,30 +79,24 @@ pub enum Command {
     },
 }
 
-impl Default for Args {
-    fn default() -> Self {
-        Self {
-            database_url: "".to_string(),
-            concurrency: 4,
-            latest_strategy_weight: 1,
-            failed_strategy_weight: 1,
-            oldest_strategy_weight: 1,
-            random_strategy_weight: 1,
-            four_fours_strategy_weight: 1,
-            history: true,
-            history_strategy: None,
-            portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
-            subcommand: None,
-            stats_recording_period: 300,
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
 
     const DATABASE_URL: &str = "postgres://localhost:5432";
+
+    impl Default for Args {
+        fn default() -> Self {
+            Self {
+                database_url: "".to_string(),
+                concurrency: 4,
+                strategy: vec![],
+                portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
+                subcommand: None,
+                stats_recording_period: 300,
+            }
+        }
+    }
 
     /// Tests that the defaults are correct when the minimum required flags are passed.
     #[test]
@@ -133,6 +116,7 @@ mod test {
         };
         assert_eq!(result, expected);
     }
+
     #[test]
     fn test_custom_concurrency() {
         const PORTAL_CLIENT_STRING: &str = "ipc:////path/to/ipc";
@@ -148,7 +132,6 @@ mod test {
         let expected = Args {
             database_url: DATABASE_URL.to_string(),
             concurrency: 3,
-            history_strategy: None,
             portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
             ..Default::default()
         };
@@ -161,8 +144,8 @@ mod test {
         const PORTAL_CLIENT_STRING: &str = "ipc:////path/to/ipc";
         let result = Args::parse_from([
             "test",
-            "--history-strategy",
-            "latest",
+            "--strategy",
+            "random",
             "--portal-client",
             PORTAL_CLIENT_STRING,
             "--database-url",
@@ -171,7 +154,36 @@ mod test {
         let expected = Args {
             database_url: DATABASE_URL.to_string(),
             concurrency: 4,
-            history_strategy: Some(vec![HistorySelectionStrategy::Latest]),
+            strategy: vec![StrategyWithWeight {
+                strategy: SelectionStrategy::History(HistorySelectionStrategy::Random),
+                weight: 1,
+            }],
+            portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
+            ..Default::default()
+        };
+        assert_eq!(result, expected);
+    }
+
+    /// Tests that a specific audit strategy can be used with weight.
+    #[test]
+    fn test_custom_strategy_with_weight() {
+        const PORTAL_CLIENT_STRING: &str = "ipc:////path/to/ipc";
+        let result = Args::parse_from([
+            "test",
+            "--strategy",
+            "random:10",
+            "--portal-client",
+            PORTAL_CLIENT_STRING,
+            "--database-url",
+            DATABASE_URL,
+        ]);
+        let expected = Args {
+            database_url: DATABASE_URL.to_string(),
+            concurrency: 4,
+            strategy: vec![StrategyWithWeight {
+                strategy: SelectionStrategy::History(HistorySelectionStrategy::Random),
+                weight: 10,
+            }],
             portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
             ..Default::default()
         };
@@ -179,7 +191,6 @@ mod test {
     }
 
     /// Tests that arbitrary combinations of audit strategies are permitted.
-    /// This case shows 1 latest and 2 random, which doubles the rate of random audits.
     #[test]
     fn test_multiple_custom_strategies() {
         const PORTAL_CLIENT_STRING: &str = "ipc:////path/to/ipc";
@@ -187,23 +198,26 @@ mod test {
             "test",
             "--portal-client",
             PORTAL_CLIENT_STRING,
-            "--history-strategy",
+            "--strategy",
             "random",
-            "--history-strategy",
-            "latest",
-            "--history-strategy",
-            "random", // Duplicate is permitted
+            "--strategy",
+            "sync:2",
             "--database-url",
             DATABASE_URL,
         ]);
         let expected = Args {
             database_url: DATABASE_URL.to_string(),
             concurrency: 4,
-            history_strategy: Some(vec![
-                HistorySelectionStrategy::Random,
-                HistorySelectionStrategy::Latest,
-                HistorySelectionStrategy::Random,
-            ]),
+            strategy: vec![
+                StrategyWithWeight {
+                    strategy: SelectionStrategy::History(HistorySelectionStrategy::Random),
+                    weight: 1,
+                },
+                StrategyWithWeight {
+                    strategy: SelectionStrategy::History(HistorySelectionStrategy::Sync),
+                    weight: 2,
+                },
+            ],
             portal_client: vec![PORTAL_CLIENT_STRING.to_owned()],
             ..Default::default()
         };
