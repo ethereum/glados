@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use chrono::DateTime;
 use entity::{
     content::SubProtocol,
@@ -9,7 +7,7 @@ use entity::{
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use glados_core::db::store_content_key;
 use sea_orm::DatabaseConnection;
-use tokio::{sync::mpsc, time::interval};
+use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
 
 use crate::AuditTask;
@@ -33,9 +31,7 @@ pub async fn select_sync_content_for_audit(
         .await
         .map_or(0, |block_number| block_number + 1);
 
-    let mut interval = interval(Duration::from_secs(1));
     loop {
-        interval.tick().await;
         if tx.is_closed() {
             error!("Channel is closed.");
             panic!();
@@ -45,7 +41,7 @@ pub async fn select_sync_content_for_audit(
             block_number = 0;
         }
 
-        debug!(strategy = "sync", block_number, "Creating audit task");
+        debug!(block_number, "Creating audit task");
 
         let content_key = HistoryContentKey::new_block_header_by_number(block_number);
 

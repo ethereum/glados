@@ -255,6 +255,7 @@ async fn perform_single_audit(
     let client_info = client.client_info.clone();
 
     debug!(
+        strategy = ?task.strategy,
         content.key = hex_encode(&task.content.content_key),
         client.url =? client.api.client,
         "auditing content",

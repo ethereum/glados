@@ -202,6 +202,7 @@ async fn add_to_queue(
     let capacity = tx.capacity();
     let max_capacity = tx.max_capacity();
     debug!(
+        ?strategy,
         items.len = items.len(),
         channel.availability = capacity,
         channel.size = max_capacity,
