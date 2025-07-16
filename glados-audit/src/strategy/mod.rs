@@ -1,6 +1,11 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, TimeZone, Utc};
+use entity::{
+    block,
+    content::{self, SubProtocol},
+    content_audit::{self, HistorySelectionStrategy, SelectionStrategy},
+};
 use glados_core::db::store_block_keys;
 use migration::{Alias, Expr, Query};
 use rand::{thread_rng, Rng};
@@ -14,13 +19,9 @@ use tokio::{
 };
 use tracing::{debug, error, warn};
 
-use entity::{
-    block,
-    content::{self, SubProtocol},
-    content_audit::{self, HistorySelectionStrategy, SelectionStrategy},
-};
-
 use crate::AuditTask;
+
+pub mod sync;
 
 pub const MERGE_BLOCK_HEIGHT: i32 = 15537393;
 
@@ -49,19 +50,9 @@ pub async fn start_audit_selection_task(
             error!("SpecificContentKey is not a valid audit strategy")
         }
         SelectionStrategy::History(HistorySelectionStrategy::Sync) => {
-            select_sync_content_for_audit(tx, conn).await
+            sync::select_sync_content_for_audit(tx, conn).await
         }
     }
-}
-
-/// Creates and sends audit tasks for [HistorySelectionStrategy::Sync].
-///
-/// It does following steps:
-/// 1. Finds the block number of the latest Sync strategy audit
-/// 2. Creates audit task for the following block number
-/// 3. Keeps going until the merge block, then restarts from genesis
-async fn select_sync_content_for_audit(_tx: mpsc::Sender<AuditTask>, _conn: DatabaseConnection) {
-    todo!("Sync strategy is not yet impelemnted");
 }
 
 /// Finds and sends audit tasks for [Strategy::Latest].
@@ -202,8 +193,7 @@ async fn select_fourfours_content_for_audit(
     }
 }
 
-/// Adds Glados database History sub-protocol search results
-/// to a channel for auditing against a Portal Node.
+/// Adds content to a channel for auditing against a Portal Node.
 async fn add_to_queue(
     tx: mpsc::Sender<AuditTask>,
     strategy: SelectionStrategy,
@@ -212,17 +202,19 @@ async fn add_to_queue(
     let capacity = tx.capacity();
     let max_capacity = tx.max_capacity();
     debug!(
+        ?strategy,
+        items.len = items.len(),
         channel.availability = capacity,
         channel.size = max_capacity,
-        "Adding items to audit task channel."
+        "Adding items to audit task channel"
     );
-    for content_key_model in items {
+    for content in items {
         let task = AuditTask {
             strategy: strategy.clone(),
-            content: content_key_model,
+            content,
         };
-        if let Err(e) = tx.send(task).await {
-            error!(audit.strategy=?strategy, err=?e, "Could not send key for audit, channel might be full or closed.")
+        if tx.send(task).await.is_err() {
+            error!(?strategy, "Could not send key for audit, channel is closed");
         }
     }
 }
