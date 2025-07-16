@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use clap::ValueEnum;
 use content::SubProtocol;
 use ethportal_api::{utils::bytes::hex_encode, OverlayContentKey};
+use sea_orm::QueryOrder;
 use sea_orm::{
     entity::prelude::*, strum::IntoEnumIterator, ActiveValue::NotSet, DbBackend, DeriveActiveEnum,
     FromQueryResult, Set, Statement, TryGetable,
@@ -284,6 +285,17 @@ pub async fn get_audits<T: OverlayContentKey>(
     Ok(Entity::find()
         .filter(Column::ContentKey.eq(content_key_model.id))
         .all(conn)
+        .await?)
+}
+
+pub async fn get_latest_audit(
+    strategy: SelectionStrategy,
+    conn: &DatabaseConnection,
+) -> Result<Option<Model>> {
+    Ok(Entity::find()
+        .filter(Column::StrategyUsed.eq(strategy))
+        .order_by_desc(Column::Id)
+        .one(conn)
         .await?)
 }
 

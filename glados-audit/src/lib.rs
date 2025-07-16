@@ -29,11 +29,11 @@ use entity::{
 };
 use glados_core::jsonrpc::PortalClient;
 
-use crate::{selection::start_audit_selection_task, validation::content_is_valid};
+use crate::{strategy::start_audit_selection_task, validation::content_is_valid};
 
 pub mod cli;
-pub(crate) mod selection;
 pub mod stats;
+pub(crate) mod strategy;
 pub(crate) mod validation;
 
 /// Configuration created from CLI arguments.
