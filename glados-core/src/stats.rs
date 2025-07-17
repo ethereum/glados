@@ -52,6 +52,7 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
         }
     };
     // Content type filters
+    // TODO(milos): Update to new content keys
     match filters.content_type {
         ContentTypeFilter::All => audits,
         ContentTypeFilter::HeadersByNumber => {
@@ -64,22 +65,6 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
             audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x01").into_condition())
         }
     }
-}
-
-/// Counts new content items for the given subprotocol and period
-pub async fn get_new_content_count(
-    subprotocol: SubProtocol,
-    period: Period,
-    conn: &DatabaseConnection,
-) -> Result<u32, DbErr> {
-    let cutoff = period.cutoff_time();
-
-    let new_content = content::Entity::find()
-        .filter(content::Column::ProtocolId.eq(subprotocol))
-        .filter(content::Column::FirstAvailableAt.gt(cutoff))
-        .count(conn)
-        .await? as u32;
-    Ok(new_content)
 }
 
 /// Calculates stats for the given set of audits over the given period.
@@ -107,8 +92,8 @@ pub async fn get_audit_stats(
 
     let total_failures = total_audits - total_passes;
 
-    let audits_per_minute = (60 * total_audits)
-        .checked_div(period.total_seconds())
+    let audits_per_minute = total_audits
+        .checked_div(period.as_time_delta().num_minutes() as u32)
         .unwrap_or(0);
 
     let (pass_percent, fail_percent) = if total_audits == 0 {
@@ -160,21 +145,16 @@ impl Display for Period {
 }
 
 impl Period {
-    fn cutoff_time(&self) -> DateTime<Utc> {
-        let duration = match self {
-            Period::Hour => chrono::TimeDelta::try_hours(1).unwrap(),
-            Period::Day => chrono::TimeDelta::try_days(1).unwrap(),
-            Period::Week => chrono::TimeDelta::try_weeks(1).unwrap(),
-        };
-        Utc::now() - duration
+    fn as_time_delta(&self) -> chrono::TimeDelta {
+        match self {
+            Period::Hour => chrono::TimeDelta::hours(1),
+            Period::Day => chrono::TimeDelta::days(1),
+            Period::Week => chrono::TimeDelta::weeks(1),
+        }
     }
 
-    fn total_seconds(&self) -> u32 {
-        match self {
-            Period::Hour => 3600,
-            Period::Day => 86400,
-            Period::Week => 604800,
-        }
+    fn cutoff_time(&self) -> DateTime<Utc> {
+        Utc::now() - self.as_time_delta()
     }
 }
 

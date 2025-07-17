@@ -62,34 +62,6 @@ impl MigrationTrait for Migration {
             .await?;
 
         db.execute_unprepared(
-            "INSERT INTO audit_result_latest
-            SELECT
-                audits.content_id,
-                audits.last_audited,
-                audits.result,
-                audits.strategy_used,
-                content.first_available_at,
-                get_byte(content.content_key, 0) AS content_type,
-                content.protocol_id,
-                content.content_key
-            FROM (
-                SELECT DISTINCT ON (content_key)
-                    content_key AS content_id,
-                    created_at AS last_audited,
-                    result,
-                    strategy_used
-                FROM content_audit
-                ORDER BY
-                  content_key,
-                  created_at DESC
-            ) audits
-            JOIN content ON audits.content_id = content.id
-            WHERE content.protocol_id = 0
-            ;",
-        )
-        .await?;
-
-        db.execute_unprepared(
             "CREATE OR REPLACE FUNCTION public.update_audit_result_latest()
                 RETURNS trigger
                 LANGUAGE plpgsql

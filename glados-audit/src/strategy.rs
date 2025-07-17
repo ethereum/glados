@@ -1,4 +1,4 @@
-use chrono::DateTime;
+use chrono::{DateTime, Duration, Utc};
 use entity::{
     content::SubProtocol,
     content_audit::{self, HistorySelectionStrategy, SelectionStrategy},
@@ -14,6 +14,8 @@ use crate::AuditTask;
 
 /// The first post-merge block number.
 const MERGE_BLOCK_HEIGHT: u64 = 15537394;
+
+const GENESIS_TIMESTAMP: DateTime<Utc> = DateTime::from_timestamp(1438269976, 0).unwrap();
 
 pub async fn execute_audit_strategy(
     strategy: SelectionStrategy,
@@ -75,7 +77,7 @@ async fn audit_block_number(
         &content_key,
         "block_header_by_number",
         block_number as i32,
-        DateTime::UNIX_EPOCH,
+        GENESIS_TIMESTAMP + Duration::seconds(12 * block_number as i64), // TODO(milos): fix
         conn,
         SubProtocol::History,
     )

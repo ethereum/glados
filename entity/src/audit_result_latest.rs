@@ -11,6 +11,7 @@ use crate::content_audit::AuditResult;
 
 // Not using the constants in ethportal-api because seaorm does not support DeriveActiveEnum from a
 // variable
+// TODO(milos): Update to new content keys
 #[derive(
     Debug,
     Clone,
@@ -26,8 +27,6 @@ use crate::content_audit::AuditResult;
 #[sea_orm(rs_type = "u8", db_type = "Integer")]
 #[strum(serialize_all = "snake_case")]
 pub enum ContentType {
-    #[strum(message = "Block headers by hash")]
-    BlockHeadersByHash = 0,
     #[strum(message = "Block bodies")]
     BlockBodies = 1,
     #[strum(message = "Block receipts")]

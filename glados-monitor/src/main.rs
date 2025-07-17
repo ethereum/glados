@@ -10,6 +10,8 @@ use sea_orm::{Database, DatabaseConnection};
 use tokio::{signal, task};
 use tracing::{debug, info};
 
+
+// TODO(milos): remove?
 #[tokio::main]
 async fn main() -> Result<()> {
     // Setup logging

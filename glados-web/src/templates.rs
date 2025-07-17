@@ -26,7 +26,6 @@ pub struct IndexTemplate {
     pub client_diversity_data: Vec<ClientDiversityResult>,
     pub average_radius_chart: Vec<CalculatedRadiusChartData>,
     pub stats: [AuditStats; 3],
-    pub new_content: [u32; 3],
     pub content_types: Vec<ContentType>,
 }
 
