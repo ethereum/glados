@@ -27,25 +27,14 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
     // Run audit stat queries in parallel.
     let (
         history_all,
-        history_latest,
+        history_sync,
         history_random,
-        history_fourfours,
-        history_all_headers,
-        history_all_headers_by_number,
         history_all_bodies,
         history_all_receipts,
-        history_latest_headers,
-        history_latest_headers_by_number,
-        history_latest_bodies,
-        history_latest_receipts,
-        history_random_headers,
-        history_random_headers_by_number,
+        history_sync_bodies,
+        history_sync_receipts,
         history_random_bodies,
         history_random_receipts,
-        history_fourfours_headers,
-        history_fourfours_headers_by_number,
-        history_fourfours_bodies,
-        history_fourfours_receipts,
     ) = tokio::join!(
         get_audit_stats(
             filter_audits(AuditFilters {
@@ -59,7 +48,7 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Latest,
+                strategy: StrategyFilter::Sync,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
                 network: SubProtocol::History
@@ -71,36 +60,6 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::Random,
                 content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
-        ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::FourFours,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
-        ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::All,
-                content_type: ContentTypeFilter::Headers,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
-        ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::All,
-                content_type: ContentTypeFilter::HeadersByNumber,
                 success: SuccessFilter::All,
                 network: SubProtocol::History
             },),
@@ -129,27 +88,7 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Latest,
-                content_type: ContentTypeFilter::Headers,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
-        ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::Latest,
-                content_type: ContentTypeFilter::HeadersByNumber,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
-        ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::Latest,
+                strategy: StrategyFilter::Sync,
                 content_type: ContentTypeFilter::Bodies,
                 success: SuccessFilter::All,
                 network: SubProtocol::History
@@ -159,7 +98,7 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_audit_stats(
             filter_audits(AuditFilters {
-                strategy: StrategyFilter::Latest,
+                strategy: StrategyFilter::Sync,
                 content_type: ContentTypeFilter::Receipts,
                 success: SuccessFilter::All,
                 network: SubProtocol::History
@@ -170,26 +109,6 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         get_audit_stats(
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::Random,
-                content_type: ContentTypeFilter::Headers,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
-        ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::Random,
-                content_type: ContentTypeFilter::HeadersByNumber,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
-        ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::Random,
                 content_type: ContentTypeFilter::Bodies,
                 success: SuccessFilter::All,
                 network: SubProtocol::History
@@ -200,46 +119,6 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         get_audit_stats(
             filter_audits(AuditFilters {
                 strategy: StrategyFilter::Random,
-                content_type: ContentTypeFilter::Receipts,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
-        ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::FourFours,
-                content_type: ContentTypeFilter::Headers,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
-        ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::FourFours,
-                content_type: ContentTypeFilter::HeadersByNumber,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
-        ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::FourFours,
-                content_type: ContentTypeFilter::Bodies,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
-        ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::FourFours,
                 content_type: ContentTypeFilter::Receipts,
                 success: SuccessFilter::All,
                 network: SubProtocol::History
@@ -251,54 +130,26 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
 
     // Handle errors and get success rates.
     let success_rate_history_all = history_all?.pass_percent;
-    let success_rate_history_latest = history_latest?.pass_percent;
+    let success_rate_history_sync = history_sync?.pass_percent;
     let success_rate_history_random = history_random?.pass_percent;
-    let success_rate_history_oldest = 0.0;
-    let success_rate_history_fourfours = history_fourfours?.pass_percent;
-    let success_rate_history_all_headers = history_all_headers?.pass_percent;
-    let success_rate_history_all_headers_by_number = history_all_headers_by_number?.pass_percent;
     let success_rate_history_all_bodies = history_all_bodies?.pass_percent;
     let success_rate_history_all_receipts = history_all_receipts?.pass_percent;
-    let success_rate_history_latest_headers = history_latest_headers?.pass_percent;
-    let success_rate_history_latest_headers_by_number =
-        history_latest_headers_by_number?.pass_percent;
-    let success_rate_history_latest_bodies = history_latest_bodies?.pass_percent;
-    let success_rate_history_latest_receipts = history_latest_receipts?.pass_percent;
-    let success_rate_history_random_headers = history_random_headers?.pass_percent;
-    let success_rate_history_random_headers_by_number =
-        history_random_headers_by_number?.pass_percent;
+    let success_rate_history_sync_bodies = history_sync_bodies?.pass_percent;
+    let success_rate_history_sync_receipts = history_sync_receipts?.pass_percent;
     let success_rate_history_random_bodies = history_random_bodies?.pass_percent;
     let success_rate_history_random_receipts = history_random_receipts?.pass_percent;
-    let success_rate_history_fourfours_headers = history_fourfours_headers?.pass_percent;
-    let success_rate_history_fourfours_headers_by_number =
-        history_fourfours_headers_by_number?.pass_percent;
-    let success_rate_history_fourfours_bodies = history_fourfours_bodies?.pass_percent;
-    let success_rate_history_fourfours_receipts = history_fourfours_receipts?.pass_percent;
     // Record the values.
     match audit_stats::create(
         Utc::now(),
-        0,
         success_rate_history_all,
-        success_rate_history_latest,
+        success_rate_history_sync,
         success_rate_history_random,
-        success_rate_history_oldest,
-        success_rate_history_fourfours,
-        success_rate_history_all_headers,
-        success_rate_history_all_headers_by_number,
         success_rate_history_all_bodies,
         success_rate_history_all_receipts,
-        success_rate_history_latest_headers,
-        success_rate_history_latest_headers_by_number,
-        success_rate_history_latest_bodies,
-        success_rate_history_latest_receipts,
-        success_rate_history_random_headers,
-        success_rate_history_random_headers_by_number,
+        success_rate_history_sync_bodies,
+        success_rate_history_sync_receipts,
         success_rate_history_random_bodies,
         success_rate_history_random_receipts,
-        success_rate_history_fourfours_headers,
-        success_rate_history_fourfours_headers_by_number,
-        success_rate_history_fourfours_bodies,
-        success_rate_history_fourfours_receipts,
         conn,
     )
     .await

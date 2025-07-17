@@ -1,8 +1,7 @@
 use anyhow::Result;
-use chrono::Utc;
 use cli::Args;
 use ethportal_api::types::query_trace::QueryTrace;
-use ethportal_api::{utils::bytes::hex_encode, HistoryContentKey, OverlayContentKey};
+use ethportal_api::utils::bytes::hex_encode;
 use sea_orm::DatabaseConnection;
 use serde_json::json;
 use std::{
@@ -24,16 +23,16 @@ use tracing::{debug, error, info, warn};
 use entity::{
     audit_internal_failure, client_info,
     content::{self, SubProtocol},
-    content_audit::{self, HistorySelectionStrategy, SelectionStrategy},
+    content_audit::{self, SelectionStrategy},
     execution_metadata, node,
 };
 use glados_core::jsonrpc::PortalClient;
 
-use crate::{strategy::start_audit_selection_task, validation::content_is_valid};
+use crate::{strategy::execute_audit_strategy, validation::content_is_valid};
 
 pub mod cli;
 pub mod stats;
-pub(crate) mod strategy;
+mod strategy;
 pub(crate) mod validation;
 
 /// Configuration created from CLI arguments.
@@ -109,28 +108,6 @@ pub struct TaskChannel {
     rx: Receiver<AuditTask>,
 }
 
-pub async fn run_glados_command(conn: DatabaseConnection, command: cli::Command) -> Result<()> {
-    let (content_key, portal_client) = match command {
-        cli::Command::Audit {
-            content_key,
-            portal_client,
-            ..
-        } => (content_key, portal_client),
-    };
-    let content_key =
-        HistoryContentKey::try_from_hex(&content_key).expect("needs valid hex-encoded history key");
-
-    let task = AuditTask {
-        strategy: SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey),
-        content: content::get_or_create(SubProtocol::History, &content_key, Utc::now(), &conn)
-            .await?,
-    };
-    let client = PortalClient::from(portal_client).await?;
-    let active_threads = Arc::new(AtomicU8::new(0));
-    perform_single_audit(active_threads, task, client.clone(), conn).await;
-    Ok(())
-}
-
 pub async fn run_glados_audit(conn: DatabaseConnection, config: AuditConfig) {
     start_audit(conn.clone(), config).await;
 
@@ -155,7 +132,7 @@ async fn start_audit(conn: DatabaseConnection, config: AuditConfig) {
         };
         task_channels.push(task_channel);
         // Strategies generate tasks in their own thread for their own channel.
-        tokio::spawn(start_audit_selection_task(strategy, tx, conn.clone()));
+        tokio::spawn(execute_audit_strategy(strategy, tx, conn.clone()));
     }
     // Collation of generated tasks, taken proportional to weights.
     let (collation_tx, collation_rx) = mpsc::channel::<AuditTask>(100);
@@ -344,10 +321,9 @@ async fn perform_single_audit(
         create_entry_for_failures(created_audit, trace, &conn).await;
     }
 
-    // Display audit result.
     match task.content.protocol_id {
         SubProtocol::History => {
-            display_history_audit_result(task.content, audit_result, &conn).await;
+            log_history_audit_result(task.content, audit_result, &conn).await;
         }
     }
 
@@ -388,7 +364,7 @@ async fn create_entry_for_failures(
     }
 }
 
-async fn display_history_audit_result(
+async fn log_history_audit_result(
     content: content::Model,
     audit_result: bool,
     conn: &DatabaseConnection,
@@ -409,10 +385,13 @@ async fn display_history_audit_result(
                 "Block metadata absent for history key."
             );
         }
-        Err(e) => error!(
-                    content.key=hex_encode(content.content_key),
-                    err=?e,
-                    "Problem getting block metadata for history key."),
+        Err(e) => {
+            error!(
+                content.key=hex_encode(content.content_key),
+                err=?e,
+                "Problem getting block metadata for history key.",
+            );
+        }
     };
 }
 
@@ -420,18 +399,16 @@ async fn display_history_audit_result(
 mod tests {
     use chrono::Utc;
     use enr::NodeId;
-    use entity::content_audit::HistorySelectionStrategy;
-    use entity::execution_metadata;
     use entity::{
         audit_internal_failure::{self, TransferFailureType},
         client_info,
         content::{self, SubProtocol},
-        content_audit::{self, AuditResult},
-        node,
+        content_audit::{self, AuditResult, HistorySelectionStrategy},
+        execution_metadata, node,
         prelude::*,
         record,
     };
-    use ethportal_api::utils::bytes::hex_decode;
+    use ethportal_api::{utils::bytes::hex_decode, HistoryContentKey, OverlayContentKey};
     use migration::{DbErr, Migrator, MigratorTrait};
     use pgtemp::PgTempDB;
     use sea_orm::{

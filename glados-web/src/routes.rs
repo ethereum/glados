@@ -89,7 +89,7 @@ pub async fn network_overview(
     let radius_percentages = generate_radius_graph_data(&state, subprotocol).await;
 
     let strategy: StrategyFilter = match subprotocol {
-        SubProtocol::History => StrategyFilter::FourFours,
+        SubProtocol::History => StrategyFilter::Sync,
     };
 
     // Run queries for content dashboard data concurrently
@@ -128,6 +128,7 @@ pub async fn network_overview(
             &state.database_connection,
         ),
     );
+
     // Get results from queries
     let hour_new = hour_new.unwrap();
     let hour_stats = hour_stats.unwrap();

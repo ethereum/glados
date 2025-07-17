@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use clap::{ArgAction, Parser, Subcommand, ValueEnum};
+use clap::{ArgAction, Parser, ValueEnum};
 use entity::content_audit::{HistorySelectionStrategy, SelectionStrategy};
 
 const DEFAULT_STATS_PERIOD: &str = "300";
@@ -26,9 +26,6 @@ pub struct Args {
 
     #[arg(long, action(ArgAction::Append))]
     pub portal_client: Vec<String>,
-
-    #[command(subcommand)]
-    pub subcommand: Option<Command>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -69,16 +66,6 @@ impl FromStr for StrategyWithWeight {
     }
 }
 
-#[derive(Subcommand, Debug, Eq, PartialEq, Clone)]
-pub enum Command {
-    /// Run a single audit for a specific, previously audited content key.
-    Audit {
-        content_key: String,
-        portal_client: String,
-        database_url: String,
-    },
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -92,7 +79,6 @@ mod test {
                 concurrency: 4,
                 strategy: vec![],
                 portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
-                subcommand: None,
                 stats_recording_period: 300,
             }
         }

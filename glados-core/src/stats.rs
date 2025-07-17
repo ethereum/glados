@@ -32,20 +32,14 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
     // Strategy filters
     let audits = match filters.strategy {
         StrategyFilter::All => audits,
+        StrategyFilter::Sync => audits.filter(
+            content_audit::Column::StrategyUsed
+                .eq(SelectionStrategy::History(HistorySelectionStrategy::Sync)),
+        ),
         StrategyFilter::Random => audits.filter(
             content_audit::Column::StrategyUsed
                 .eq(SelectionStrategy::History(HistorySelectionStrategy::Random)),
         ),
-        StrategyFilter::Latest => audits.filter(
-            content_audit::Column::StrategyUsed
-                .eq(SelectionStrategy::History(HistorySelectionStrategy::Latest)),
-        ),
-        StrategyFilter::Oldest => audits.filter(content_audit::Column::StrategyUsed.eq(
-            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited),
-        )),
-        StrategyFilter::FourFours => audits.filter(content_audit::Column::StrategyUsed.eq(
-            SelectionStrategy::History(HistorySelectionStrategy::FourFours),
-        )),
     };
     // Success filters
     let audits = match filters.success {
@@ -60,23 +54,14 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
     // Content type filters
     match filters.content_type {
         ContentTypeFilter::All => audits,
-        ContentTypeFilter::Headers => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x00").into_condition())
-        }
-        ContentTypeFilter::Bodies => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x01").into_condition())
-        }
-        ContentTypeFilter::Receipts => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x02").into_condition())
-        }
         ContentTypeFilter::HeadersByNumber => {
             audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x03").into_condition())
         }
-        ContentTypeFilter::AccountTrieNodes => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x20").into_condition())
+        ContentTypeFilter::Bodies => {
+            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x03").into_condition())
         }
-        ContentTypeFilter::BlockRoots => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x10").into_condition())
+        ContentTypeFilter::Receipts => {
+            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x01").into_condition())
         }
     }
 }
@@ -204,20 +189,16 @@ pub struct AuditFilters {
 #[derive(Deserialize, Copy, Clone)]
 pub enum StrategyFilter {
     All,
+    Sync,
     Random,
-    Latest,
-    Oldest,
-    FourFours,
 }
 
 impl Display for StrategyFilter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let name = match &self {
             StrategyFilter::All => "All",
+            StrategyFilter::Sync => "Sync",
             StrategyFilter::Random => "Random",
-            StrategyFilter::Latest => "Latest",
-            StrategyFilter::Oldest => "Oldest",
-            StrategyFilter::FourFours => "4444s",
         };
         write!(f, "{}", name)
     }
@@ -233,10 +214,7 @@ pub enum SuccessFilter {
 #[derive(Deserialize, Copy, Clone)]
 pub enum ContentTypeFilter {
     All,
-    Headers,
+    HeadersByNumber,
     Bodies,
     Receipts,
-    AccountTrieNodes,
-    BlockRoots,
-    HeadersByNumber,
 }

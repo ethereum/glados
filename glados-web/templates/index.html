@@ -24,8 +24,8 @@
                     <button class="question-mark" aria-label="Toggle explanation"></button>
                     <div class="explanation">
                     {% match strategy %}
-                        {% when StrategyFilter::FourFours %}
-                            Glados continuously queries the Portal network for random 4444s headers, blocks, and receipts.
+                        {% when StrategyFilter::Sync %}
+                            Glados continuously queries the Portal network for pre-merge bodies and receipts.
                             Statistical results of these audits are displayed here and can be viewed in more granular detail on the Audit Dashboard.
                         {% else %}
                             No explanation available for {{ strategy }}

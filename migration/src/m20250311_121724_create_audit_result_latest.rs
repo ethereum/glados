@@ -79,7 +79,6 @@ impl MigrationTrait for Migration {
                     result,
                     strategy_used
                 FROM content_audit
-                WHERE strategy_used = 5
                 ORDER BY
                   content_key,
                   created_at DESC
@@ -96,33 +95,31 @@ impl MigrationTrait for Migration {
                 LANGUAGE plpgsql
             AS $function$
             BEGIN
-                IF NEW.strategy_used = 5 THEN
-                    INSERT INTO audit_result_latest
-                    SELECT
-                        NEW.content_key,
-                        NEW.created_at,
-                        NEW.result,
-                        NEW.strategy_used,
-                        content.first_available_at,
-                        get_byte(content.content_key, 0) AS content_type,
-                        content.protocol_id,
-                        content.content_key
-                    FROM content
-                    WHERE
-                        NEW.content_key = content.id AND
-                        content.protocol_id = 0
-                    ON CONFLICT (content_id) DO
-                    UPDATE
-                        SET
-                            last_audited = EXCLUDED.last_audited,
-                            result = EXCLUDED.result,
-                            strategy_used = EXCLUDED.strategy_used,
-                            first_available_at = EXCLUDED.first_available_at,
-                            content_type = EXCLUDED.content_type,
-                            protocol_id = EXCLUDED.protocol_id,
-                            content_key = EXCLUDED.content_key
-                      ;
-                END IF;
+                INSERT INTO audit_result_latest
+                SELECT
+                    NEW.content_key,
+                    NEW.created_at,
+                    NEW.result,
+                    NEW.strategy_used,
+                    content.first_available_at,
+                    get_byte(content.content_key, 0) AS content_type,
+                    content.protocol_id,
+                    content.content_key
+                FROM content
+                WHERE
+                    NEW.content_key = content.id AND
+                    content.protocol_id = 0
+                ON CONFLICT (content_id) DO
+                UPDATE
+                    SET
+                        last_audited = EXCLUDED.last_audited,
+                        result = EXCLUDED.result,
+                        strategy_used = EXCLUDED.strategy_used,
+                        first_available_at = EXCLUDED.first_available_at,
+                        content_type = EXCLUDED.content_type,
+                        protocol_id = EXCLUDED.protocol_id,
+                        content_key = EXCLUDED.content_key
+                    ;
                 RETURN NEW;
             END;
             $function$
