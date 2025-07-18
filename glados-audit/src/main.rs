@@ -1,12 +1,10 @@
 use anyhow::Result;
 use clap::Parser;
 use glados_audit::stats::periodically_record_stats;
-use sea_orm::Database;
-use tokio::time::Duration;
 use tracing::{debug, info};
 
 use glados_audit::cli::Args;
-use glados_audit::{run_glados_audit, AuditConfig};
+use glados_audit::{config::AuditConfig, run_glados_audit};
 use migration::{Migrator, MigratorTrait};
 
 #[tokio::main]
@@ -22,26 +20,19 @@ async fn main() -> Result<()> {
 }
 
 async fn run_audit(args: Args) -> Result<()> {
-    //
-    // Database Connection
-    //
     let config = AuditConfig::from_args(args).await?;
-    debug!(
-        database_url = &config.database_url,
-        "Connecting to database"
-    );
 
-    let conn = Database::connect(&config.database_url).await?;
-    info!(
-        database_url = &config.database_url,
-        "database connection established"
-    );
+    Migrator::up(&config.database_connection, None).await?;
 
-    Migrator::up(&conn, None).await?;
-    tokio::spawn(periodically_record_stats(
-        Duration::from_secs(config.stats_recording_period),
-        conn.clone(),
-    ));
-    run_glados_audit(conn, config).await;
-    Ok(())
+    tokio::spawn(periodically_record_stats(config.clone()));
+
+    run_glados_audit(config).await;
+
+    debug!("setting up CTRL+C listener");
+    tokio::signal::ctrl_c()
+        .await
+        .expect("failed to pause until ctrl-c");
+
+    info!("got CTRL+C. shutting down...");
+    std::process::exit(0);
 }

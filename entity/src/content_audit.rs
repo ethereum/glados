@@ -223,13 +223,13 @@ pub async fn create(
     content_key_model_id: i32,
     client_info_id: i32,
     node_id: i32,
-    query_successful: bool,
+    audit_result: bool,
     strategy_used: SelectionStrategy,
     trace_string: String,
     conn: &DatabaseConnection,
 ) -> Result<Model> {
     // If no record exists, create one and return it
-    let audit_result = if query_successful {
+    let audit_result = if audit_result {
         AuditResult::Success
     } else {
         AuditResult::Failure

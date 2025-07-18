@@ -11,8 +11,15 @@ pub struct Args {
     #[arg(short, long)]
     pub database_url: String,
 
-    #[arg(short, long, default_value = "4", help = "number of auditing threads")]
-    pub concurrency: u8,
+    #[arg(long, default_value = "4", help = "The number of auditing threads")]
+    pub concurrency: usize,
+
+    #[arg(
+        long,
+        default_value = "100",
+        help = "The maximum number of audits per second."
+    )]
+    pub max_audit_rate: usize,
 
     #[arg(
         long,
@@ -32,6 +39,12 @@ pub struct Args {
 pub struct StrategyWithWeight {
     pub strategy: SelectionStrategy,
     pub weight: u8,
+}
+
+impl StrategyWithWeight {
+    pub fn as_tuple(&self) -> (SelectionStrategy, u8) {
+        (self.strategy.clone(), self.weight)
+    }
 }
 
 impl FromStr for StrategyWithWeight {
@@ -77,6 +90,7 @@ mod test {
             Self {
                 database_url: "".to_string(),
                 concurrency: 4,
+                max_audit_rate: 10,
                 strategy: vec![],
                 portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
                 stats_recording_period: 300,

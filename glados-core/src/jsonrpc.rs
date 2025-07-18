@@ -1,16 +1,14 @@
 use std::{path::PathBuf, time::Duration};
 
 use alloy_primitives::hex::FromHexError;
-use entity::content;
-use ethportal_api::types::enr::Enr;
-use ethportal_api::types::portal::TraceContentInfo;
-use ethportal_api::types::query_trace::QueryTrace;
-use ethportal_api::utils::bytes::ByteUtilsError;
+use entity::{client_info, content, node};
 use ethportal_api::{
-    ContentKeyError, Discv5ApiClient, HistoryContentKey, HistoryNetworkApiClient, NodeInfo,
-    OverlayContentKey, RoutingTableInfo, Web3ApiClient,
+    types::query_trace::QueryTrace, utils::bytes::ByteUtilsError, ContentKeyError, Discv5ApiClient,
+    HistoryContentKey, HistoryNetworkApiClient, NodeInfo, OverlayContentKey, RawContentValue,
+    RoutingTableInfo, Web3ApiClient,
 };
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
+use sea_orm::DatabaseConnection;
 use thiserror::Error;
 use url::Url;
 
@@ -29,8 +27,8 @@ pub struct PortalApi {
 #[derive(Clone, Debug)]
 pub struct PortalClient {
     pub api: PortalApi,
-    pub client_info: String,
-    pub enr: Enr,
+    pub client_info: client_info::Model,
+    pub node_info: node::Model,
 }
 
 const CONTENT_NOT_FOUND_ERROR_CODE: i32 = -39001;
@@ -129,29 +127,44 @@ impl From<jsonrpsee::core::client::Error> for JsonRpcError {
     }
 }
 
-pub struct Content {
-    pub raw: Vec<u8>,
-}
-
 impl PortalClient {
-    pub async fn from(portal_client_url: String) -> Result<Self, JsonRpcError> {
+    pub async fn new(portal_client_url: String, conn: &DatabaseConnection) -> anyhow::Result<Self> {
         let api = PortalApi::new(portal_client_url).await?;
 
-        let client_info = api.get_client_version().await?;
-
+        let client_version = api.get_client_version().await?;
         let node_info = api.get_node_info().await?;
+
+        let client_info = client_info::get_or_create(client_version, conn).await?;
+        let node_info = node::get_or_create(node_info.enr.node_id(), conn).await?;
 
         Ok(PortalClient {
             api,
             client_info,
-            enr: node_info.enr,
+            node_info,
         })
     }
 
     pub fn supports_trace(&self) -> bool {
-        self.client_info.contains("trin")
-            || self.client_info.contains("nimbus")
-            || self.client_info.contains("ultralight")
+        self.client_info.version_info.contains("trin")
+            || self.client_info.version_info.contains("nimbus")
+            || self.client_info.version_info.contains("ultralight")
+    }
+
+    pub async fn get_content(
+        &self,
+        content: &content::Model,
+    ) -> Result<(RawContentValue, Option<QueryTrace>), JsonRpcError> {
+        if self.supports_trace() {
+            self.api
+                .get_content_with_trace(content)
+                .await
+                .map(|(content, trace)| (content, Some(trace)))
+        } else {
+            self.api
+                .get_content(content)
+                .await
+                .map(|content| (content, None))
+        }
     }
 }
 
@@ -185,58 +198,33 @@ impl PortalApi {
     }
 
     pub async fn get_content(
-        self,
+        &self,
         content: &content::Model,
-    ) -> Result<Option<Content>, JsonRpcError> {
+    ) -> Result<RawContentValue, JsonRpcError> {
         match content.protocol_id {
             content::SubProtocol::History => {
-                match HistoryNetworkApiClient::get_content(
+                let content_info = HistoryNetworkApiClient::get_content(
                     &self.client,
                     HistoryContentKey::try_from_bytes(&content.content_key)?,
                 )
-                .await
-                {
-                    Ok(content_info) => Ok(Some(Content {
-                        raw: content_info.content.into(),
-                    })),
-                    Err(err) => match err.into() {
-                        JsonRpcError::ContentNotFound { trace: _ } => Ok(None),
-                        err => Err(err),
-                    },
-                }
+                .await?;
+                Ok(content_info.content)
             }
         }
     }
 
     pub async fn get_content_with_trace(
-        self,
+        &self,
         content: &content::Model,
-    ) -> Result<(Option<Content>, QueryTrace), JsonRpcError> {
+    ) -> Result<(RawContentValue, QueryTrace), JsonRpcError> {
         match content.protocol_id {
             content::SubProtocol::History => {
-                match HistoryNetworkApiClient::trace_get_content(
+                let trace_content_info = HistoryNetworkApiClient::trace_get_content(
                     &self.client,
                     HistoryContentKey::try_from_bytes(&content.content_key)?,
                 )
-                .await
-                {
-                    Ok(TraceContentInfo { content, trace, .. }) => Ok((
-                        Some(Content {
-                            raw: content.into(),
-                        }),
-                        trace,
-                    )),
-                    Err(err) => match err.into() {
-                        JsonRpcError::ContentNotFound { trace } => {
-                            if let Some(trace) = trace {
-                                Ok((None, trace))
-                            } else {
-                                Err(JsonRpcError::MissingQueryTrace)
-                            }
-                        }
-                        err => Err(err),
-                    },
-                }
+                .await?;
+                Ok((trace_content_info.content, trace_content_info.trace))
             }
         }
     }

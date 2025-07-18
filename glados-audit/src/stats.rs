@@ -5,25 +5,41 @@ use glados_core::stats::{
     SuccessFilter,
 };
 use sea_orm::{DatabaseConnection, DbErr};
-use tokio::time::{interval, Duration};
+use tokio::time::interval;
 use tracing::{debug, error};
 
+use crate::AuditConfig;
+
 /// Loops indefinitely, periodically recording audit stats to the database.
-pub async fn periodically_record_stats(period: Duration, conn: DatabaseConnection) -> ! {
+pub async fn periodically_record_stats(config: AuditConfig) -> ! {
     debug!("initializing task for logging audit stats");
-    let mut interval = interval(period);
+    let mut interval = interval(config.stats_recording_period);
 
     loop {
-        record_current_stats(&conn).await.unwrap_or_else(|e| {
-            error!("failed to record audit stats: {e}");
-        });
+        if let Err(err) = record_current_stats(&config.database_connection).await {
+            error!(%err, "Failed to record audit stats.");
+        };
         interval.tick().await;
     }
 }
 
 /// Records audit stats for the current moment to the database.
+///
 /// Calculates success rate for many combinations of strategy and content type.
 async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
+    let get_stats = |subprotocol, strategy, content_type| {
+        get_audit_stats(
+            filter_audits(AuditFilters {
+                strategy,
+                content_type,
+                success: SuccessFilter::All,
+                network: subprotocol,
+            }),
+            Period::Hour,
+            conn,
+        )
+    };
+
     // Run audit stat queries in parallel.
     let (
         history_all,
@@ -36,95 +52,50 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         history_random_bodies,
         history_random_receipts,
     ) = tokio::join!(
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::All,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
+        get_stats(
+            SubProtocol::History,
+            StrategyFilter::All,
+            ContentTypeFilter::All,
         ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::Sync,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
+        get_stats(
+            SubProtocol::History,
+            StrategyFilter::Sync,
+            ContentTypeFilter::All,
         ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::Random,
-                content_type: ContentTypeFilter::All,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
+        get_stats(
+            SubProtocol::History,
+            StrategyFilter::Random,
+            ContentTypeFilter::All,
         ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::All,
-                content_type: ContentTypeFilter::Bodies,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
+        get_stats(
+            SubProtocol::History,
+            StrategyFilter::All,
+            ContentTypeFilter::Bodies,
         ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::All,
-                content_type: ContentTypeFilter::Receipts,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
+        get_stats(
+            SubProtocol::History,
+            StrategyFilter::All,
+            ContentTypeFilter::Receipts,
         ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::Sync,
-                content_type: ContentTypeFilter::Bodies,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
+        get_stats(
+            SubProtocol::History,
+            StrategyFilter::Sync,
+            ContentTypeFilter::Bodies,
         ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::Sync,
-                content_type: ContentTypeFilter::Receipts,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
+        get_stats(
+            SubProtocol::History,
+            StrategyFilter::Sync,
+            ContentTypeFilter::Receipts,
         ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::Random,
-                content_type: ContentTypeFilter::Bodies,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
+        get_stats(
+            SubProtocol::History,
+            StrategyFilter::Random,
+            ContentTypeFilter::Bodies,
         ),
-        get_audit_stats(
-            filter_audits(AuditFilters {
-                strategy: StrategyFilter::Random,
-                content_type: ContentTypeFilter::Receipts,
-                success: SuccessFilter::All,
-                network: SubProtocol::History
-            },),
-            Period::Hour,
-            conn
+        get_stats(
+            SubProtocol::History,
+            StrategyFilter::Random,
+            ContentTypeFilter::Receipts,
         ),
     );
 
@@ -138,6 +109,7 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
     let success_rate_history_sync_receipts = history_sync_receipts?.pass_percent;
     let success_rate_history_random_bodies = history_random_bodies?.pass_percent;
     let success_rate_history_random_receipts = history_random_receipts?.pass_percent;
+
     // Record the values.
     match audit_stats::create(
         Utc::now(),
