@@ -13,7 +13,7 @@ use tokio::{
         mpsc::{self, Receiver},
         OwnedSemaphorePermit, Semaphore,
     },
-    time::{interval, sleep, Duration, MissedTickBehavior},
+    time::{interval, Duration, MissedTickBehavior},
 };
 use tracing::{debug, error, info, warn};
 
@@ -86,8 +86,6 @@ async fn start_collation(
                     Err(_) => break,
                 }
             }
-            // Limit check for new tasks to 5/sec
-            sleep(Duration::from_millis(200)).await;
         }
     }
 }

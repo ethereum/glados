@@ -90,7 +90,7 @@ mod test {
             Self {
                 database_url: "".to_string(),
                 concurrency: 4,
-                max_audit_rate: 10,
+                max_audit_rate: 100,
                 strategy: vec![],
                 portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
                 stats_recording_period: 300,
