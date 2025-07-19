@@ -52,11 +52,7 @@ pub async fn run_glados_audit(config: AuditConfig) {
         task_channels.push(task_channel);
 
         // Strategies generate tasks in their own thread for their own channel.
-        tokio::spawn(execute_audit_strategy(
-            strategy,
-            tx,
-            config.database_connection.clone(),
-        ));
+        tokio::spawn(execute_audit_strategy(strategy, tx, config.clone()));
     }
 
     // Collation of generated tasks, taken proportional to weights.

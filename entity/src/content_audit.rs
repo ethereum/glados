@@ -13,14 +13,14 @@ use sea_orm::{
 };
 use sea_query::{ArrayType, Nullable, SeaRc, ValueType, ValueTypeErr};
 
-#[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum AuditResult {
     Failure = 0,
     Success = 1,
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq, EnumIter, DeriveActiveEnum, ValueEnum)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, EnumIter, DeriveActiveEnum, ValueEnum)]
 #[clap(rename_all = "snake_case")]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 /// Each strategy is responsible for selecting which content key(s) to begin audits for.
@@ -44,9 +44,9 @@ impl From<i32> for HistorySelectionStrategy {
 impl TryFrom<String> for HistorySelectionStrategy {
     type Error = anyhow::Error;
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.as_str() {
-            "Sync" => Ok(HistorySelectionStrategy::Sync),
-            "Random" => Ok(HistorySelectionStrategy::Random),
+        match value.to_lowercase().as_str() {
+            "sync" => Ok(HistorySelectionStrategy::Sync),
+            "random" => Ok(HistorySelectionStrategy::Random),
             _ => bail!("Invalid value for HistorySelectionStrategy {}", value),
         }
     }

@@ -5,6 +5,9 @@ use entity::content_audit::{HistorySelectionStrategy, SelectionStrategy};
 
 const DEFAULT_STATS_PERIOD: &str = "300";
 
+/// The first post-merge block number.
+const MAINNET_MERGE_BLOCK_HEIGHT: u64 = 15537394;
+
 #[derive(Parser, Debug, Eq, PartialEq)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
@@ -27,6 +30,20 @@ pub struct Args {
         help = "Specific strategy to use. Strategy can be selected by name and weight (--strategy random:10) or by name only (--strategy random) which assumes weight 1. May be passed multiple times for multiple strategies (--strategy random --strategy sync:5)"
     )]
     pub strategy: Vec<StrategyWithWeight>,
+
+    #[arg(
+        long,
+        default_value_t = 0,
+        help = "Specifies the start of the block range that should be used for audit. This applies to following strategies: sync, random."
+    )]
+    pub start_block: u64,
+
+    #[arg(
+        long,
+        default_value_t = MAINNET_MERGE_BLOCK_HEIGHT - 1,
+        help = "Specifies the end of the block range that should be used for audit. This applies to following strategies: sync, random."
+    )]
+    pub end_block: u64,
 
     #[arg(long, default_value = DEFAULT_STATS_PERIOD, help = "stats recording period (seconds)")]
     pub stats_recording_period: u64,
@@ -92,8 +109,10 @@ mod test {
                 concurrency: 4,
                 max_audit_rate: 100,
                 strategy: vec![],
-                portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
+                start_block: 0,
+                end_block: MAINNET_MERGE_BLOCK_HEIGHT - 1,
                 stats_recording_period: 300,
+                portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
             }
         }
     }

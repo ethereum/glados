@@ -10,24 +10,22 @@ use sea_orm::DatabaseConnection;
 use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
 
-use crate::AuditTask;
+use crate::{config::AuditConfig, AuditTask};
 
-/// The first post-merge block number.
-const MERGE_BLOCK_HEIGHT: u64 = 15537394;
-
+// TODO(milos): remove
 const GENESIS_TIMESTAMP: DateTime<Utc> = DateTime::from_timestamp(1438269976, 0).unwrap();
 
 pub async fn execute_audit_strategy(
     strategy: SelectionStrategy,
     tx: mpsc::Sender<AuditTask>,
-    conn: DatabaseConnection,
+    config: AuditConfig,
 ) {
     match &strategy {
         SelectionStrategy::History(HistorySelectionStrategy::Sync) => {
-            execute_sync_strategy(tx, conn).await
+            execute_sync_strategy(tx, config).await
         }
         SelectionStrategy::History(HistorySelectionStrategy::Random) => {
-            execute_random_strategy(tx, conn).await
+            execute_random_strategy(tx, config).await
         }
     }
 }
@@ -38,29 +36,39 @@ pub async fn execute_audit_strategy(
 /// 1. Finds the block number of the latest Sync strategy audit
 /// 2. Creates audit task for the following block number
 /// 3. Keeps going until the merge block, then restarts from genesis
-async fn execute_sync_strategy(tx: mpsc::Sender<AuditTask>, conn: DatabaseConnection) -> ! {
+async fn execute_sync_strategy(tx: mpsc::Sender<AuditTask>, config: AuditConfig) -> ! {
+    let block_range = config.block_range;
+    let conn = config.database_connection;
+
     let strategy = SelectionStrategy::History(HistorySelectionStrategy::Sync);
 
-    let mut block_number = latest_audit_block_number(&conn).await.unwrap_or(0);
+    let mut block_number = match latest_audit_block_number(&conn).await {
+        Some(block_number) => block_number + 1,
+        None => 0,
+    };
 
     loop {
-        block_number += 1;
-        if block_number >= MERGE_BLOCK_HEIGHT {
-            block_number = 0;
+        if !block_range.contains(&block_number) {
+            block_number = *block_range.start();
         }
 
         audit_block_number(block_number, strategy.clone(), &tx, &conn).await;
+
+        block_number += 1;
     }
 }
 
 /// Creates and sends audit tasks for [HistorySelectionStrategy::Random].
 ///
 /// Selects the random block number and sends audit tasks.
-async fn execute_random_strategy(tx: mpsc::Sender<AuditTask>, conn: DatabaseConnection) -> ! {
+async fn execute_random_strategy(tx: mpsc::Sender<AuditTask>, config: AuditConfig) -> ! {
+    let block_range = config.block_range;
+    let conn = config.database_connection;
+
     let strategy = SelectionStrategy::History(HistorySelectionStrategy::Random);
 
     loop {
-        let block_number = rand::random_range(0..MERGE_BLOCK_HEIGHT);
+        let block_number = rand::random_range(block_range.clone());
         audit_block_number(block_number, strategy.clone(), &tx, &conn).await;
     }
 }

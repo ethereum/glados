@@ -1,4 +1,6 @@
-use std::{collections::HashMap, thread::available_parallelism, time::Duration};
+use std::{
+    collections::HashMap, ops::RangeInclusive, thread::available_parallelism, time::Duration,
+};
 
 use entity::content_audit::SelectionStrategy;
 use glados_core::jsonrpc::PortalClient;
@@ -14,6 +16,8 @@ pub struct AuditConfig {
     pub database_connection: DatabaseConnection,
     /// Specific audit strategies to run, and their weights.
     pub strategies: HashMap<SelectionStrategy, u8>,
+    /// The block range that should be used for audit.
+    pub block_range: RangeInclusive<u64>,
     /// Number requests to a Portal node active at the same time.
     pub concurrency: usize,
     /// The maximum number of audits per second.
@@ -63,6 +67,7 @@ impl AuditConfig {
 
         Ok(AuditConfig {
             database_connection,
+            block_range: args.start_block..=args.end_block,
             strategies,
             concurrency: args.concurrency,
             max_audit_rate: args.max_audit_rate,

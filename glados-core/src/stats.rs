@@ -1,10 +1,10 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use chrono::{DateTime, Utc};
 use sea_orm::{
     sea_query::{Expr, IntoCondition},
-    ColumnTrait, DatabaseConnection, DbErr, EntityTrait, JoinType, PaginatorTrait, QueryFilter,
-    QuerySelect, RelationTrait, Select,
+    ColumnTrait, DatabaseConnection, DbErr, EntityTrait, JoinType, QueryFilter, QuerySelect,
+    RelationTrait, Select,
 };
 use serde::Deserialize;
 
@@ -14,6 +14,7 @@ use entity::{
 };
 
 /// Generates a SeaORM select query for audits based on the provided filters.
+///
 /// User can decide whether to retrieve or only count results.
 /// TODO: add support for filtering by portal client
 pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
@@ -75,26 +76,24 @@ pub async fn get_audit_stats(
 ) -> Result<AuditStats, DbErr> {
     let cutoff = period.cutoff_time();
 
-    let total_audits = filtered
+    let audit_result_count: HashMap<AuditResult, i64> = filtered
         .clone()
         .filter(content_audit::Column::CreatedAt.gt(cutoff))
-        .count(conn)
-        .await? as u32;
+        .select_only()
+        .column(content_audit::Column::Result)
+        .column_as(content_audit::Column::Result.count(), "count")
+        .group_by(content_audit::Column::Result)
+        .into_tuple::<(AuditResult, i64)>()
+        .all(conn)
+        .await?
+        .into_iter()
+        .collect();
 
-    let total_passes = filtered
-        .filter(content_audit::Column::CreatedAt.gt(cutoff))
-        .filter(content_audit::Column::Result.eq(AuditResult::Success))
-        .count(conn)
-        .await? as u32;
+    let total_passes = *audit_result_count.get(&AuditResult::Success).unwrap_or(&0) as u64;
+    let total_failures = *audit_result_count.get(&AuditResult::Failure).unwrap_or(&0) as u64;
+    let total_audits = total_passes + total_failures;
 
-    // In case the numbers change in between queries, make sure passes don't exceed total audits
-    let total_passes = std::cmp::min(total_passes, total_audits);
-
-    let total_failures = total_audits - total_passes;
-
-    let audits_per_minute = total_audits
-        .checked_div(period.as_time_delta().num_minutes() as u32)
-        .unwrap_or(0);
+    let audits_per_minute = total_audits / (period.as_time_delta().num_minutes() as u64);
 
     let (pass_percent, fail_percent) = if total_audits == 0 {
         (0.0, 0.0)
@@ -119,12 +118,12 @@ pub async fn get_audit_stats(
 
 pub struct AuditStats {
     pub period: Period,
-    pub total_audits: u32,
-    pub total_passes: u32,
+    pub total_audits: u64,
+    pub total_passes: u64,
     pub pass_percent: f32,
-    pub total_failures: u32,
+    pub total_failures: u64,
     pub fail_percent: f32,
-    pub audits_per_minute: u32,
+    pub audits_per_minute: u64,
 }
 
 pub enum Period {
@@ -194,7 +193,7 @@ pub enum SuccessFilter {
 #[derive(Deserialize, Copy, Clone)]
 pub enum ContentTypeFilter {
     All,
-    HeadersByNumber,
+    HeadersByNumber, // TODO(milos): remove
     Bodies,
     Receipts,
 }
