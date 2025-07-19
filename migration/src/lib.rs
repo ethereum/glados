@@ -13,23 +13,16 @@ mod m20230511_104838_create_execution_metadata;
 mod m20230511_104937_create_key_value;
 mod m20230599_999999_create_census_tables;
 mod m20231107_004843_create_audit_stats;
-mod m20240213_190221_add_fourfours_stats;
 mod m20240322_205213_add_content_audit_index;
-mod m20240515_064320_state_roots;
 mod m20240720_111606_create_census_index;
 mod m20240814_121507_census_subnetwork;
 mod m20240919_121611_census_subnetwork_index;
 mod m20241010_151313_audit_stats_performance;
-mod m20241206_154045_add_beacon_and_state_audit_stats;
 mod m20250130_042751_create_audit_internal_failures;
 mod m20250311_115816_create_blocks;
 mod m20250311_121724_create_audit_result_latest;
-mod m20250314_144135_add_history_headers_by_number_audit_stats;
-mod m20250317_183352_refactor_history_audit_stats;
 mod m20250404_202958_internal_failures_replace_node_with_record;
 mod m20250404_220628_add_client_info_to_census_node;
-mod m20250713_130007_remove_state;
-mod m20250713_191500_remove_beacon_audit_stats;
 
 pub struct Migrator;
 
@@ -46,23 +39,16 @@ impl MigratorTrait for Migrator {
             Box::new(m20230511_104937_create_key_value::Migration),
             Box::new(m20230599_999999_create_census_tables::Migration),
             Box::new(m20231107_004843_create_audit_stats::Migration),
-            Box::new(m20240213_190221_add_fourfours_stats::Migration),
             Box::new(m20240322_205213_add_content_audit_index::Migration),
-            Box::new(m20240515_064320_state_roots::Migration),
             Box::new(m20240720_111606_create_census_index::Migration),
             Box::new(m20240814_121507_census_subnetwork::Migration),
             Box::new(m20240919_121611_census_subnetwork_index::Migration),
             Box::new(m20241010_151313_audit_stats_performance::Migration),
-            Box::new(m20241206_154045_add_beacon_and_state_audit_stats::Migration),
             Box::new(m20250130_042751_create_audit_internal_failures::Migration),
             Box::new(m20250311_115816_create_blocks::Migration),
             Box::new(m20250311_121724_create_audit_result_latest::Migration),
-            Box::new(m20250314_144135_add_history_headers_by_number_audit_stats::Migration),
-            Box::new(m20250317_183352_refactor_history_audit_stats::Migration),
             Box::new(m20250404_202958_internal_failures_replace_node_with_record::Migration),
             Box::new(m20250404_220628_add_client_info_to_census_node::Migration),
-            Box::new(m20250713_130007_remove_state::Migration),
-            Box::new(m20250713_191500_remove_beacon_audit_stats::Migration),
         ]
     }
 }

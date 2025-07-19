@@ -49,12 +49,11 @@ use entity::{
     census_node::{Client, OperatingSystem, Version},
     client_info, content,
     content::SubProtocol,
-    content_audit::{self, AuditResult},
-    execution_metadata, key_value, node, record,
+    content_audit, execution_metadata, key_value, node, record,
 };
 use glados_core::stats::{
-    filter_audits, get_audit_stats, get_new_content_count, AuditFilters, ContentTypeFilter, Period,
-    StrategyFilter, SuccessFilter,
+    filter_audits, get_audit_stats, AuditFilters, ContentTypeFilter, Period, StrategyFilter,
+    SuccessFilter,
 };
 use migration::{Alias, Order};
 
@@ -89,12 +88,11 @@ pub async fn network_overview(
     let radius_percentages = generate_radius_graph_data(&state, subprotocol).await;
 
     let strategy: StrategyFilter = match subprotocol {
-        SubProtocol::History => StrategyFilter::FourFours,
+        SubProtocol::History => StrategyFilter::Sync,
     };
 
     // Run queries for content dashboard data concurrently
-    let (hour_new, hour_stats, day_new, day_stats, week_new, week_stats) = tokio::join!(
-        get_new_content_count(subprotocol, Period::Hour, &state.database_connection,),
+    let (hour_stats, day_stats, week_stats) = tokio::join!(
         get_audit_stats(
             filter_audits(AuditFilters {
                 strategy,
@@ -105,7 +103,6 @@ pub async fn network_overview(
             Period::Hour,
             &state.database_connection,
         ),
-        get_new_content_count(subprotocol, Period::Day, &state.database_connection,),
         get_audit_stats(
             filter_audits(AuditFilters {
                 strategy,
@@ -116,7 +113,6 @@ pub async fn network_overview(
             Period::Day,
             &state.database_connection,
         ),
-        get_new_content_count(subprotocol, Period::Week, &state.database_connection,),
         get_audit_stats(
             filter_audits(AuditFilters {
                 strategy,
@@ -128,21 +124,13 @@ pub async fn network_overview(
             &state.database_connection,
         ),
     );
-    // Get results from queries
-    let hour_new = hour_new.unwrap();
-    let hour_stats = hour_stats.unwrap();
-    let day_new = day_new.unwrap();
-    let day_stats = day_stats.unwrap();
-    let week_new = week_new.unwrap();
-    let week_stats = week_stats.unwrap();
 
     let template = IndexTemplate {
         subprotocol,
         strategy,
         client_diversity_data,
         average_radius_chart: radius_percentages,
-        stats: [hour_stats, day_stats, week_stats],
-        new_content: [hour_new, day_new, week_new],
+        stats: [hour_stats.unwrap(), day_stats.unwrap(), week_stats.unwrap()],
         content_types: ContentType::iter().collect(),
     };
     HtmlTemplate(template)
@@ -260,102 +248,6 @@ pub async fn enr_detail(
         key_value_list,
     };
     Ok(HtmlTemplate(template))
-}
-
-pub async fn get_recent_audits(
-    num_audits: u64,
-    conn: &DatabaseConnection,
-) -> Result<Vec<AuditTuple>, StatusCode> {
-    let recent_audits: Vec<content_audit::Model> = content_audit::Entity::find()
-        .order_by_desc(content_audit::Column::CreatedAt)
-        .limit(num_audits)
-        .all(conn)
-        .await
-        .map_err(|e| {
-            error!(key.count=num_audits, err=?e, "Could not look up recent audits");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    get_audit_tuples_from_audit_models(recent_audits, conn).await
-}
-
-pub async fn get_audits_for_recent_content(
-    num_content: u64,
-    conn: &DatabaseConnection,
-) -> Result<Vec<AuditTuple>, StatusCode> {
-    // Get recent content that has been audited along with the audit.
-    // Done in a single query and then split using unzip.
-    let (recent_content, audits): (Vec<content::Model>, Vec<content_audit::Model>) =
-        content::Entity::find()
-            .order_by_desc(content::Column::FirstAvailableAt)
-            .find_with_related(content_audit::Entity)
-            .filter(content_audit::Column::Result.is_not_null())
-            .limit(num_content)
-            .all(conn)
-            .await
-            .map_err(|e| {
-                error!(key.count=num_content, err=?e, "Could not look up latest keys with audits");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?
-            .into_iter()
-            .filter_map(|(content, audits)| audits.into_iter().next().map(|audit| (content, audit)))
-            .unzip();
-
-    let client_info = audits
-        .load_one(client_info::Entity, conn)
-        .await
-        .map_err(|e| {
-            error!(key.count=audits.len(), err=?e, "Could not look up client info for recent audits");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    let audit_tuples: Vec<AuditTuple> = itertools::izip!(audits, recent_content, client_info)
-        .filter_map(|(audit, con, info)| {
-            if let (c, Some(i)) = (con, info) {
-                Some((audit, c, i))
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    Ok(audit_tuples)
-}
-
-pub async fn get_recent_audit_successes(
-    num_audits: u64,
-    conn: &DatabaseConnection,
-) -> Result<Vec<AuditTuple>, StatusCode> {
-    let recent_audits: Vec<content_audit::Model> = content_audit::Entity::find()
-        .order_by_desc(content_audit::Column::CreatedAt)
-        .filter(content_audit::Column::Result.eq(AuditResult::Success))
-        .limit(num_audits)
-        .all(conn)
-        .await
-        .map_err(|e| {
-            error!(key.count=num_audits, err=?e, "Could not look up recent audit successes");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    get_audit_tuples_from_audit_models(recent_audits, conn).await
-}
-
-pub async fn get_recent_audit_failures(
-    num_audits: u64,
-    conn: &DatabaseConnection,
-) -> Result<Vec<AuditTuple>, StatusCode> {
-    let recent_audits: Vec<content_audit::Model> = content_audit::Entity::find()
-        .order_by_desc(content_audit::Column::CreatedAt)
-        .filter(content_audit::Column::Result.eq(AuditResult::Failure))
-        .limit(num_audits)
-        .all(conn)
-        .await
-        .map_err(|e| {
-            error!(key.count=num_audits, err=?e, "Could not look up recent audit failures");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    get_audit_tuples_from_audit_models(recent_audits, conn).await
 }
 
 pub async fn get_audit_tuples_from_audit_models(

@@ -2,6 +2,7 @@
 
 use sea_orm::entity::prelude::*;
 
+// TODO(milos): remove?
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "block")]
 pub struct Model {

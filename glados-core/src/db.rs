@@ -16,6 +16,7 @@ use tracing::{debug, error};
 /// header, body and receipts tables.
 ///
 /// Errors are logged.
+/// TODO(milos): remove
 pub async fn store_block_keys(
     block_number: i32,
     block_hash: &[u8; 32],

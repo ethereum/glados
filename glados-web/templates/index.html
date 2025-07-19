@@ -24,8 +24,8 @@
                     <button class="question-mark" aria-label="Toggle explanation"></button>
                     <div class="explanation">
                     {% match strategy %}
-                        {% when StrategyFilter::FourFours %}
-                            Glados continuously queries the Portal network for random 4444s headers, blocks, and receipts.
+                        {% when StrategyFilter::Sync %}
+                            Glados continuously queries the Portal network for pre-merge bodies and receipts.
                             Statistical results of these audits are displayed here and can be viewed in more granular detail on the Audit Dashboard.
                         {% else %}
                             No explanation available for {{ strategy }}
@@ -38,7 +38,6 @@
                             <thead>
                                 <tr>
                                     <th scope="col">Period</th>
-                                    <th scope="col">New content</th>
                                     <th scope="col">Total audits</th>
                                     <th scope="col">Total audit passes</th>
                                     <th scope="col">Total audit failures</th>
@@ -51,7 +50,6 @@
                                 {% for stat in stats %}
                                 <tr>
                                     <th scope="row">{{ stat.period.to_string() }}</th>
-                                    <td>{{ new_content[loop.index0] }}</td>
                                     <td>{{ stat.total_audits }}</td>
                                     <td>{{ stat.total_passes }}</td>
                                     <td>{{ stat.total_failures }}</td>

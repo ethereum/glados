@@ -1,9 +1,12 @@
 use std::str::FromStr;
 
-use clap::{ArgAction, Parser, Subcommand, ValueEnum};
+use clap::{ArgAction, Parser, ValueEnum};
 use entity::content_audit::{HistorySelectionStrategy, SelectionStrategy};
 
 const DEFAULT_STATS_PERIOD: &str = "300";
+
+/// The first post-merge block number.
+const MAINNET_MERGE_BLOCK_HEIGHT: u64 = 15537394;
 
 #[derive(Parser, Debug, Eq, PartialEq)]
 #[command(author, version, about, long_about = None)]
@@ -11,8 +14,15 @@ pub struct Args {
     #[arg(short, long)]
     pub database_url: String,
 
-    #[arg(short, long, default_value = "4", help = "number of auditing threads")]
-    pub concurrency: u8,
+    #[arg(long, default_value = "4", help = "The number of auditing threads")]
+    pub concurrency: usize,
+
+    #[arg(
+        long,
+        default_value = "100",
+        help = "The maximum number of audits per second."
+    )]
+    pub max_audit_rate: usize,
 
     #[arg(
         long,
@@ -21,20 +31,37 @@ pub struct Args {
     )]
     pub strategy: Vec<StrategyWithWeight>,
 
+    #[arg(
+        long,
+        default_value_t = 0,
+        help = "Specifies the start of the block range that should be used for audit. This applies to following strategies: sync, random."
+    )]
+    pub start_block: u64,
+
+    #[arg(
+        long,
+        default_value_t = MAINNET_MERGE_BLOCK_HEIGHT - 1,
+        help = "Specifies the end of the block range that should be used for audit. This applies to following strategies: sync, random."
+    )]
+    pub end_block: u64,
+
     #[arg(long, default_value = DEFAULT_STATS_PERIOD, help = "stats recording period (seconds)")]
     pub stats_recording_period: u64,
 
     #[arg(long, action(ArgAction::Append))]
     pub portal_client: Vec<String>,
-
-    #[command(subcommand)]
-    pub subcommand: Option<Command>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct StrategyWithWeight {
     pub strategy: SelectionStrategy,
     pub weight: u8,
+}
+
+impl StrategyWithWeight {
+    pub fn as_tuple(&self) -> (SelectionStrategy, u8) {
+        (self.strategy.clone(), self.weight)
+    }
 }
 
 impl FromStr for StrategyWithWeight {
@@ -69,16 +96,6 @@ impl FromStr for StrategyWithWeight {
     }
 }
 
-#[derive(Subcommand, Debug, Eq, PartialEq, Clone)]
-pub enum Command {
-    /// Run a single audit for a specific, previously audited content key.
-    Audit {
-        content_key: String,
-        portal_client: String,
-        database_url: String,
-    },
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -90,10 +107,12 @@ mod test {
             Self {
                 database_url: "".to_string(),
                 concurrency: 4,
+                max_audit_rate: 100,
                 strategy: vec![],
-                portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
-                subcommand: None,
+                start_block: 0,
+                end_block: MAINNET_MERGE_BLOCK_HEIGHT - 1,
                 stats_recording_period: 300,
+                portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
             }
         }
     }

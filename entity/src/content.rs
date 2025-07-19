@@ -25,6 +25,7 @@ impl SubProtocol {
     }
 }
 
+// TODO(milos): remove first_available_at and add content type
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "content")]
 pub struct Model {

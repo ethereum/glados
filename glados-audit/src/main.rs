@@ -1,73 +1,38 @@
 use anyhow::Result;
 use clap::Parser;
 use glados_audit::stats::periodically_record_stats;
-use sea_orm::Database;
-use tokio::time::Duration;
 use tracing::{debug, info};
 
-use glados_audit::cli::{Args, Command};
-use glados_audit::{run_glados_audit, run_glados_command, AuditConfig};
+use glados_audit::cli::Args;
+use glados_audit::{config::AuditConfig, run_glados_audit};
 use migration::{Migrator, MigratorTrait};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Setup logging
     env_logger::init();
-    let args = Args::parse();
-    info!("Starting glados-audit");
 
-    //
-    // CLI argument parsing
-    //
     debug!("Parsing CLI arguments");
+    let args = Args::parse();
 
-    match args.subcommand {
-        Some(command) => run_command(command).await?,
-        None => run_audit(args).await?,
-    }
-    Ok(())
-}
-
-async fn run_command(command: Command) -> Result<()> {
-    //
-    // Database Connection
-    //
-    let database_url = match &command {
-        Command::Audit { database_url, .. } => database_url,
-    };
-    debug!(database_url = database_url, "Connecting to database");
-
-    let conn = Database::connect(database_url).await?;
-    info!(
-        database_url = database_url,
-        "database connection established"
-    );
-
-    Migrator::up(&conn, None).await?;
-    run_glados_command(conn, command).await
+    info!("Starting glados-audit");
+    run_audit(args).await
 }
 
 async fn run_audit(args: Args) -> Result<()> {
-    //
-    // Database Connection
-    //
     let config = AuditConfig::from_args(args).await?;
-    debug!(
-        database_url = &config.database_url,
-        "Connecting to database"
-    );
 
-    let conn = Database::connect(&config.database_url).await?;
-    info!(
-        database_url = &config.database_url,
-        "database connection established"
-    );
+    Migrator::up(&config.database_connection, None).await?;
 
-    Migrator::up(&conn, None).await?;
-    tokio::spawn(periodically_record_stats(
-        Duration::from_secs(config.stats_recording_period),
-        conn.clone(),
-    ));
-    run_glados_audit(conn, config).await;
-    Ok(())
+    tokio::spawn(periodically_record_stats(config.clone()));
+
+    run_glados_audit(config).await;
+
+    debug!("setting up CTRL+C listener");
+    tokio::signal::ctrl_c()
+        .await
+        .expect("failed to pause until ctrl-c");
+
+    info!("got CTRL+C. shutting down...");
+    std::process::exit(0);
 }

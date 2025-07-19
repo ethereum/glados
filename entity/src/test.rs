@@ -87,19 +87,12 @@ async fn test_node_crud() -> Result<(), DbErr> {
 
 #[tokio::test]
 async fn crud_record() -> Result<(), DbErr> {
-    use enr::{k256, Enr};
-    use rand::thread_rng;
+    use enr::{CombinedKey, Enr};
     use std::net::Ipv4Addr;
 
-    // generate a random secp256k1 key
-    let mut rng = thread_rng();
-    let key = k256::ecdsa::SigningKey::random(&mut rng);
-
+    let key = CombinedKey::generate_secp256k1();
     let ip = Ipv4Addr::new(192, 168, 0, 1);
-    let enr = {
-        let mut builder = Enr::builder();
-        builder.ip4(ip).tcp4(8000).build(&key).unwrap()
-    };
+    let enr = Enr::builder().ip4(ip).tcp4(8000).build(&key).unwrap();
 
     assert_eq!(enr.ip4(), Some("192.168.0.1".parse().unwrap()));
     assert_eq!(enr.id(), Some("v4".into()));

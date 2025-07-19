@@ -13,51 +13,29 @@ use sea_orm::{
 };
 use sea_query::{ArrayType, Nullable, SeaRc, ValueType, ValueTypeErr};
 
-#[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum AuditResult {
     Failure = 0,
     Success = 1,
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq, EnumIter, DeriveActiveEnum, ValueEnum)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, EnumIter, DeriveActiveEnum, ValueEnum)]
 #[clap(rename_all = "snake_case")]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 /// Each strategy is responsible for selecting which content key(s) to begin audits for.
 pub enum HistorySelectionStrategy {
-    /// Content that is:
-    /// 1. Not yet audited
-    /// 2. Sorted by date entered into glados database (newest first).
-    Latest = 0,
-    /// Randomly selected content.
+    /// Starts from genesis and goes up to the latest available block.
+    Sync = 0,
+    /// Selects random available block for audit.
     Random = 1,
-    /// Content that looks for failed audits and checks whether the data is still missing.
-    /// 1. Key was audited previously
-    /// 2. Latest audit for the key failed (data absent)
-    /// 3. Keys sorted by date audited (keys with oldest failed audit first)
-    Failed = 2,
-    /// Content that is:
-    /// 1. Not yet audited.
-    /// 2. Sorted by date entered into glados database (oldest first).
-    SelectOldestUnaudited = 3,
-    /// Perform a single audit for a previously audited content key.
-    SpecificContentKey = 4,
-    /// Perform audits of random fourfours data.
-    FourFours = 5,
-    /// Fetches content in order, from genesis, up to the latest available block.
-    Sync = 6,
 }
 
 impl From<i32> for HistorySelectionStrategy {
     fn from(value: i32) -> Self {
         match value {
-            0 => HistorySelectionStrategy::Latest,
+            0 => HistorySelectionStrategy::Sync,
             1 => HistorySelectionStrategy::Random,
-            2 => HistorySelectionStrategy::Failed,
-            3 => HistorySelectionStrategy::SelectOldestUnaudited,
-            4 => HistorySelectionStrategy::SpecificContentKey,
-            5 => HistorySelectionStrategy::FourFours,
-            6 => HistorySelectionStrategy::Sync,
             _ => panic!("Invalid value for HistorySelectionStrategy"),
         }
     }
@@ -66,14 +44,9 @@ impl From<i32> for HistorySelectionStrategy {
 impl TryFrom<String> for HistorySelectionStrategy {
     type Error = anyhow::Error;
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.as_str() {
-            "Latest" => Ok(HistorySelectionStrategy::Latest),
-            "Random" => Ok(HistorySelectionStrategy::Random),
-            "Failed" => Ok(HistorySelectionStrategy::Failed),
-            "SelectOldestUnaudited" => Ok(HistorySelectionStrategy::SelectOldestUnaudited),
-            "SpecificContentKey" => Ok(HistorySelectionStrategy::SpecificContentKey),
-            "FourFours" => Ok(HistorySelectionStrategy::FourFours),
-            "Sync" => Ok(HistorySelectionStrategy::Sync),
+        match value.to_lowercase().as_str() {
+            "sync" => Ok(HistorySelectionStrategy::Sync),
+            "random" => Ok(HistorySelectionStrategy::Random),
             _ => bail!("Invalid value for HistorySelectionStrategy {}", value),
         }
     }
@@ -250,13 +223,13 @@ pub async fn create(
     content_key_model_id: i32,
     client_info_id: i32,
     node_id: i32,
-    query_successful: bool,
+    audit_result: bool,
     strategy_used: SelectionStrategy,
     trace_string: String,
     conn: &DatabaseConnection,
 ) -> Result<Model> {
     // If no record exists, create one and return it
-    let audit_result = if query_successful {
+    let audit_result = if audit_result {
         AuditResult::Success
     } else {
         AuditResult::Failure
@@ -366,19 +339,8 @@ impl SelectionStrategy {
     /// Display implementation.
     pub fn as_text(&self) -> String {
         match self {
-            SelectionStrategy::History(HistorySelectionStrategy::Latest) => "Latest".to_string(),
-            SelectionStrategy::History(HistorySelectionStrategy::Random) => "Random".to_string(),
-            SelectionStrategy::History(HistorySelectionStrategy::Failed) => "Failed".to_string(),
-            SelectionStrategy::History(HistorySelectionStrategy::FourFours) => {
-                "FourFours".to_string()
-            }
-            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited) => {
-                "Select Oldest Unaudited".to_string()
-            }
-            SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey) => {
-                "Specific Content Key".to_string()
-            }
             SelectionStrategy::History(HistorySelectionStrategy::Sync) => "Sync".to_string(),
+            SelectionStrategy::History(HistorySelectionStrategy::Random) => "Random".to_string(),
         }
     }
 }
@@ -413,32 +375,12 @@ mod tests {
     #[test]
     fn test_selection_strategy_to_value() {
         assert_eq!(
-            SelectionStrategy::History(HistorySelectionStrategy::Latest).to_value(),
+            SelectionStrategy::History(HistorySelectionStrategy::Sync).to_value(),
             0
         );
         assert_eq!(
             SelectionStrategy::History(HistorySelectionStrategy::Random).to_value(),
             1
-        );
-        assert_eq!(
-            SelectionStrategy::History(HistorySelectionStrategy::Failed).to_value(),
-            2
-        );
-        assert_eq!(
-            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited).to_value(),
-            3
-        );
-        assert_eq!(
-            SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey).to_value(),
-            4
-        );
-        assert_eq!(
-            SelectionStrategy::History(HistorySelectionStrategy::FourFours).to_value(),
-            5
-        );
-        assert_eq!(
-            SelectionStrategy::History(HistorySelectionStrategy::Sync).to_value(),
-            6
         );
     }
 
@@ -446,133 +388,47 @@ mod tests {
     fn test_selection_strategy_try_from_value() {
         assert_eq!(
             SelectionStrategy::try_from_value(&0).unwrap(),
-            SelectionStrategy::History(HistorySelectionStrategy::Latest)
+            SelectionStrategy::History(HistorySelectionStrategy::Sync)
         );
         assert_eq!(
             SelectionStrategy::try_from_value(&1).unwrap(),
             SelectionStrategy::History(HistorySelectionStrategy::Random)
-        );
-        assert_eq!(
-            SelectionStrategy::try_from_value(&2).unwrap(),
-            SelectionStrategy::History(HistorySelectionStrategy::Failed)
-        );
-        assert_eq!(
-            SelectionStrategy::try_from_value(&3).unwrap(),
-            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited)
-        );
-        assert_eq!(
-            SelectionStrategy::try_from_value(&4).unwrap(),
-            SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey)
-        );
-        assert_eq!(
-            SelectionStrategy::try_from_value(&5).unwrap(),
-            SelectionStrategy::History(HistorySelectionStrategy::FourFours)
-        );
-        assert_eq!(
-            SelectionStrategy::try_from_value(&6).unwrap(),
-            SelectionStrategy::History(HistorySelectionStrategy::Sync)
         );
     }
 
     #[test]
     fn test_selection_strategy_as_text() {
         assert_eq!(
-            SelectionStrategy::History(HistorySelectionStrategy::Latest).as_text(),
-            "Latest"
+            SelectionStrategy::History(HistorySelectionStrategy::Sync).as_text(),
+            "Sync"
         );
         assert_eq!(
             SelectionStrategy::History(HistorySelectionStrategy::Random).as_text(),
             "Random"
-        );
-        assert_eq!(
-            SelectionStrategy::History(HistorySelectionStrategy::Failed).as_text(),
-            "Failed"
-        );
-        assert_eq!(
-            SelectionStrategy::History(HistorySelectionStrategy::SelectOldestUnaudited).as_text(),
-            "Select Oldest Unaudited"
-        );
-        assert_eq!(
-            SelectionStrategy::History(HistorySelectionStrategy::SpecificContentKey).as_text(),
-            "Specific Content Key"
-        );
-        assert_eq!(
-            SelectionStrategy::History(HistorySelectionStrategy::FourFours).as_text(),
-            "FourFours"
-        );
-        assert_eq!(
-            SelectionStrategy::History(HistorySelectionStrategy::Sync).as_text(),
-            "Sync"
         );
     }
 
     #[test]
     fn test_selection_strategy_from_text() {
         assert_eq!(
-            HistorySelectionStrategy::try_from("Latest".to_string()).unwrap(),
-            HistorySelectionStrategy::Latest,
+            HistorySelectionStrategy::try_from("Sync".to_string()).unwrap(),
+            HistorySelectionStrategy::Sync,
         );
         assert_eq!(
             HistorySelectionStrategy::try_from("Random".to_string()).unwrap(),
             HistorySelectionStrategy::Random,
-        );
-        assert_eq!(
-            HistorySelectionStrategy::try_from("Failed".to_string()).unwrap(),
-            HistorySelectionStrategy::Failed
-        );
-        assert_eq!(
-            HistorySelectionStrategy::try_from("SelectOldestUnaudited".to_string()).unwrap(),
-            HistorySelectionStrategy::SelectOldestUnaudited
-        );
-        assert_eq!(
-            HistorySelectionStrategy::try_from("SpecificContentKey".to_string()).unwrap(),
-            HistorySelectionStrategy::SpecificContentKey
-        );
-        assert_eq!(
-            HistorySelectionStrategy::try_from("FourFours".to_string()).unwrap(),
-            HistorySelectionStrategy::FourFours
-        );
-        assert_eq!(
-            HistorySelectionStrategy::try_from("Sync".to_string()).unwrap(),
-            HistorySelectionStrategy::Sync
         );
     }
 
     #[test]
     fn test_from_selection_strategy_to_value() {
         assert_eq!(
-            Value::from(SelectionStrategy::History(HistorySelectionStrategy::Latest)),
+            Value::from(SelectionStrategy::History(HistorySelectionStrategy::Sync)),
             Value::Int(Some(0))
         );
         assert_eq!(
             Value::from(SelectionStrategy::History(HistorySelectionStrategy::Random)),
             Value::Int(Some(1))
-        );
-        assert_eq!(
-            Value::from(SelectionStrategy::History(HistorySelectionStrategy::Failed)),
-            Value::Int(Some(2))
-        );
-        assert_eq!(
-            Value::from(SelectionStrategy::History(
-                HistorySelectionStrategy::SelectOldestUnaudited
-            )),
-            Value::Int(Some(3))
-        );
-        assert_eq!(
-            Value::from(SelectionStrategy::History(
-                HistorySelectionStrategy::SpecificContentKey
-            )),
-            Value::Int(Some(4))
-        );
-        assert_eq!(
-            Value::from(SelectionStrategy::History(
-                HistorySelectionStrategy::FourFours
-            )),
-            Value::Int(Some(5))
-        );
-        assert_eq!(
-            Value::from(SelectionStrategy::History(HistorySelectionStrategy::Sync)),
-            Value::Int(Some(6))
         );
     }
 }

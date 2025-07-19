@@ -22,69 +22,48 @@ impl MigrationTrait for Migration {
                             .timestamp_with_time_zone()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(AuditStats::NumAudits).integer().not_null())
                     .col(
-                        ColumnDef::new(AuditStats::SuccessRateAll)
+                        ColumnDef::new(AuditStats::SuccessRateHistoryAll)
                             .float()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(AuditStats::SuccessRateLatest)
+                        ColumnDef::new(AuditStats::SuccessRateHistorySync)
                             .float()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(AuditStats::SuccessRateRandom)
+                        ColumnDef::new(AuditStats::SuccessRateHistoryRandom)
                             .float()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(AuditStats::SuccessRateOldest)
+                        ColumnDef::new(AuditStats::SuccessRateHistoryAllBodies)
                             .float()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(AuditStats::SuccessRateAllHeaders)
+                        ColumnDef::new(AuditStats::SuccessRateHistoryAllReceipts)
                             .float()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(AuditStats::SuccessRateAllBodies)
+                        ColumnDef::new(AuditStats::SuccessRateHistorySyncBodies)
                             .float()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(AuditStats::SuccessRateAllReceipts)
+                        ColumnDef::new(AuditStats::SuccessRateHistorySyncReceipts)
                             .float()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(AuditStats::SuccessRateLatestHeaders)
+                        ColumnDef::new(AuditStats::SuccessRateHistoryRandomBodies)
                             .float()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(AuditStats::SuccessRateLatestBodies)
-                            .float()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(AuditStats::SuccessRateLatestReceipts)
-                            .float()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(AuditStats::SuccessRateRandomHeaders)
-                            .float()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(AuditStats::SuccessRateRandomBodies)
-                            .float()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(AuditStats::SuccessRateRandomReceipts)
+                        ColumnDef::new(AuditStats::SuccessRateHistoryRandomReceipts)
                             .float()
                             .not_null(),
                     )
@@ -114,18 +93,13 @@ pub enum AuditStats {
     Table,
     Id,
     Timestamp,
-    NumAudits,
-    SuccessRateAll,
-    SuccessRateLatest,
-    SuccessRateRandom,
-    SuccessRateOldest,
-    SuccessRateAllHeaders,
-    SuccessRateAllBodies,
-    SuccessRateAllReceipts,
-    SuccessRateLatestHeaders,
-    SuccessRateLatestBodies,
-    SuccessRateLatestReceipts,
-    SuccessRateRandomHeaders,
-    SuccessRateRandomBodies,
-    SuccessRateRandomReceipts,
+    SuccessRateHistoryAll,
+    SuccessRateHistorySync,
+    SuccessRateHistoryRandom,
+    SuccessRateHistoryAllBodies,
+    SuccessRateHistoryAllReceipts,
+    SuccessRateHistorySyncBodies,
+    SuccessRateHistorySyncReceipts,
+    SuccessRateHistoryRandomBodies,
+    SuccessRateHistoryRandomReceipts,
 }
