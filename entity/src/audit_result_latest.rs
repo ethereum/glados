@@ -31,8 +31,6 @@ pub enum ContentType {
     BlockBodies = 1,
     #[strum(message = "Block receipts")]
     BlockReceipts = 2,
-    #[strum(message = "Block headers by number")]
-    BlockHeadersByNumber = 3,
 }
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]

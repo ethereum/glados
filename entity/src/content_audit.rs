@@ -27,7 +27,7 @@ pub enum AuditResult {
 pub enum HistorySelectionStrategy {
     /// Starts from genesis and goes up to the latest available block.
     Sync = 0,
-    /// Randomly random valid block and does audit.
+    /// Selects random available block for audit.
     Random = 1,
 }
 

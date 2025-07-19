@@ -56,9 +56,6 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
     // TODO(milos): Update to new content keys
     match filters.content_type {
         ContentTypeFilter::All => audits,
-        ContentTypeFilter::HeadersByNumber => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x03").into_condition())
-        }
         ContentTypeFilter::Bodies => {
             audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x03").into_condition())
         }
@@ -193,7 +190,6 @@ pub enum SuccessFilter {
 #[derive(Deserialize, Copy, Clone)]
 pub enum ContentTypeFilter {
     All,
-    HeadersByNumber, // TODO(milos): remove
     Bodies,
     Receipts,
 }
