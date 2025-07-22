@@ -7,9 +7,9 @@ use enr::NodeId;
 use ethportal_api::utils::bytes::hex_encode;
 
 use sea_orm::{
-    entity::prelude::*, ActiveValue::NotSet, FromQueryResult, QueryOrder, QuerySelect, Set,
+    entity::prelude::*, sea_query::Expr, ActiveValue::NotSet, FromQueryResult, QueryOrder,
+    QuerySelect, Set,
 };
-use sea_query::Expr;
 
 use lazy_static::lazy_static;
 

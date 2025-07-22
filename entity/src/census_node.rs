@@ -3,15 +3,13 @@ use alloy_primitives::U256;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use sea_orm::{
-    entity::prelude::*,
-    strum::{Display, EnumProperty},
-    ActiveValue::NotSet,
-    ColIdx, QueryResult, Set, TryGetError, TryGetable,
+    entity::prelude::*, ActiveValue::NotSet, ColIdx, QueryResult, Set, TryGetError, TryGetable,
 };
 use serde::{
     ser::{Serialize as SerializeTrait, SerializeStruct, Serializer},
     Deserialize, Serialize,
 };
+use strum::{Display, EnumProperty};
 
 use crate::content::SubProtocol;
 use ethportal_api::types::ping_extensions::extensions::type_0::ClientInfo;

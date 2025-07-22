@@ -3,12 +3,6 @@ use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Response},
 };
-use sea_orm::strum::{EnumMessage, EnumProperty};
-
-use crate::routes::{
-    CalculatedRadiusChartData, ClientDiversityResult, PaginatedCensusListResult, RawEnr,
-    TransferFailure,
-};
 use entity::{
     audit_result_latest::ContentType,
     census_node::{Client, OperatingSystem},
@@ -17,6 +11,12 @@ use entity::{
     content_audit, execution_metadata, key_value, node, record,
 };
 use glados_core::stats::{AuditStats, StrategyFilter};
+use strum::{EnumMessage, EnumProperty};
+
+use crate::routes::{
+    CalculatedRadiusChartData, ClientDiversityResult, PaginatedCensusListResult, RawEnr,
+    TransferFailure,
+};
 
 #[derive(Template)]
 #[template(path = "index.html")]

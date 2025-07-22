@@ -21,10 +21,10 @@ lazy_static = "1.4.0"
 migration.workspace = true
 pgtemp.workspace = true
 rand.workspace = true
-sea-orm = { workspace = true, features = ["sqlx-postgres", "macros", "runtime-tokio-native-tls"] }
-sea-query = "0.28.4"
+sea-orm.workspace = true
 serde.workspace = true
-tokio = { workspace = true, features = ["macros"] }
+strum.workspace = true
+tokio.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
