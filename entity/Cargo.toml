@@ -18,7 +18,6 @@ enr.workspace = true
 env_logger.workspace = true
 ethportal-api.workspace = true
 lazy_static = "1.4.0"
-migration.workspace = true
 pgtemp.workspace = true
 rand.workspace = true
 sea-orm.workspace = true
@@ -28,4 +27,5 @@ tokio.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+migration.workspace = true
 rstest.workspace = true
