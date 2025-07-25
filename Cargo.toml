@@ -12,7 +12,6 @@ members = [
     "glados-audit",
     "glados-cartographer",
     "glados-core",
-    "glados-monitor",
     "glados-web",
     "migration",
 ]
@@ -22,7 +21,6 @@ members = [
 [dependencies]
 entity.workspace = true
 glados-core.workspace = true
-glados-monitor.workspace = true
 glados-audit.workspace = true
 glados-web.workspace = true
 migration.workspace = true
@@ -39,7 +37,6 @@ env_logger = "0.10.0"
 ethportal-api = "0.10.1"
 futures = "0.3.31"
 glados-core = { path = "glados-core" }
-glados-monitor = { path = "glados-monitor" }
 glados-audit = { path = "glados-audit" }
 glados-web = { path = "glados-web" }
 migration = { path = "migration" }

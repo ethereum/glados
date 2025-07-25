@@ -41,21 +41,6 @@ jobs:
           command: |
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
             docker push portalnetwork/glados-web:latest
-  docker-build-glados-monitor-and-publish:
-    resource_class: xlarge
-    executor: docker-publisher
-    steps:
-      - non_lfs_checkout
-      - setup_remote_docker
-      - run:
-          name: Build Docker image
-          no_output_timeout: 30m
-          command: docker build -f glados-monitor/Dockerfile -t portalnetwork/glados-monitor:latest --build-arg GIT_HASH=$CIRCLE_SHA1 .
-      - run:
-          name: Publish docker image to Docker Hub
-          command: |
-            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            docker push portalnetwork/glados-monitor:latest
   docker-build-glados-cartographer-and-publish:
     resource_class: xlarge
     executor: docker-publisher
@@ -130,10 +115,6 @@ workflows:
   merge-test:
     jobs:
       - docker-build-glados-web-and-publish:
-          filters:
-            branches:
-              only: master
-      - docker-build-glados-monitor-and-publish:
           filters:
             branches:
               only: master
