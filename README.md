@@ -2,14 +2,12 @@
 
 Network health monitoring tool for the Portal Network
 
-
 ## Project Overview
 
 The project is split up into a few different crates.
 
 - `glados-core`: Contains shared code that is shared by the other crates.
 - `glados-web`: The web application that serves the HTML dashboard
-- `glados-monitor`: The long running system processes that pull in chain data and audit the portal network.
 
 ### Technology Choices
 
@@ -25,8 +23,6 @@ For our database, we use Postgres in both development and production.
 ### Architecture
 
 The rough shape of Glados is as follows:
-
-The `glados-monitor` crate implements a long running process which continually follows the tip of the chain, and computes the ContentID/ContentKey values for new content as new blocks are added to the canonical chain.  These values are inserted into a relational database.
 
 The `glados-audit` process then queries the database for content that it will then "audit" to determine whether the content can be successfully retrieved from the network.  The audit process will use the Portal Network JSON-RPC api to query the portal network for the given content and then record in the database whether the content could be successfully retrieved.  The database is structured such that a piece of content can be audited many times, giving a historical view over the lifetime of the content showing times when it was or was not available.
 
@@ -49,20 +45,7 @@ Glados needs a postgres database to use. To run a postgres instance locally usin
 
 This postgres instance can be accessed via `postgres://postgres:password@localhost:5432/glados`. This value will be referred to as the `DATABASE_URL`.
 
-In most cases, you will want to set the environment variable `RUST_LOG` to enable some level of `debug` level logs.  `RUST_LOG=glados_monitor=debug` is a good way to only enable the debug logs for a specific crate/namespace.
-
-### Running `glados-monitor`
-
-The `glados-monitor` crate can be run as follows to populate a local database with content ids.
-
-The CLI needs a DATABASE_URL to know what relational database to connect to, as well as an HTTP_PROVIDER_URI to connect to an Ethereum JSON-RPC provider (not a portal node).
-
-```
-$ cargo run -p glados-monitor -- --database-url <DATABASE_URL> follow-head --provider-url <HTTP_PROVIDER_URI>
-```
-For example, if an Ethereum execution client is running on localhost port 8545:
-```
-$ cargo run -p glados-monitor -- --database-url  follow-head --provider-url http://127.0.0.1:8545
+In most cases, you will want to set the environment variable `RUST_LOG` to enable some level of `debug` level logs.  `RUST_LOG=glados_audit=debug` is a good way to only enable the debug logs for a specific crate/namespace.
 ```
 
 ### Running `glados-web`

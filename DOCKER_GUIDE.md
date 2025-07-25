@@ -22,10 +22,6 @@ Then, from the root of this repo, run:
 
 `docker compose up -d`
 
-Finally, seed the `block` table with pre-merge blocks
-
-`docker compose run --rm glados_monitor --database-url postgres://postgres:$GLADOS_POSTGRES_PASSWORD@glados_postgres:5432/glados seed --table-name block`
-
 If successful, you should be able to navigate to `127.0.0.1:3001/` and see
 the Glados web dashboard populating with data.
 

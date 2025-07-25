@@ -34,10 +34,9 @@ Descriptions of the databases used in glados
     - The main function of glados.
     - Consists of a content key, a pass/fail and a timestamp.
     - Steps:
-        1. Record what the portal network should have (`glados-monitor`)
-        2. Pick something (a content key), and check the portal network for it (`glados-audit`)
-        3. Record a pass/fail and timestamp for that thing.
-        4. Display that (`glados-web`), e.g., the content key "`x`" (which may represent "block `y`
+        1. Pick something (a content key), and check the portal network for it (`glados-audit`)
+        2. Record a pass/fail and timestamp for that thing.
+        3. Display that (`glados-web`), e.g., the content key "`x`" (which may represent "block `y`
         receipts") was not present in the portal network at timestamp `z`.
 
 ## Definitions

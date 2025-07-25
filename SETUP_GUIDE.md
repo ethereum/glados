@@ -7,7 +7,6 @@ This example uses the following:
 - "`machine-a`" (headless Ubuntu)
     - Locally running Ethereum execution client
     - `trin`
-    - `glados-monitor`
     - `glados-audit`
     - `glados-web`
 - "`machine-b`" (with display)
@@ -19,20 +18,7 @@ Start trin (see [docs](https://ethereum.github.io/trin/developers/quick_setup.ht
 ```command
 ~/trin$ RUST_LOG=debug cargo run -p trin -- --web3-transport http
 ```
-Start `glados-monitor`, which uses chain data from the execution node and stores that in the
-glados database. For an empty database file, the `--migration` flag triggers
-database table creation.
-```command
-~/glados$ RUST_LOG=glados_monitor=debug cargo run -p glados-monitor -- \
-    --migrate \
-    --database-url postgres://<user>:<password>@localhost:5432/<database> \
-    follow-head \
-    --provider-url https://mainnet.infura.io/v3/<api-key>
-```
-Seed pre-merge block data to the database, for old blocks a RPC endpoint is not needed.
-```command
-~/glados$ RUST_LOG=glados_monitor=info cargo run -p glados-monitor -- --database-url postgres://<user>:<password>@localhost:5432/<database> seed --table-name block
-```
+
 Start `glados-audit`, which takes monitoring data from the glados database,
 checks if `trin` has it, then records the outcome in the glados database.
 ```command
@@ -41,12 +27,14 @@ checks if `trin` has it, then records the outcome in the glados database.
     --database-url postgres://<user>:<password>@localhost:5432/<database> \
     --strategy random
 ```
+
 Start `glados-web`, which takes audit data from the glados database and serves
 that for viewing.
 ```command
 ~/glados$ RUST_LOG=debug cargo run -p glados-web -- \
     --database-url postgres://<user>:<password>@localhost:5432/<database>
 ```
+
 Start `glados-cartographer`, which takes census of all the nodes on the network
 ```command
 ~/glados$ RUST_LOG=debug cargo run -p glados-cartographer -- \
