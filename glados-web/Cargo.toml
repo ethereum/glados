@@ -12,7 +12,7 @@ authors = ["Piper Merriam <piper@pipermerriam.com>"]
 alloy-primitives.workspace = true
 alloy = "0.15"
 anyhow.workspace = true
-askama = { version = "0.11.1", features = ["serde-json"] }
+askama = { version = "0.14.0", features = ["serde_json"] }
 axum = "0.6.11"
 chrono.workspace = true
 clap.workspace = true
@@ -25,6 +25,7 @@ itertools = "0.10.5"
 migration.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
+strum.workspace = true
 tokio.workspace = true
 tower-http = { version = "0.3.5", features = ["fs"] }
 tracing.workspace = true

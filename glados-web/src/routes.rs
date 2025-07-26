@@ -15,8 +15,7 @@ use axum::{
 use chrono::{DateTime, TimeZone, Utc};
 use clap::ValueEnum;
 use enr::NodeId;
-use entity::audit_internal_failure::TransferFailureType;
-use entity::census_node::client_from_short_name;
+use entity::{client, SelectionStrategy};
 use ethportal_api::{
     jsonrpsee::core::__reexports::serde_json,
     types::{
@@ -27,6 +26,9 @@ use ethportal_api::{
     utils::bytes::{hex_decode, hex_encode},
     HistoryContentKey, OverlayContentKey,
 };
+use sea_orm::prelude::DateTimeUtc;
+use sea_orm::sea_query::Alias;
+use sea_orm::Order;
 use sea_orm::{
     sea_query::{Expr, Query, SimpleExpr},
     ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult,
@@ -44,18 +46,14 @@ use crate::templates::{
 };
 use crate::{state::State, templates::AuditTuple};
 use entity::{
-    audit_result_latest::ContentType,
-    audit_stats, census, census_node,
-    census_node::{Client, OperatingSystem, Version},
-    client_info, content,
-    content::SubProtocol,
-    content_audit, execution_metadata, key_value, node, record,
+    audit, audit_stats, census, census_node,
+    client_info::{Client, OperatingSystem, Version},
+    content, node, node_enr, ContentType, SubProtocol, TransferFailureType,
 };
 use glados_core::stats::{
     filter_audits, get_audit_stats, AuditFilters, ContentTypeFilter, Period, StrategyFilter,
     SuccessFilter,
 };
-use migration::{Alias, Order};
 
 //
 // Routes
@@ -76,18 +74,18 @@ pub async fn network_overview(
     params: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
-    let subprotocol = get_subprotocol_from_params(&params);
+    let sub_protocol = get_subprotocol_from_params(&params);
 
-    let client_diversity_data = match get_max_census_id(&state, subprotocol).await {
+    let client_diversity_data = match get_max_census_id(&state, sub_protocol).await {
         None => vec![],
         Some(max_census_id) => generate_client_diversity_data(&state, max_census_id.id)
             .await
             .unwrap(),
     };
 
-    let radius_percentages = generate_radius_graph_data(&state, subprotocol).await;
+    let radius_percentages = generate_radius_graph_data(&state, sub_protocol).await;
 
-    let strategy: StrategyFilter = match subprotocol {
+    let strategy: StrategyFilter = match sub_protocol {
         SubProtocol::History => StrategyFilter::Sync,
     };
 
@@ -98,7 +96,7 @@ pub async fn network_overview(
                 strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
-                network: subprotocol,
+                sub_protocol,
             },),
             Period::Hour,
             &state.database_connection,
@@ -108,7 +106,7 @@ pub async fn network_overview(
                 strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
-                network: subprotocol,
+                sub_protocol,
             },),
             Period::Day,
             &state.database_connection,
@@ -118,7 +116,7 @@ pub async fn network_overview(
                 strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
-                network: subprotocol,
+                sub_protocol,
             },),
             Period::Week,
             &state.database_connection,
@@ -126,7 +124,7 @@ pub async fn network_overview(
     );
 
     let template = IndexTemplate {
-        subprotocol,
+        subprotocol: sub_protocol,
         strategy,
         client_diversity_data,
         average_radius_chart: radius_percentages,
@@ -165,9 +163,9 @@ pub async fn node_detail(
         })
         .unwrap()
         .unwrap();
-    let enr_list = record::Entity::find()
-        .filter(record::Column::NodeId.eq(node_model.id))
-        .order_by_desc(record::Column::SequenceNumber)
+    let enr_list = node_enr::Entity::find()
+        .filter(node_enr::Column::NodeId.eq(node_model.id))
+        .order_by_desc(node_enr::Column::SequenceNumber)
         .all(&state.database_connection)
         .await
         .map_err(|e| {
@@ -180,24 +178,9 @@ pub async fn node_detail(
 
     let latest_enr = enr_list.first().cloned();
 
-    let latest_enr_key_value_list = match &latest_enr {
-        Some(enr) => Some(
-            key_value::Entity::find()
-                .filter(key_value::Column::RecordId.eq(enr.id))
-                .order_by_asc(key_value::Column::Key)
-                .all(&state.database_connection)
-                .await
-                .map_err(|e| {
-                    error!(enr.id=enr.id, err=?e, "Error looking up key_value pairs");
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?,
-        ),
-        None => None,
-    };
     let template = NodeDetailTemplate {
         node: node_model,
         latest_enr,
-        latest_enr_key_value_list,
         enr_list,
         closest_node_list,
     };
@@ -222,9 +205,9 @@ pub async fn enr_detail(
         })
         .unwrap()
         .unwrap();
-    let enr = record::Entity::find()
-        .filter(record::Column::NodeId.eq(node_model.id.to_owned()))
-        .filter(record::Column::SequenceNumber.eq(enr_seq))
+    let enr = node_enr::Entity::find()
+        .filter(node_enr::Column::NodeId.eq(node_model.id.to_owned()))
+        .filter(node_enr::Column::SequenceNumber.eq(enr_seq))
         .one(&state.database_connection)
         .await
         .map_err(|e| {
@@ -233,25 +216,16 @@ pub async fn enr_detail(
         })
         .unwrap()
         .unwrap();
-    let key_value_list = key_value::Entity::find()
-        .filter(key_value::Column::RecordId.eq(enr.id))
-        .all(&state.database_connection)
-        .await
-        .map_err(|e| {
-            error!(enr.id=enr.id, enr.node_id=node_id_hex, err=?e, "Error looking up key_value pairs");
-            StatusCode::NOT_FOUND
-        })?;
 
     let template = EnrDetailTemplate {
         node: node_model,
         enr,
-        key_value_list,
     };
     Ok(HtmlTemplate(template))
 }
 
 pub async fn get_audit_tuples_from_audit_models(
-    audits: Vec<content_audit::Model>,
+    audits: Vec<audit::Model>,
     conn: &DatabaseConnection,
 ) -> Result<Vec<AuditTuple>, StatusCode> {
     // Get the corresponding content for each audit.
@@ -262,8 +236,8 @@ pub async fn get_audit_tuples_from_audit_models(
         })?;
 
     // Get the corresponding client_info for each audit.
-    let client_info: Vec<Option<client_info::Model>> = audits
-        .load_one(client_info::Entity, conn)
+    let client: Vec<Option<client::Model>> = audits
+        .load_one(client::Entity, conn)
         .await
         .map_err(|e| {
             error!(key.count=audits.len(), err=?e, "Could not look up client info for recent audits");
@@ -272,7 +246,7 @@ pub async fn get_audit_tuples_from_audit_models(
 
     // Zip up the audits with their corresponding content and client info.
     // Filter out the (ideally zero) audits that do not have content or client info.
-    let audit_tuples: Vec<AuditTuple> = itertools::izip!(audits, content, client_info)
+    let audit_tuples: Vec<AuditTuple> = itertools::izip!(audits, content, client)
         .filter_map(|(audit, content, info)| content.map(|c| (audit, c, info.unwrap())))
         .collect();
 
@@ -368,7 +342,7 @@ pub async fn census_explorer() -> Result<HtmlTemplate<CensusExplorerTemplate>, S
 pub async fn hourly_success_rate(
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<f32>, StatusCode> {
-    let open_filter = content_audit::Entity::find();
+    let open_filter = audit::Entity::find();
     let stats = get_audit_stats(open_filter, Period::Hour, &state.database_connection)
         .await
         .map_err(|e| {
@@ -390,7 +364,7 @@ pub async fn contentkey_detail(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    let content_key_model = content::Entity::find()
+    let content_model = content::Entity::find()
         .filter(content::Column::ContentKey.eq(content_key_raw))
         .one(&state.database_connection)
         .await
@@ -403,8 +377,8 @@ pub async fn contentkey_detail(
             StatusCode::NOT_FOUND
         })?;
 
-    let contentaudit_list = content_key_model
-        .find_related(content_audit::Entity)
+    let audit_list = content_model
+        .find_related(audit::Entity)
         .all(&state.database_connection)
         .await
         .map_err(|e| {
@@ -412,35 +386,18 @@ pub async fn contentkey_detail(
             StatusCode::NOT_FOUND
         })?;
 
-    let (content_id, content_kind) =
-        if let Ok(content_key) = HistoryContentKey::try_from_hex(&content_key_hex) {
-            let content_id = hex_encode(content_key.content_id());
-            let content_kind = content_key.to_string();
-            (content_id, content_kind)
-        } else {
-            error!(
-                content.key = content_key_hex,
-                "Could not create key from bytes"
-            );
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        };
-    let metadata_model = execution_metadata::Entity::find()
-        .filter(execution_metadata::Column::Content.eq(content_key_model.id))
-        .one(&state.database_connection)
-        .await
-        .map_err(|e| {
-            error!(content.key=content_key_hex, err=?e, "No content metadata found");
-            StatusCode::NOT_FOUND
-        })?;
-    let block_number = metadata_model.map(|m| m.block_number);
+    let Ok(content_key) = HistoryContentKey::try_from_hex(&content_key_hex) else {
+        error!(
+            content.key = content_key_hex,
+            "Could not create key from bytes"
+        );
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    };
 
     let template = ContentKeyDetailTemplate {
-        content_key: content_key_hex,
-        content_key_model,
-        contentaudit_list,
-        content_id,
-        content_kind,
-        block_number,
+        content: content_model,
+        content_kind: content_key.to_string(),
+        audit_list,
     };
     Ok(HtmlTemplate(template))
 }
@@ -451,7 +408,7 @@ pub async fn contentaudit_detail(
 ) -> Result<HtmlTemplate<ContentAuditDetailTemplate>, StatusCode> {
     let audit_id = audit_id.parse::<i32>().unwrap();
     info!("Audit ID: {}", audit_id);
-    let mut audit = match content_audit::Entity::find_by_id(audit_id)
+    let mut audit = match audit::Entity::find_by_id(audit_id)
         .one(&state.database_connection)
         .await
     {
@@ -463,13 +420,15 @@ pub async fn contentaudit_detail(
         }
     };
 
-    let trace_string = &audit.trace;
-    let mut trace: Option<QueryTrace> = match serde_json::from_str(trace_string) {
-        Ok(trace) => Some(trace),
-        Err(err) => {
-            error!(trace=?trace_string, err=?err, "Failed to deserialize query trace.");
-            None
-        }
+    let mut trace: Option<QueryTrace> = match &audit.trace {
+        Some(trace) => match serde_json::from_str::<QueryTrace>(trace) {
+            Ok(trace) => Some(trace),
+            Err(err) => {
+                error!(trace=?audit.trace, err=?err, "Failed to deserialize query trace.");
+                None
+            }
+        },
+        None => None,
     };
 
     // If we were able to deserialize the trace, we can look up & interpolate the radius for the nodes in the trace.
@@ -550,7 +509,7 @@ pub async fn contentaudit_detail(
         });
         // Update the trace with radius metadata.
         audit.trace =
-            serde_json::to_string(&trace).expect("Failed to serialize updated query trace.");
+            Some(serde_json::to_string(&trace).expect("Failed to serialize updated query trace."));
     }
 
     let content = audit
@@ -560,17 +519,7 @@ pub async fn contentaudit_detail(
         .unwrap()
         .expect("Failed to get audit content key");
 
-    let execution_metadata = content
-        .find_related(execution_metadata::Entity)
-        .one(&state.database_connection)
-        .await
-        .unwrap();
-
-    let template = ContentAuditDetailTemplate {
-        audit,
-        content,
-        execution_metadata,
-    };
+    let template = ContentAuditDetailTemplate { audit, content };
     Ok(HtmlTemplate(template))
 }
 
@@ -592,7 +541,7 @@ pub async fn contentaudit_filter(
         get_audit_stats(audits.clone(), Period::Day, &state.database_connection),
         get_audit_stats(audits.clone(), Period::Week, &state.database_connection),
         audits
-            .order_by_desc(content_audit::Column::CreatedAt)
+            .order_by_desc(audit::Column::CreatedAt)
             .limit(30)
             .all(&state.database_connection),
     );
@@ -704,29 +653,34 @@ pub async fn get_failed_keys_handler(
     http_args: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<Vec<String>>, StatusCode> {
-    let subprotocol = get_subprotocol_from_params(&http_args);
+    let sub_protocol = get_subprotocol_from_params(&http_args);
 
-    let strategy: String = match http_args.get("strategy") {
+    let strategy: &str = match http_args.get("strategy") {
         // Set a default for each subprotocol
-        None => match subprotocol {
-            SubProtocol::History => "FourFours".to_string(),
+        None => match sub_protocol {
+            SubProtocol::History => "Sync",
         },
-        Some(strategy) => strategy.to_string(),
+        Some(strategy) => &strategy.to_string(),
     };
+    let strategy = SelectionStrategy::try_from_str(sub_protocol, strategy).map_err(|err| {
+        error!(?sub_protocol, %strategy, %err, "Unkown strategy");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let page: u32 = match http_args.get("page") {
         None => 1,
         Some(page) => page.parse::<u32>().unwrap_or(1),
     };
 
-    let failed_keys =
-        content_audit::get_failed_keys(subprotocol, strategy, page, &state.database_connection)
-            .await
-            .map_err(|e| {
-                error!(err=?e, "Could not fetch failed keys");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-
+    let failed_keys = audit::get_failed_keys(strategy, page, &state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Could not fetch failed keys");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .into_iter()
+        .map(|failed_key| hex_encode(failed_key.content_key))
+        .collect::<Vec<_>>();
     Ok(Json(failed_keys))
 }
 
@@ -773,7 +727,7 @@ pub async fn census_explorer_list(
         .from(census::Entity)
         .from(census_node::Entity)
         .and_where(
-            Expr::col((census::Entity, census_node::Column::Id)).eq(Expr::col((
+            Expr::col((census::Entity, census::Column::Id)).eq(Expr::col((
                 census_node::Entity,
                 census_node::Column::CensusId,
             ))),
@@ -1036,10 +990,7 @@ pub async fn weekly_census_history(
             WHERE
                 census.sub_network = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census.started_at < NOW() - INTERVAL '1 week' * $1 AND
-                census_node.sub_network = $2 AND
-                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes'
+                census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
                 census.id
             ORDER BY census.started_at
@@ -1108,10 +1059,7 @@ pub async fn weekly_census_clients(
             WHERE
                 census.sub_network = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census.started_at < NOW() - INTERVAL '1 week' * $1 AND
-                census_node.sub_network = $2 AND
-                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes'
+                census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
               census.id,
               census_node.client_name
@@ -1173,9 +1121,6 @@ pub async fn weekly_census_client_versions(
                 census.sub_network = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 census.started_at < NOW() - INTERVAL '1 week' * $1 AND
-                census_node.sub_network = $2 AND
-                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes' AND
                 census_node.client_name = $3
              GROUP BY
               census.id,
@@ -1250,10 +1195,7 @@ pub async fn weekly_census_operating_systems(
             WHERE
                 census.sub_network = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census.started_at < NOW() - INTERVAL '1 week' * $1 AND
-                census_node.sub_network = $2 AND
-                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes'
+                census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
               census.id,
               census_node.operating_system
@@ -1337,9 +1279,6 @@ pub async fn weekly_census_protocol_versions(
                 census.sub_network = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 census.started_at < NOW() - INTERVAL '1 week' * $1 AND
-                census_node.sub_network = $2 AND
-                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes' AND
                 key = '\\x7076' -- hex('pv')
             GROUP BY
               census.id,
@@ -1664,9 +1603,9 @@ async fn generate_enr_list_from_census_id(
     let builder = state.database_connection.get_database_backend();
     let mut enrs_from_census = Query::select();
     enrs_from_census
-        .expr(Expr::col((record::Entity, record::Column::Raw)))
+        .expr(Expr::col((node_enr::Entity, node_enr::Column::Raw)))
         .from(census_node::Entity)
-        .from(record::Entity)
+        .from(node_enr::Entity)
         .from_subquery(census_selection_query, Alias::new("selected_census_id"))
         .and_where(
             Expr::col((census_node::Entity, census_node::Column::CensusId)).eq(Expr::col((
@@ -1675,8 +1614,8 @@ async fn generate_enr_list_from_census_id(
             ))),
         )
         .and_where(
-            Expr::col((census_node::Entity, census_node::Column::RecordId))
-                .eq(Expr::col((record::Entity, record::Column::Id))),
+            Expr::col((census_node::Entity, census_node::Column::NodeEnrId))
+                .eq(Expr::col((node_enr::Entity, node_enr::Column::Id))),
         );
 
     Some(
@@ -1773,13 +1712,14 @@ async fn generate_radius_graph_data(
     state: &Arc<State>,
     subprotocol: SubProtocol,
 ) -> Vec<CalculatedRadiusChartData> {
-    let radius_chart_data = RadiusChartData::find_by_statement(Statement::from_sql_and_values( DbBackend::Postgres,
-    "
+    let radius_chart_data = RadiusChartData::find_by_statement(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "
         WITH latest_census AS (
-            SELECT started_at, duration
+            SELECT id
             FROM census
             WHERE sub_network = $1
-            ORDER BY started_at DESC
+            ORDER BY id DESC
             LIMIT 1
         )
         SELECT
@@ -1792,13 +1732,15 @@ async fn generate_radius_graph_data(
             record,
             latest_census
         WHERE
-            census_node.sub_network = $1
-            AND census_node.surveyed_at >= latest_census.started_at
-            AND census_node.surveyed_at < latest_census.started_at + latest_census.duration * interval '1 second'
+            AND census_node.census_id == latest_census.id
             AND census_node.record_id = record.id
             AND record.node_id = node.id
             ",
-     vec![subprotocol.into()])).all(&state.database_connection).await.unwrap();
+        vec![subprotocol.into()],
+    ))
+    .all(&state.database_connection)
+    .await
+    .unwrap();
 
     let mut radius_percentages: Vec<CalculatedRadiusChartData> = vec![];
     for i in radius_chart_data {
@@ -1902,8 +1844,8 @@ async fn generate_client_diversity_data(
 pub struct TransferFailurePrimitive {
     pub audit: i32,
     pub client: String,
-    pub created_at: DateTime<Utc>,
-    pub failure_type: i32,
+    pub created_at: DateTimeUtc,
+    pub failure_type: TransferFailureType,
 }
 
 #[derive(FromQueryResult, Debug, Clone)]
@@ -1919,6 +1861,7 @@ pub async fn diagnostics(
 ) -> Result<HtmlTemplate<DiagnosticsTemplate>, StatusCode> {
     // Query to get the 20 most recent internal failures joined with audits for timestamps
     // TODO: include more than 4444 errors (or maybe a dropdown to select which kind of error)
+    // TODO(milos): fix
     let transfer_failures: Vec<TransferFailurePrimitive> =
         TransferFailurePrimitive::find_by_statement(Statement::from_sql_and_values(
             DbBackend::Postgres,
@@ -1928,7 +1871,7 @@ pub async fn diagnostics(
                 convert_from(COALESCE(substr(substr(kv.value, 1, 2), length(substr(kv.value, 1, 2)), 1), 'unknown'), 'utf8') AS client,
                 ca.created_at,
                 aif.failure_type
-            FROM audit_internal_failure AS aif
+            FROM audit_transfer_failure AS aif
             LEFT JOIN record AS r ON aif.sender_record_id=r.id
             LEFT JOIN key_value AS kv ON (r.id=kv.record_id AND kv.key = '\x63') -- hex('c')
             LEFT JOIN content_audit AS ca ON aif.audit=ca.id
@@ -1947,15 +1890,11 @@ pub async fn diagnostics(
     let transfer_failures: Vec<TransferFailure> = transfer_failures
         .into_iter()
         .map(|f| {
-            let failure_type = TransferFailureType::try_from(f.failure_type).map_err(|e| {
-                error!(err=?e, "Failed to convert transfer failure: {}", f.failure_type);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
             Ok::<TransferFailure, StatusCode>(TransferFailure {
                 audit: f.audit,
-                client: client_from_short_name(f.client),
+                client: Client::from(f.client),
                 created_at: f.created_at,
-                failure_type: format!("{failure_type:?}"),
+                failure_type: format!("{:?}", f.failure_type),
             })
         })
         .collect::<Result<Vec<_>, StatusCode>>()?;

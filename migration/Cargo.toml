@@ -16,18 +16,9 @@ async-std = { version = "^1", features = ["attributes", "tokio1"] }
 futures.workspace = true
 reqwest.workspace = true
 sea-orm.workspace = true
+sea-orm-migration = {version = "1.1.14", features = ["runtime-tokio-native-tls", "sqlx-postgres"]}
 tokio-util = "0.7.13"
 tracing.workspace = true
-
-[dependencies.sea-orm-migration]
-version = "^0.11.3"
-features = [
-  # Enable at least one `ASYNC_RUNTIME` and `DATABASE_DRIVER` feature if you want to run migration via CLI.
-  # View the list of supported features at https://www.sea-ql.org/SeaORM/docs/install-and-config/database-and-async-runtime.
-  # e.g.
-  "runtime-tokio-native-tls",  # `ASYNC_RUNTIME` feature
-  "sqlx-postgres",         # `DATABASE_DRIVER` feature
-]
 
 [dev-dependencies]
 pgtemp.workspace = true

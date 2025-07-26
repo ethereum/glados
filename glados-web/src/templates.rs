@@ -3,20 +3,18 @@ use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Response},
 };
-use sea_orm::strum::{EnumMessage, EnumProperty};
+use entity::{
+    audit, client,
+    client_info::{Client, OperatingSystem},
+    content, node, node_enr, ContentType, SubProtocol,
+};
+use glados_core::stats::{AuditStats, StrategyFilter};
+use strum::{EnumMessage, EnumProperty};
 
 use crate::routes::{
     CalculatedRadiusChartData, ClientDiversityResult, PaginatedCensusListResult, RawEnr,
     TransferFailure,
 };
-use entity::{
-    audit_result_latest::ContentType,
-    census_node::{Client, OperatingSystem},
-    client_info,
-    content::{self, SubProtocol},
-    content_audit, execution_metadata, key_value, node, record,
-};
-use glados_core::stats::{AuditStats, StrategyFilter};
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -56,9 +54,8 @@ pub struct CensusExplorerTemplate {}
 #[template(path = "node_detail.html")]
 pub struct NodeDetailTemplate {
     pub node: node::Model,
-    pub latest_enr: Option<record::Model>,
-    pub latest_enr_key_value_list: Option<Vec<key_value::Model>>,
-    pub enr_list: Vec<record::Model>,
+    pub latest_enr: Option<node_enr::Model>,
+    pub enr_list: Vec<node_enr::Model>,
     pub closest_node_list: Vec<node::ModelWithDistance>,
 }
 
@@ -66,11 +63,10 @@ pub struct NodeDetailTemplate {
 #[template(path = "enr_detail.html")]
 pub struct EnrDetailTemplate {
     pub node: node::Model,
-    pub enr: record::Model,
-    pub key_value_list: Vec<key_value::Model>,
+    pub enr: node_enr::Model,
 }
 
-pub type AuditTuple = (content_audit::Model, content::Model, client_info::Model);
+pub type AuditTuple = (audit::Model, content::Model, client::Model);
 
 #[derive(Template)]
 #[template(path = "contentid_list.html")]
@@ -88,9 +84,8 @@ pub struct ContentIdDetailTemplate {
 #[derive(Template)]
 #[template(path = "contentaudit_detail.html")]
 pub struct ContentAuditDetailTemplate {
-    pub audit: content_audit::Model,
+    pub audit: audit::Model,
     pub content: content::Model,
-    pub execution_metadata: Option<execution_metadata::Model>,
 }
 
 #[derive(Template)]
@@ -115,12 +110,9 @@ pub struct AuditTableTemplate {
 #[derive(Template)]
 #[template(path = "contentkey_detail.html")]
 pub struct ContentKeyDetailTemplate {
-    pub content_key_model: content::Model,
-    pub content_key: String,
-    pub content_id: String,
+    pub content: content::Model,
     pub content_kind: String,
-    pub block_number: Option<i32>,
-    pub contentaudit_list: Vec<content_audit::Model>,
+    pub audit_list: Vec<audit::Model>,
 }
 
 #[derive(Template)]

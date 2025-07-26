@@ -1,5 +1,5 @@
 use chrono::Utc;
-use entity::{audit_stats, content::SubProtocol};
+use entity::{audit_stats, SubProtocol};
 use glados_core::stats::{
     filter_audits, get_audit_stats, AuditFilters, ContentTypeFilter, Period, StrategyFilter,
     SuccessFilter,
@@ -33,7 +33,7 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
                 strategy,
                 content_type,
                 success: SuccessFilter::All,
-                network: subprotocol,
+                sub_protocol: subprotocol,
             }),
             Period::Hour,
             conn,
@@ -46,10 +46,10 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         history_sync,
         history_random,
         history_all_bodies,
-        history_all_receipts,
         history_sync_bodies,
-        history_sync_receipts,
         history_random_bodies,
+        history_all_receipts,
+        history_sync_receipts,
         history_random_receipts,
     ) = tokio::join!(
         get_stats(
@@ -74,23 +74,23 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         ),
         get_stats(
             SubProtocol::History,
+            StrategyFilter::Sync,
+            ContentTypeFilter::Bodies,
+        ),
+        get_stats(
+            SubProtocol::History,
+            StrategyFilter::Random,
+            ContentTypeFilter::Bodies,
+        ),
+        get_stats(
+            SubProtocol::History,
             StrategyFilter::All,
             ContentTypeFilter::Receipts,
         ),
         get_stats(
             SubProtocol::History,
             StrategyFilter::Sync,
-            ContentTypeFilter::Bodies,
-        ),
-        get_stats(
-            SubProtocol::History,
-            StrategyFilter::Sync,
             ContentTypeFilter::Receipts,
-        ),
-        get_stats(
-            SubProtocol::History,
-            StrategyFilter::Random,
-            ContentTypeFilter::Bodies,
         ),
         get_stats(
             SubProtocol::History,
@@ -104,10 +104,10 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
     let success_rate_history_sync = history_sync?.pass_percent;
     let success_rate_history_random = history_random?.pass_percent;
     let success_rate_history_all_bodies = history_all_bodies?.pass_percent;
-    let success_rate_history_all_receipts = history_all_receipts?.pass_percent;
     let success_rate_history_sync_bodies = history_sync_bodies?.pass_percent;
-    let success_rate_history_sync_receipts = history_sync_receipts?.pass_percent;
     let success_rate_history_random_bodies = history_random_bodies?.pass_percent;
+    let success_rate_history_all_receipts = history_all_receipts?.pass_percent;
+    let success_rate_history_sync_receipts = history_sync_receipts?.pass_percent;
     let success_rate_history_random_receipts = history_random_receipts?.pass_percent;
 
     // Record the values.
@@ -117,10 +117,10 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         success_rate_history_sync,
         success_rate_history_random,
         success_rate_history_all_bodies,
-        success_rate_history_all_receipts,
         success_rate_history_sync_bodies,
-        success_rate_history_sync_receipts,
         success_rate_history_random_bodies,
+        success_rate_history_all_receipts,
+        success_rate_history_sync_receipts,
         success_rate_history_random_receipts,
         conn,
     )
