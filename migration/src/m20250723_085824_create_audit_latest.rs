@@ -15,7 +15,7 @@ impl MigrationTrait for Migration {
                     .table(AuditLatest::Table)
                     .if_not_exists()
                     .col(integer(AuditLatest::ContentId).primary_key())
-                    .col(integer(AuditLatest::AuditId))
+                    .col(integer_uniq(AuditLatest::AuditId))
                     .foreign_key(
                         ForeignKey::create()
                             .name(FK_CONTENT_ID)
@@ -27,7 +27,7 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .name(FK_AUDIT_ID)
-                            .from(AuditLatest::Table, AuditLatest::ContentId)
+                            .from(AuditLatest::Table, AuditLatest::AuditId)
                             .to(Audit::Table, Audit::Id)
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade),

@@ -9,6 +9,7 @@ use crate::audit;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub content_id: i32,
+    #[sea_orm(unique)]
     pub audit_id: i32,
 }
 
@@ -16,7 +17,7 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::audit::Entity",
-        from = "Column::ContentId",
+        from = "Column::AuditId",
         to = "super::audit::Column::Id",
         on_update = "Cascade",
         on_delete = "Cascade"
