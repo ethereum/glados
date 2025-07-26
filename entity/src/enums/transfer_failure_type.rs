@@ -9,8 +9,8 @@ pub enum TransferFailureType {
     UtpTransferFailed = 2,
 }
 
-impl From<QueryFailureKind> for TransferFailureType {
-    fn from(kind: QueryFailureKind) -> Self {
+impl From<&QueryFailureKind> for TransferFailureType {
+    fn from(kind: &QueryFailureKind) -> Self {
         match kind {
             QueryFailureKind::InvalidContent => Self::InvalidContent,
             QueryFailureKind::UtpConnectionFailed => Self::UtpConnectionFailed,

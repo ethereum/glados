@@ -27,6 +27,12 @@ pub enum SelectionStrategy {
 }
 
 impl SelectionStrategy {
+    pub fn sub_protocol(&self) -> SubProtocol {
+        match self {
+            Self::History(_) => SubProtocol::History,
+        }
+    }
+
     pub fn try_from_str(sub_protocol: SubProtocol, s: &str) -> Result<Self, String> {
         match sub_protocol {
             SubProtocol::History => {
@@ -54,7 +60,7 @@ impl ActiveEnum for SelectionStrategy {
         let (sub_protocol_value, strategy_value) = match self {
             Self::History(strategy) => (SubProtocol::History.into_value(), strategy.to_value()),
         };
-        sub_protocol_value << 16 | strategy_value
+        (sub_protocol_value << 16) | strategy_value
     }
 
     fn try_from_value(v: &Self::Value) -> std::prelude::v1::Result<Self, DbErr> {

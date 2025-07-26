@@ -28,7 +28,7 @@ use tokio::{
 };
 use tracing::{debug, error, info, warn};
 
-use entity::{census, census_node, record};
+use entity::{census, census_node, node_enr};
 use glados_core::jsonrpc::TransportConfig;
 
 use crate::cli::TransportType;
@@ -100,7 +100,7 @@ async fn orchestrate_dht_census(config: CartographerConfig, conn: DatabaseConnec
 
 struct DHTCensusRecord {
     enr: Enr,
-    record_id: i32,
+    node_enr_id: i32,
     data_radius: U256,
     client_info: Option<ClientInfo>,
     surveyed_at: DateTime<Utc>,
@@ -196,7 +196,7 @@ impl DHTCensus {
     async fn add_alive(
         &self,
         enr: Enr,
-        record_id: i32,
+        node_enr_id: i32,
         capabilities: ClientInfoRadiusCapabilities,
     ) {
         if self.alive.read().await.contains_key(&enr.node_id().raw()) {
@@ -204,7 +204,7 @@ impl DHTCensus {
         }
         let census_record = DHTCensusRecord {
             enr,
-            record_id,
+            node_enr_id,
             data_radius: *capabilities.data_radius,
             client_info: capabilities.client_info,
             surveyed_at: Utc::now(),
@@ -356,25 +356,28 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
     ping_handle.abort();
     enumerate_handle.abort();
 
-    let duration: u32 = census.duration().num_seconds().try_into().unwrap();
-
-    let census_model =
-        match census::create(census.started_at, duration, config.subnetwork.into(), &conn).await {
-            Ok(census_model) => census_model,
-            Err(err) => {
-                error!(err=?err, "Error saving census model to database");
-                return;
-            }
-        };
+    let census_model = match census::create(
+        census.started_at,
+        census.duration(),
+        config.subnetwork.into(),
+        &conn,
+    )
+    .await
+    {
+        Ok(census_model) => census_model,
+        Err(err) => {
+            error!(err=?err, "Error saving census model to database");
+            return;
+        }
+    };
 
     for (_, census_record) in census.alive.read().await.iter() {
         match census_node::create(
             census_model.id,
-            census_record.record_id,
+            census_record.node_enr_id,
+            census_record.surveyed_at,
             census_record.data_radius,
             census_record.client_info.as_ref(),
-            census_record.surveyed_at,
-            config.subnetwork.into(),
             &conn,
         )
         .await
@@ -385,10 +388,10 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
                 "Saved new census_node record"
             ),
             Err(err) => error!(
-                census.id=census_model.id,
-                census_node.record_id=census_record.record_id,
-                census_node.data_radius=?census_record.data_radius,
-                census_node.surveyed_at=?census_record.surveyed_at,
+                census.id = census_model.id,
+                census_node.record_id = census_record.node_enr_id,
+                census_node.data_radius = ?census_record.data_radius,
+                census_node.surveyed_at = ?census_record.surveyed_at,
                 err=?err,
                 "Error saving new census_node record"
             ),
@@ -452,11 +455,11 @@ async fn do_liveliness_check(
         TransportConfig::IPC(_path) => panic!("not implemented"),
     };
 
-    // Save record to database
-    let record_model = match record::get_or_create(&enr, &conn).await {
-        Ok(record_model) => {
+    // Save to database
+    let node_enr_model = match node_enr::get_or_create(&enr, &conn).await {
+        Ok(node_enr_model) => {
             debug!(enr.base64 = enr.to_base64(), "Saved ENR");
-            record_model
+            node_enr_model
         }
         Err(err) => {
             error!(enr.node_id=?B256::from(enr.node_id().raw()), err=?err, "Error saving ENR to database");
@@ -496,7 +499,7 @@ async fn do_liveliness_check(
                 }
             } {
                 census
-                    .add_alive(enr.clone(), record_model.id, capabilities)
+                    .add_alive(enr.clone(), node_enr_model.id, capabilities)
                     .await;
                 // Send enr to process that enumerates its routing table
                 match to_enumerate_tx.send(enr.clone()).await {

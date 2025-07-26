@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use clap::{ArgAction, Parser, ValueEnum};
-use entity::content_audit::{HistorySelectionStrategy, SelectionStrategy};
+use entity::{HistorySelectionStrategy, SelectionStrategy};
 
 const DEFAULT_STATS_PERIOD: &str = "300";
 
@@ -73,16 +73,18 @@ impl FromStr for StrategyWithWeight {
         match parts.len() {
             1 => {
                 // assuming weight 1
-                let strategy =
-                    HistorySelectionStrategy::from_str(parts[0], /* ignore_case= */ true)?;
+                let strategy = <HistorySelectionStrategy as ValueEnum>::from_str(
+                    parts[0], /* ignore_case= */ true,
+                )?;
                 Ok(Self {
                     strategy: SelectionStrategy::History(strategy),
                     weight: 1,
                 })
             }
             2 => {
-                let strategy =
-                    HistorySelectionStrategy::from_str(parts[0], /* ignore_case= */ true)?;
+                let strategy = <HistorySelectionStrategy as ValueEnum>::from_str(
+                    parts[0], /* ignore_case= */ true,
+                )?;
                 let weight: u8 = parts[1]
                     .parse()
                     .map_err(|_| format!("Invalid strategy weight: {}", parts[1]))?;

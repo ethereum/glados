@@ -153,11 +153,11 @@ pub async fn get_latest_audit(
     strategy: SelectionStrategy,
     conn: &DatabaseConnection,
 ) -> Result<Option<Model>, DbErr> {
-    Ok(Entity::find()
+    Entity::find()
         .filter(Column::Strategy.eq(strategy))
         .order_by_desc(Column::Id)
         .one(conn)
-        .await?)
+        .await
 }
 
 #[derive(FromQueryResult)]
@@ -176,35 +176,18 @@ pub async fn get_failed_keys(
         FailedKeysResult::find_by_statement(Statement::from_sql_and_values(
             DbBackend::Postgres,
             "
-        SELECT
-              content.content_key
-        FROM content_audit
-        INNER JOIN content ON content.id = content_audit.content_key
-        WHERE
-            content_audit.result = 0 AND
-            content_audit.strategy_used = $1 AND
-            content_audit.created_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours'
-        GROUP BY content.content_key
-        ORDER BY MAX(content_audit.created_at) DESC
-        LIMIT $2
-        OFFSET $3
-          content_key
-        FROM (
-          SELECT
-            content.content_key,
-            MAX(content_audit.created_at) AS created_at
-          FROM content_audit
-          JOIN content ON content.id = content_audit.content_key
-          WHERE
-            content_audit.result = 0  AND
-            content_audit.strategy_used = $1 AND
-            content_audit.created_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours'
-          GROUP BY content.content_key
-        ) prep
-        ORDER BY created_at DESC
-        LIMIT $2
-        OFFSET $3
-        ",
+            SELECT
+                content.content_key
+            FROM audit
+            INNER JOIN content ON content.id = audit.content_id
+            WHERE
+                audit.result = 0 AND
+                audit.strategy = $1
+            GROUP BY content.content_key
+            ORDER BY MAX(audit.created_at) DESC
+            LIMIT $2
+            OFFSET $3
+            ",
             vec![
                 strategy.into(),
                 PAGE_SIZE.into(),

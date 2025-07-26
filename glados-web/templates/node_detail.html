@@ -36,24 +36,19 @@
     <div class="row">
         <div class="col">
             {% match latest_enr %}
-            {% when Some with (enr) %}
-            <div class="card shadow-sm enr-card">
-                <div class="card-body">
-                    <h2>Latest ENR</h2>
-                    <ul>
-                        <li>Sequence Number: {{ enr.sequence_number }}</li>
-                    </ul>
-                    <pre>{{ enr.raw }}</pre>
-                    <div id="enr-data-box" class="form-group"></div>
-                </div>
-            </div>
-            {% match latest_enr_key_value_list %}
-            {% when Some with (key_value_list) %}
-            {% when None %}
-            <p>This shouldn't happen</p>
-            {% endmatch %}
-            {% when None %}
-            <p>No latest ENR found</p>
+                {% when Some with (enr) %}
+                    <div class="card shadow-sm enr-card">
+                        <div class="card-body">
+                            <h2>Latest ENR</h2>
+                            <ul>
+                                <li>Sequence Number: {{ enr.sequence_number }}</li>
+                            </ul>
+                            <pre>{{ enr.raw }}</pre>
+                            <div id="enr-data-box" class="form-group"></div>
+                        </div>
+                    </div>
+                {% when None %}
+                    <p>No latest ENR found</p>
             {% endmatch %}
         </div>
     </div>

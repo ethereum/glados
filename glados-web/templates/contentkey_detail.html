@@ -1,24 +1,23 @@
 {% extends "base.html" %}
 
-{% block title %}Content Key: {{ content_key_model.key_as_hex() }}{% endblock %}
+{% block title %}Content Key: {{ content.key_as_hex() }}{% endblock %}
 
 {% block content %}
 <div class="row">
-    <h1>Content Key: {{ content_key_model.key_as_hex() }}</h1>
+    <h1>Content Key: {{ content.key_as_hex() }}</h1>
 </div>
 <div class="row">
     <div class="col">
         <ul>
-            <li>Database ID: {{ content_key_model.id }}</li>
-            <li>Content Key: {{ content_key }}</li>
-            <li>Content Id: <a href="/content/id/{{ content_id }}/">{{ content_id }}</a></li>
+            <li>Database ID: {{ content.id }}</li>
+            <li>Content Key: {{ content.key_as_hex() }}</li>
+            <li>Content Id: <a href="/content/id/{{ content.id_as_hex() }}/">{{ content.id_as_hex() }}</a></li>
             <li>Kind: {{ content_kind }}</li>
-            {% if block_number.is_some() %}
-            <li>Block number: <a href="https://etherscan.io/block/{{ block_number.unwrap() }}">{{ block_number.unwrap()
-                    }}</a></li>
+            {% if let Some(block_number) = content.block_number() %}
+            <li>Block number: <a href="https://etherscan.io/block/{{ block_number }}">{{ block_number }}</a></li>
             {% else %}{% endif %}
             <li>Nodes on the network that will accept this content: 
-                <a href="/api/is-content-in-deadzone/{{ content_key }}" id="nodes_that_will_accept_this_account">Loading...</a>
+                <a href="/api/is-content-in-deadzone/{{ content.key_as_hex() }}" id="nodes_that_will_accept_this_account">Loading...</a>
                 </a>
             </li>
         </ul>
@@ -26,12 +25,13 @@
     <div class="col">
         <h3>Content Audits</h3>
         <ul>
-            {% for content_audit in contentaudit_list %}
-            <li>Audit#: <a style="margin-right: 4px;" href="/audit/id/{{ content_audit.id }}">{{ content_audit.id
-                    }}</a><span
-                    class="badge text-bg-{% if content_audit.is_success() %}success{% else %}danger{% endif %}">{% if
-                    content_audit.is_success() %} Success{% else %} Fail{% endif %}</span>
-                <span>{{ content_audit.strategy_as_text() }}</span>
+            {% for audit in audit_list %}
+            <li>Audit#:
+                <a style="margin-right: 4px;" href="/audit/id/{{ audit.id }}">{{ audit.id }}</a>
+                <span class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">
+                    {% if audit.is_success() %} Success{% else %} Fail{% endif %}
+                </span>
+                <span>{{ audit.strategy.as_str() }}</span>
             </li>
             {% else %}
             <li>No audits</li>
@@ -42,7 +42,7 @@
 </div>
 
 <script>
-    fetch('/api/is-content-in-deadzone/{{ content_key }}')
+    fetch('/api/is-content-in-deadzone/{{ content.key_as_hex() }}')
         .then(response => response.json())
         .then(data => {
             document.getElementById('nodes_that_will_accept_this_account').innerText = data.length;

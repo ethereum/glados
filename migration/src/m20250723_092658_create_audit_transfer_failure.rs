@@ -29,7 +29,10 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .name(FK_AUDIT_ID)
-                            .from(AuditTransferFailure::Table, AuditTransferFailure::SenderNodeEnrId)
+                            .from(
+                                AuditTransferFailure::Table,
+                                AuditTransferFailure::SenderNodeEnrId,
+                            )
                             .to(NodeEnr::Table, NodeEnr::Id)
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade),

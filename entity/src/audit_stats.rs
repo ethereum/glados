@@ -37,6 +37,7 @@ impl ActiveModelBehavior for ActiveModel {}
 
 // *** Custom additions ***
 
+#[allow(clippy::too_many_arguments)]
 pub async fn create(
     timestamp: DateTimeUtc,
     success_rate_history_all: f32,

@@ -1,19 +1,11 @@
-use chrono::{DateTime, Duration, Utc};
-use entity::{
-    content::SubProtocol,
-    content_audit::{self, HistorySelectionStrategy, SelectionStrategy},
-    execution_metadata,
-};
+use entity::{audit, content, HistorySelectionStrategy, SelectionStrategy};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
-use glados_core::db::store_content_key;
-use sea_orm::DatabaseConnection;
+use glados_core::db::store_history_content_key;
+use sea_orm::{DatabaseConnection, EntityTrait};
 use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
 
 use crate::{config::AuditConfig, AuditTask};
-
-// TODO(milos): remove
-const GENESIS_TIMESTAMP: DateTime<Utc> = DateTime::from_timestamp(1438269976, 0).unwrap();
 
 pub async fn execute_audit_strategy(
     strategy: SelectionStrategy,
@@ -81,16 +73,7 @@ async fn audit_block_number(
 ) {
     let content_key = HistoryContentKey::new_block_header_by_number(block_number);
 
-    let Some(content) = store_content_key(
-        &content_key,
-        "block_header_by_number",
-        block_number as i32,
-        GENESIS_TIMESTAMP + Duration::seconds(12 * block_number as i64), // TODO(milos): fix
-        conn,
-        SubProtocol::History,
-    )
-    .await
-    else {
+    let Some(content) = store_history_content_key(&content_key, block_number, conn).await else {
         error!(
             ?strategy,
             content.key = content_key.to_hex(),
@@ -111,7 +94,7 @@ async fn audit_block_number(
 }
 
 async fn latest_audit_block_number(conn: &DatabaseConnection) -> Option<u64> {
-    let Ok(Some(latest_audit)) = content_audit::get_latest_audit(
+    let Ok(Some(latest_audit)) = audit::get_latest_audit(
         SelectionStrategy::History(HistorySelectionStrategy::Sync),
         conn,
     )
@@ -120,17 +103,18 @@ async fn latest_audit_block_number(conn: &DatabaseConnection) -> Option<u64> {
         warn!("Latest audit not found!");
         return None;
     };
-
-    let Ok(Some(latest_audit_content_metadata)) =
-        execution_metadata::get(latest_audit.content_key, conn).await
-    else {
-        warn!(
-            audit.id = latest_audit.id,
-            content.id = latest_audit.content_key,
-            "Content metadata not found for audit"
-        );
-        return None;
-    };
-
-    Some(latest_audit_content_metadata.block_number as u64)
+    match content::Entity::find_by_id(latest_audit.content_id)
+        .one(conn)
+        .await
+    {
+        Ok(Some(content)) => content.block_number(),
+        _ => {
+            warn!(
+                audit.id = latest_audit.id,
+                content.id = latest_audit.content_id,
+                "Content not found for latest audit",
+            );
+            None
+        }
+    }
 }

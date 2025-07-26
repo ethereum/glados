@@ -1,5 +1,5 @@
 use clap::{Parser, ValueEnum};
-use entity::content::SubProtocol;
+use entity::SubProtocol;
 use std::path::PathBuf;
 use url::Url;
 
