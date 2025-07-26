@@ -2,7 +2,7 @@
 
 {% block title %}Audit Dashboard{% endblock %}
 {% block head %}
-<link href="/static/css/glados_pages.css" rel="stylesheet">
+<link href="/static/css/glados_styles.css" rel="stylesheet">
 {% endblock %}
 {% block content %}
 <div class="row">
@@ -122,9 +122,9 @@
 
         const baseUrl = "filter/";
         const url = new URL(window.location);
-        const subprotocol = url.searchParams.get('network') || document.getElementById('network-selector').value;
+        const sub_protocol = url.searchParams.get('sub_protocol') || document.getElementById('network-selector').value;
         const params = {
-            network: subprotocol,
+            sub_protocol: sub_protocol,
             strategy: strategy,
             content_type: content_type,
             success: success,

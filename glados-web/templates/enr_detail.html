@@ -20,6 +20,11 @@
             <div class="card shadow-sm enr-card">
                 <div class="card-body">
                     <ul>
+                        <li>
+                            NodeId: <a href="/network/node/{{ node.node_id_as_hex() }}/">
+                                {{ node.node_id_as_hex() }}
+                            </a>
+                        </li>
                         <li>Sequence Number: {{ enr.sequence_number }}</li>
                         <li>Base64: {{ enr.raw }}</li>
                     </ul>
@@ -85,7 +90,7 @@
         div.className = "input-group mb-3";
         div.innerHTML = `
         <span class="input-group-text">${key}</span>
-        <input type="text" class="form-control" value="${displayValue}">
+        <input type="text" class="form-control" value="${displayValue}" disabled>
     `;
 
         container.appendChild(div);

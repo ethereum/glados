@@ -20,7 +20,7 @@
                     <h3>Content Keys</h3>
                     <ul>
                         {% for content in contentkey_list %}
-                        <li><a href="/content/key/{{content.key_as_hex() }}">{{ content.key_as_hex() }}</a></li>
+                        <li><a href="/content/key/{{content.key_as_hex()}}/">{{ content.key_as_hex() }}</a></li>
                         {% else %}
                         <li>No content keys found</li>
                         {% endfor %}

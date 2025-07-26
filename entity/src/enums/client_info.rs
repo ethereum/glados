@@ -26,10 +26,10 @@ pub enum Client {
 impl From<String> for Client {
     fn from(value: String) -> Self {
         match value.to_lowercase().as_str() {
+            "trin" => Client::Trin,
             "nimbus" => Client::Nimbus,
             "samba" => Client::Samba,
             "shisui" => Client::Shisui,
-            "trin" => Client::Trin,
             "ultralight" => Client::Ultralight,
             _ => Client::Other,
         }

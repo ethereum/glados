@@ -108,6 +108,13 @@ impl Model {
     pub fn created_at_humanized(&self) -> String {
         utils::time_ago(self.created_at, Utc::now())
     }
+
+    pub fn trace_as_html(&self) -> String {
+        match &self.trace {
+            Some(trace) => trace.to_string(),
+            None => "{}".to_string(),
+        }
+    }
 }
 
 pub async fn create(

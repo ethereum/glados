@@ -115,6 +115,13 @@ impl Model {
     pub fn block_number(&self) -> Option<u64> {
         self.block_number.map(|block_number| block_number as u64)
     }
+
+    pub fn block_number_as_html(&self) -> String {
+        match self.block_number {
+            Some(block_number) => format!("{block_number}"),
+            None => String::new(),
+        }
+    }
 }
 
 #[cfg(test)]

@@ -12,7 +12,7 @@ use glados_core::stats::{AuditStats, StrategyFilter};
 use strum::{EnumMessage, EnumProperty};
 
 use crate::routes::{
-    CalculatedRadiusChartData, ClientDiversityResult, PaginatedCensusListResult, RawEnr,
+    CalculatedRadiusChartData, ClientDiversityResult, NodeEnr, PaginatedCensusListResult,
     TransferFailure,
 };
 
@@ -39,7 +39,7 @@ pub struct PaginatedCensusListTemplate {
 #[template(path = "single_census_view.html")]
 pub struct SingleCensusViewTemplate {
     pub client_diversity_data: Vec<ClientDiversityResult>,
-    pub enr_list: Vec<RawEnr>,
+    pub enr_list: Vec<NodeEnr>,
     pub census_id: i32,
     pub max_census_id: i32,
     pub node_count: i32,

@@ -91,7 +91,7 @@
 </style>
 <script>
 $(document).ready(function () {
-    let trace_string = "{{ audit.trace.clone().unwrap_or_default() }}".replace(/&quot;/g, '"');
+    let trace_string = "{{ audit.trace_as_html() }}".replace(/(&#34;|&quot;)/g, '"');
     let trace = JSON.parse(trace_string);
     let graphData, graphSvg;
     
