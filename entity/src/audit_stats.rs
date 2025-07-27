@@ -93,7 +93,7 @@ pub async fn get_weekly_history_stats(
 ) -> Result<Vec<HistoryStats>, DbErr> {
     const WEEK: TimeDelta = TimeDelta::days(7);
 
-    let beginning = Utc::now() - WEEK * weeks_ago;
+    let beginning = Utc::now() - WEEK * (weeks_ago + 1);
     let end = beginning + WEEK;
 
     Entity::find()
@@ -105,10 +105,10 @@ pub async fn get_weekly_history_stats(
             Column::SuccessRateHistorySync,
             Column::SuccessRateHistoryRandom,
             Column::SuccessRateHistoryAllBodies,
-            Column::SuccessRateHistoryAllReceipts,
             Column::SuccessRateHistorySyncBodies,
-            Column::SuccessRateHistorySyncReceipts,
             Column::SuccessRateHistoryRandomBodies,
+            Column::SuccessRateHistoryAllReceipts,
+            Column::SuccessRateHistorySyncReceipts,
             Column::SuccessRateHistoryRandomReceipts,
         ])
         .filter(Column::Timestamp.gt(beginning))

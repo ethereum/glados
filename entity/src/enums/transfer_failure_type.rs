@@ -1,7 +1,8 @@
 use ethportal_api::types::query_trace::QueryFailureKind;
 use sea_orm::prelude::*;
+use strum::Display;
 
-#[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum)]
+#[derive(Debug, Clone, Eq, PartialEq, EnumIter, DeriveActiveEnum, Display)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum TransferFailureType {
     InvalidContent = 0,

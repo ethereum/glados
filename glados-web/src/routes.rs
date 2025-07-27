@@ -3,7 +3,6 @@ use std::io;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use alloy::rlp::Decodable;
 use alloy_primitives::{hex, B256, U256};
 use axum::{
     extract::{Extension, Path, Query as HttpQuery},
@@ -19,7 +18,6 @@ use ethportal_api::{
     jsonrpsee::core::__reexports::serde_json,
     types::{
         distance::{Distance, Metric, XorMetric},
-        protocol_versions::ProtocolVersionList,
         query_trace::QueryTrace,
     },
     utils::bytes::{hex_decode, hex_encode},
@@ -34,7 +32,7 @@ use sea_orm::{
 };
 use sea_orm::{Order, QueryTrait};
 use serde::Serialize;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 
 use crate::templates::{
     AuditDashboardTemplate, AuditTableTemplate, CensusExplorerTemplate, ClientsTemplate,
@@ -989,7 +987,7 @@ pub async fn weekly_census_history(
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
             WHERE
-                census.sub_network = $2 AND
+                census.sub_protocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
@@ -1058,7 +1056,7 @@ pub async fn weekly_census_clients(
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
             WHERE
-                census.sub_network = $2 AND
+                census.sub_protocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
@@ -1119,7 +1117,7 @@ pub async fn weekly_census_client_versions(
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
             WHERE
-                census.sub_network = $2 AND
+                census.sub_protocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 census.started_at < NOW() - INTERVAL '1 week' * $1 AND
                 census_node.client_name = $3
@@ -1194,7 +1192,7 @@ pub async fn weekly_census_operating_systems(
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
             WHERE
-                census.sub_network = $2 AND
+                census.sub_protocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
@@ -1236,18 +1234,21 @@ pub struct CensusHistoryProtocolVersionsDataCompact {
 
 impl From<CensusHistoryProtocolVersionsData> for CensusHistoryProtocolVersionsDataCompact {
     fn from(value: CensusHistoryProtocolVersionsData) -> Self {
-        let protocol_version_list: ProtocolVersionList =
-            Decodable::decode(&mut value.protocol_versions.as_slice())
-                .expect("Error decoding supported protocol versions");
-
-        let protocol_versions: Vec<u8> =
-            protocol_version_list.iter().map(|p| u8::from(*p)).collect();
-
         CensusHistoryProtocolVersionsDataCompact {
             census_id: value.census_id,
             start: value.start,
-            min_protocol_version: *protocol_versions.iter().min().unwrap(),
-            max_protocol_version: *protocol_versions.iter().max().unwrap(),
+            min_protocol_version: value
+                .protocol_versions
+                .iter()
+                .min()
+                .cloned()
+                .unwrap_or_default(),
+            max_protocol_version: value
+                .protocol_versions
+                .iter()
+                .max()
+                .cloned()
+                .unwrap_or_default(),
             node_count: value.node_count,
         }
     }
@@ -1270,20 +1271,18 @@ pub async fn weekly_census_protocol_versions(
             SELECT
                 census.id AS census_id,
                 ANY_VALUE(DATE_TRUNC('second', census.started_at)) AS start,
-                key_value.value AS protocol_versions,
+                node_enr.protocol_versions,
                 COUNT(1) AS node_count
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
-            LEFT JOIN record ON census_node.node_enr_id = record.id
-            LEFT JOIN key_value ON record.id = key_value.node_enr_id
+            LEFT JOIN node_enr ON census_node.node_enr_id = node_enr.id
             WHERE
-                census.sub_network = $2 AND
+                census.sub_protocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census.started_at < NOW() - INTERVAL '1 week' * $1 AND
-                key = '\\x7076' -- hex('pv')
+                census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
               census.id,
-              key_value.value
+              node_enr.protocol_versions
             ORDER BY census.started_at
         ",
             vec![weeks_ago.into(), subprotocol.into()],
@@ -1304,7 +1303,7 @@ pub async fn weekly_census_protocol_versions(
 #[derive(FromQueryResult, Debug, Clone, Serialize)]
 pub struct TransferFailureBatches {
     start: DateTime<Utc>,
-    client: String,
+    client: client_info::Client,
     failures: i64,
 }
 
@@ -1322,18 +1321,16 @@ pub async fn weekly_transfer_failures(
             DbBackend::Postgres,
             "
             SELECT
-                DATE_BIN('15 minutes', ca.created_at, TIMESTAMP '2001-01-01') AS start,
-                convert_from(COALESCE(substr(substr(kv.value, 1, 2), length(substr(kv.value, 1, 2)), 1), 'unknown'), 'utf8') AS client,
+                DATE_BIN('15 minutes', audit.created_at, TIMESTAMP '2001-01-01') AS start,
+                census_node.client_name AS client,
                 count(*) AS failures
-            FROM audit_internal_failure AS aif
-            LEFT JOIN record AS r ON aif.sender_node_enr_id=r.id
-            LEFT JOIN key_value AS kv ON (r.id=kv.node_enr_id AND kv.key = '\x63') -- hex('c')
-            LEFT JOIN content_audit AS ca ON aif.audit=ca.id
+            FROM audit_transfer_failure
+            LEFT JOIN audit ON audit_transfer_failure.audit_id = audit.id
+            LEFT JOIN census_node ON audit_transfer_failure.sender_node_enr_id = census_node.id
             WHERE
-                ca.strategy_used = 5 AND -- Only consider 4444s audits now, there are too many History validation failures during current protocol transition
-                ca.created_at IS NOT NULL AND
-                ca.created_at > NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                ca.created_at < NOW() - INTERVAL '1 week' * $1
+                audit.created_at IS NOT NULL AND
+                audit.created_at > NOW() - INTERVAL '1 week' * ($1 + 1) AND
+                audit.created_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY start, client
             ORDER BY start;
         ",
@@ -1354,28 +1351,20 @@ fn nest_protocol_versions_clients(
     let mut nested = HashMap::<String, HashMap<String, i64>>::new();
 
     for row in census.into_iter() {
-        let protocol_versions = match row.protocol_versions {
-            Some(raw_protocol_versions) => {
-                let protocol_version_list: ProtocolVersionList =
-                    Decodable::decode(&mut raw_protocol_versions.as_slice())
-                        .expect("Error decoding supported protocol versions");
-
-                let protocol_versions: Vec<u8> =
-                    protocol_version_list.iter().map(|p| u8::from(*p)).collect();
-
-                protocol_versions
-                    .iter()
-                    .map(|pv| "v".to_string() + &pv.to_string())
-                    .collect()
-            }
-            None => vec!["Unknown".to_string()],
+        let protocol_versions = if row.protocol_versions.is_empty() {
+            vec!["Unknown".to_string()]
+        } else {
+            row.protocol_versions
+                .iter()
+                .map(|pv| format!("v{pv}"))
+                .collect()
         };
 
         for protocol_version in protocol_versions.iter() {
             *nested
                 .entry(protocol_version.to_string())
                 .or_default()
-                .entry(row.client.to_string())
+                .entry(row.client_name.to_string())
                 .or_default() += row.node_count;
         }
     }
@@ -1384,8 +1373,8 @@ fn nest_protocol_versions_clients(
 
 #[derive(FromQueryResult, Debug)]
 pub struct CensusProtocolVersionsClientsData {
-    protocol_versions: Option<Vec<u8>>,
-    client: Client,
+    protocol_versions: Vec<u8>,
+    client_name: Client,
     node_count: i64,
 }
 pub async fn census_protocol_versions_clients(
@@ -1396,36 +1385,23 @@ pub async fn census_protocol_versions_clients(
 
     let census: Vec<CensusProtocolVersionsClientsData> =
         CensusProtocolVersionsClientsData::find_by_statement(Statement::from_sql_and_values(
-            DbBackend::Postgres,
+            state.database_connection.get_database_backend(),
             "
             SELECT
-                protocol_versions.versions AS protocol_versions,
-                client_name as client,
-                COUNT(1) AS node_count
-            FROM census
-            LEFT JOIN census_node ON census.id = census_node.census_id
-            LEFT JOIN record ON census_node.node_enr_id = record.id
-            LEFT JOIN (
-                SELECT
-                    node_enr_id,
-                    value AS versions
-                FROM key_value                           // WHAT
-                WHERE key = '\\x7076'
-            ) protocol_versions ON record.id = protocol_versions.node_enr_id
+                node_enr.protocol_versions,
+                census_node.client_name,
+                COUNT(*) AS node_count
+            FROM census_node
+            LEFT JOIN node_enr ON census_node.node_enr_id = node_enr.id
             WHERE
-                census.id = (
-                    SELECT MAX(id)
-                    FROM census
-                    WHERE sub_network = $1
-                ) AND
                 census_node.census_id = (
                     SELECT MAX(id)
                     FROM census
-                    WHERE sub_network = $1
+                    WHERE sub_protocol = $1
                 )
             GROUP BY
-                versions,
-                client_name
+                node_enr.protocol_versions,
+                census_node.client_name
         ",
             vec![subprotocol.into()],
         ))
@@ -1442,96 +1418,102 @@ pub async fn census_protocol_versions_clients(
 #[derive(Debug, Clone, Serialize, FromQueryResult)]
 #[serde(rename_all = "camelCase")]
 pub struct AuditBlockStatusData {
-    start: DateTime<Utc>,
+    start: i64,
     success: i64,
     error: i64,
     unaudited: i64,
 }
+// TODO(milos): fix
 pub async fn audit_block_status(
     http_args: HttpQuery<HashMap<String, String>>,
-    Extension(state): Extension<Arc<State>>,
+    Extension(_state): Extension<Arc<State>>,
 ) -> Result<Json<Vec<AuditBlockStatusData>>, StatusCode> {
-    const GENESIS_TIMESTAMP: &str = "1438269976"; // 2015-07-30 15:26:13
-    const LAST_MINED_BLOCK_TIMESTAMP: &str = "1663224162"; // 2022-09-15 06:42:42
     const BIN_COUNT: i64 = 80; // ~200k blocks per bin for all pre-merge data
 
-    let Ok(start) = i64::from_str(
-        http_args
-            .get("start")
-            .unwrap_or(&(GENESIS_TIMESTAMP.to_string())),
-    ) else {
-        debug!("Audit Block Status: invalid start argument");
-        return Err(StatusCode::BAD_REQUEST);
+    let start = match http_args.get("start").map(|start| i64::from_str(start)) {
+        Some(Ok(start)) => start,
+        Some(Err(err)) => {
+            error!(%err, "Audit Block Status: invalid start argument");
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        None => 0,
     };
 
-    let Ok(end) = i64::from_str(
-        http_args
-            .get("end")
-            .unwrap_or(&(LAST_MINED_BLOCK_TIMESTAMP.to_string())),
-    ) else {
-        debug!("Audit Block Status: invalid end argument");
-        return Err(StatusCode::BAD_REQUEST);
+    let end = match http_args.get("end").map(|end| i64::from_str(end)) {
+        Some(Ok(end)) => end,
+        Some(Err(err)) => {
+            error!(%err, "Audit Block Status: invalid end argument");
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        None => 15000000, // TODO(milos)
     };
 
-    let interval_size_seconds: i64 = (end - start) / BIN_COUNT;
-
-    let Ok(content_type) =
-        ContentType::from_str(http_args.get("content_type").unwrap_or(&("".to_string())))
-    else {
-        debug!("Audit Block Status: invalid content_type argument");
+    if end < start {
+        error!("Audit Block Status: invalid start ({start}) and end ({end}) arguments");
         return Err(StatusCode::BAD_REQUEST);
-    };
+    }
 
-    let audit_block_status: Vec<AuditBlockStatusData> =
-    AuditBlockStatusData::find_by_statement(Statement::from_sql_and_values(
-            DbBackend::Postgres,
-            "
-            SELECT
-              start,
-              success,
-              error,
-              (COALESCE((LEAD(number) OVER (ORDER BY start)), last_block) - number) - (success + error) AS unaudited
-            FROM (
-              SELECT
-                 date_bin($1 * INTERVAL '1 second' , first_available_at, TO_TIMESTAMP($2)) AS start,
-                 SUM(CASE WHEN RESULT = 1 THEN 1 ELSE 0 END) AS success,
-                 SUM(CASE WHEN RESULT = 0 THEN 1 ELSE 0 END) AS error,
-                 0::INT8 AS unaudited
-              FROM public.audit_result_latest
-              WHERE
-                 content_type = $4 AND
-                 first_available_at >= TO_TIMESTAMP($2) AND
-                 first_available_at <= TO_TIMESTAMP($3)
-              GROUP BY 1
-            ) ranges,
-            LATERAL (
-              SELECT
-                number,
-                timestamp
-              FROM block
-              WHERE ranges.start <= block.timestamp
-              ORDER BY timestamp
-              LIMIT 1
-            )
-            CROSS JOIN (
-              SELECT number AS last_block
-                FROM block
-                WHERE timestamp <= TO_TIMESTAMP($3)
-                ORDER BY timestamp DESC
-                LIMIT 1
-            ) AS max_block_number
-            ORDER BY start
-            ",
-            vec![interval_size_seconds.into(), start.into(), end.into(), content_type.into()],
-        ))
-        .all(&state.database_connection)
-        .await
-        .map_err(|e| {
-            error!(err=?e, "Failed to lookup audit block status data");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let _interval_size_seconds: i64 = (end - start) / BIN_COUNT;
 
-    Ok(Json(audit_block_status))
+    // let Ok(content_type) =
+    //     ContentType::from_str(http_args.get("content_type").unwrap_or(&("".to_string())))
+    // else {
+    //     debug!("Audit Block Status: invalid content_type argument");
+    //     return Err(StatusCode::BAD_REQUEST);
+    // };
+
+    // let audit_block_status: Vec<AuditBlockStatusData> =
+    // AuditBlockStatusData::find_by_statement(Statement::from_sql_and_values(
+    //         DbBackend::Postgres,
+    //         "
+    //         SELECT
+    //           start,
+    //           success,
+    //           error,
+    //           (COALESCE((LEAD(number) OVER (ORDER BY start)), last_block) - number) - (success + error) AS unaudited
+    //         FROM (
+    //           SELECT
+    //              date_bin($1 * INTERVAL '1 second' , first_available_at, TO_TIMESTAMP($2)) AS start,
+    //              SUM(CASE WHEN RESULT = 1 THEN 1 ELSE 0 END) AS success,
+    //              SUM(CASE WHEN RESULT = 0 THEN 1 ELSE 0 END) AS error,
+    //              0::INT8 AS unaudited
+    //           FROM public.audit_result_latest
+    //           WHERE
+    //              content_type = $4 AND
+    //              first_available_at >= TO_TIMESTAMP($2) AND
+    //              first_available_at <= TO_TIMESTAMP($3)
+    //           GROUP BY 1
+    //         ) ranges,
+    //         LATERAL (
+    //           SELECT
+    //             number,
+    //             timestamp
+    //           FROM block
+    //           WHERE ranges.start <= block.timestamp
+    //           ORDER BY timestamp
+    //           LIMIT 1
+    //         )
+    //         CROSS JOIN (
+    //           SELECT number AS last_block
+    //             FROM block
+    //             WHERE timestamp <= TO_TIMESTAMP($3)
+    //             ORDER BY timestamp DESC
+    //             LIMIT 1
+    //         ) AS max_block_number
+    //         ORDER BY start
+    //         ",
+    //         vec![interval_size_seconds.into(), start.into(), end.into(), content_type.into()],
+    //     ))
+    //     .all(&state.database_connection)
+    //     .await
+    //     .map_err(|e| {
+    //         error!(err=?e, "Failed to lookup audit block status data");
+    //         StatusCode::INTERNAL_SERVER_ERROR
+    //     })?;
+
+    // Ok(Json(audit_block_status))
+
+    Ok(Json(vec![]))
 }
 
 pub async fn single_census_view(
@@ -1636,9 +1618,9 @@ pub struct CensusCreatedAt {
 
 #[derive(FromQueryResult, Debug)]
 pub struct RadiusChartData {
-    pub data_radius: Vec<u8>,
-    pub node_id: Vec<u8>,
     pub raw: String,
+    pub node_id: Vec<u8>,
+    pub data_radius: Vec<u8>,
 }
 
 #[derive(Serialize, Debug)]
@@ -1682,23 +1664,23 @@ async fn generate_radius_graph_data(
         WITH latest_census AS (
             SELECT id
             FROM census
-            WHERE sub_network = $1
+            WHERE sub_protocol = $1
             ORDER BY id DESC
             LIMIT 1
         )
         SELECT
-            census_node.data_radius,
-            record.raw,
-            node.node_id
+            node_enr.raw,
+            node.node_id,
+            census_node.data_radius
         FROM
             census_node,
             node,
-            record,
+            node_enr,
             latest_census
         WHERE
-            AND census_node.census_id == latest_census.id
-            AND census_node.node_enr_id = record.id
-            AND record.node_id = node.id
+            census_node.census_id = latest_census.id
+            AND census_node.node_enr_id = node_enr.id
+            AND node_enr.node_id = node.id
             ",
         vec![subprotocol.into()],
     ))
@@ -1789,44 +1771,36 @@ async fn generate_client_diversity_data(
 }
 
 #[derive(FromQueryResult, Debug, Clone)]
-pub struct TransferFailurePrimitive {
+pub struct TransferFailure {
     pub audit: i32,
-    pub client: String,
+    pub client: Client,
     pub created_at: DateTimeUtc,
     pub failure_type: TransferFailureType,
 }
 
-#[derive(FromQueryResult, Debug, Clone)]
-pub struct TransferFailure {
-    pub audit: i32,
-    pub client: Client,
-    pub created_at: DateTime<Utc>,
-    pub failure_type: String,
-}
-
 pub async fn diagnostics(
+    params: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<HtmlTemplate<DiagnosticsTemplate>, StatusCode> {
+    let sub_protocol = get_subprotocol_from_params(&params);
     // Query to get the 20 most recent internal failures joined with audits for timestamps
-    // TODO: include more than 4444 errors (or maybe a dropdown to select which kind of error)
-    // TODO(milos): fix
-    let transfer_failures: Vec<TransferFailurePrimitive> =
-        TransferFailurePrimitive::find_by_statement(Statement::from_sql_and_values(
+    let transfer_failures: Vec<TransferFailure> =
+        TransferFailure::find_by_statement(Statement::from_sql_and_values(
             DbBackend::Postgres,
             "
             SELECT
-                aif.audit,
-                convert_from(COALESCE(substr(substr(kv.value, 1, 2), length(substr(kv.value, 1, 2)), 1), 'unknown'), 'utf8') AS client,
-                ca.created_at,
-                aif.failure_type
-            FROM audit_transfer_failure AS aif
-            LEFT JOIN record AS r ON aif.sender_node_enr_id=r.id
-            LEFT JOIN key_value AS kv ON (r.id=kv.node_enr_id AND kv.key = '\x63') -- hex('c')  // WHAT
-            LEFT JOIN content_audit AS ca ON aif.audit=ca.id
-            WHERE ca.strategy_used = 5 AND ca.created_at IS NOT NULL
-            ORDER BY created_at DESC
+                audit_transfer_failure.audit_id,
+                COALESCE(census_node.client_name, 'unknown') as client,
+                audit.created_at,
+                audit_transfer_failure.failure_type
+            FROM audit_transfer_failure
+            LEFT JOIN audit ON audit_transfer_failure.audit_id = audit.id
+            LEFT JOIN content ON audit.content_id = content.id
+            LEFT JOIN census_node ON audit_transfer_failure.sender_node_enr_id = census_node.node_enr_id
+            WHERE content.sub_protocol = $1
+            ORDER BY audit.created_at DESC
             LIMIT 20;",
-            vec![],
+            vec![sub_protocol.into()],
         ))
         .all(&state.database_connection)
         .await
@@ -1834,18 +1808,6 @@ pub async fn diagnostics(
             error!(err=?e, "Failed to lookup weekly transfer failures");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-
-    let transfer_failures: Vec<TransferFailure> = transfer_failures
-        .into_iter()
-        .map(|f| {
-            Ok::<TransferFailure, StatusCode>(TransferFailure {
-                audit: f.audit,
-                client: Client::from(f.client),
-                created_at: f.created_at,
-                failure_type: format!("{:?}", f.failure_type),
-            })
-        })
-        .collect::<Result<Vec<_>, StatusCode>>()?;
 
     let template = DiagnosticsTemplate {
         failures: transfer_failures,
@@ -1863,38 +1825,38 @@ mod tests {
     fn test_nest_protocol_versions_clients() {
         let census = vec![
             CensusProtocolVersionsClientsData {
-                client: Client::from("shisui".to_string()),
-                protocol_versions: Some(vec![0u8]),
+                client_name: Client::from("shisui".to_string()),
+                protocol_versions: vec![0u8],
                 node_count: 1,
             },
             CensusProtocolVersionsClientsData {
-                client: Client::from("ultralight".to_string()),
-                protocol_versions: Some(vec![0u8]),
+                client_name: Client::from("ultralight".to_string()),
+                protocol_versions: vec![0u8],
                 node_count: 7,
             },
             CensusProtocolVersionsClientsData {
-                client: Client::from("shisui".to_string()),
-                protocol_versions: Some(vec![130u8, 0u8, 1u8]),
+                client_name: Client::from("shisui".to_string()),
+                protocol_versions: vec![0u8, 1u8],
                 node_count: 8,
             },
             CensusProtocolVersionsClientsData {
-                client: Client::from("trin".to_string()),
-                protocol_versions: Some(vec![130u8, 0u8, 1u8]),
+                client_name: Client::from("trin".to_string()),
+                protocol_versions: vec![0u8, 1u8],
                 node_count: 213,
             },
             CensusProtocolVersionsClientsData {
-                client: Client::from(None),
-                protocol_versions: Some(vec![130u8, 0u8, 1u8]),
+                client_name: Client::from(None),
+                protocol_versions: vec![0u8, 1u8],
                 node_count: 191,
             },
             CensusProtocolVersionsClientsData {
-                client: Client::from("trin".to_string()),
-                protocol_versions: None,
+                client_name: Client::from("trin".to_string()),
+                protocol_versions: vec![],
                 node_count: 21,
             },
             CensusProtocolVersionsClientsData {
-                client: Client::from(None),
-                protocol_versions: None,
+                client_name: Client::from(None),
+                protocol_versions: vec![],
                 node_count: 1,
             },
         ];
