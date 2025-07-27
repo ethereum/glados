@@ -10,7 +10,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 use clap::ValueEnum;
 use enr::NodeId;
 use entity::{client, client_info, SelectionStrategy};
@@ -127,6 +127,7 @@ pub async fn network_overview(
         average_radius_chart: radius_percentages,
         stats: [hour_stats.unwrap(), day_stats.unwrap(), week_stats.unwrap()],
         content_types: ContentType::iter().collect(),
+        clients: Client::iter().collect(),
     };
     HtmlTemplate(template)
 }
@@ -431,7 +432,7 @@ pub async fn contentaudit_detail(
     // If we were able to deserialize the trace, we can look up & interpolate the radius for the nodes in the trace.
     if let Some(trace) = &mut trace {
         // Get the timestamp of the query
-        let timestamp: DateTime<Utc> = Utc
+        let timestamp: DateTimeUtc = Utc
             .timestamp_millis_opt(trace.started_at_ms as i64)
             .single()
             .expect("Failed to convert timestamp to DateTime");
@@ -758,7 +759,7 @@ pub async fn census_explorer_list(
 #[derive(Debug, Clone, FromQueryResult)]
 pub struct NodeStatus {
     enr_id: Option<i32>,
-    census_time: DateTime<Utc>,
+    census_time: DateTimeUtc,
     census_id: i32,
     node_id: Option<Vec<u8>>,
     present: bool,
@@ -780,7 +781,7 @@ pub struct CensusTimeSeriesData {
 #[derive(Debug, Clone, Serialize)]
 pub struct CensusStatuses {
     census_id: i32,
-    time: DateTime<Utc>,
+    time: DateTimeUtc,
     enr_statuses: Vec<Option<i32>>,
 }
 
@@ -920,7 +921,7 @@ fn decouple_nodes_and_censuses(
     let mut node_set: HashSet<String> = HashSet::new();
 
     type NodeEnrIdStatuses = HashMap<String, Option<i32>>;
-    let mut census_map: HashMap<i32, (DateTime<Utc>, NodeEnrIdStatuses)> = HashMap::new();
+    let mut census_map: HashMap<i32, (DateTimeUtc, NodeEnrIdStatuses)> = HashMap::new();
 
     for status in node_statuses {
         let entry = census_map
@@ -962,7 +963,7 @@ fn decouple_nodes_and_censuses(
 #[serde(rename_all = "camelCase")]
 pub struct CensusHistoryData {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     node_count: i64,
 }
 pub async fn weekly_census_history(
@@ -1008,7 +1009,7 @@ pub async fn weekly_census_history(
 #[derive(FromQueryResult)]
 pub struct WeeklyCensusClientsData {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     client: Client,
     node_count: i64,
 }
@@ -1017,7 +1018,7 @@ pub struct WeeklyCensusClientsData {
 #[serde(rename_all = "camelCase")]
 pub struct WeeklyCensusClientsDataCompact {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     client_slug: String,
     node_count: i64,
 }
@@ -1083,7 +1084,7 @@ pub async fn weekly_census_clients(
 #[serde(rename_all = "camelCase")]
 pub struct WeeklyCensusClientVersionsData {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     version: Version,
     node_count: i64,
 }
@@ -1145,7 +1146,7 @@ pub async fn weekly_census_client_versions(
 #[derive(FromQueryResult)]
 pub struct CensusHistoryOperatinSytemData {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     operating_system: OperatingSystem,
     node_count: i64,
 }
@@ -1154,7 +1155,7 @@ pub struct CensusHistoryOperatinSytemData {
 #[serde(rename_all = "camelCase")]
 pub struct CensusHistoryOperatinSytemDataCompact {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     operating_system_slug: String,
     node_count: i64,
 }
@@ -1218,7 +1219,7 @@ pub async fn weekly_census_operating_systems(
 #[derive(FromQueryResult)]
 pub struct CensusHistoryProtocolVersionsData {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     protocol_versions: Vec<u8>,
     node_count: i64,
 }
@@ -1226,7 +1227,7 @@ pub struct CensusHistoryProtocolVersionsData {
 #[serde(rename_all = "camelCase")]
 pub struct CensusHistoryProtocolVersionsDataCompact {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     min_protocol_version: u8,
     max_protocol_version: u8,
     node_count: i64,
@@ -1302,8 +1303,8 @@ pub async fn weekly_census_protocol_versions(
 
 #[derive(FromQueryResult, Debug, Clone, Serialize)]
 pub struct TransferFailureBatches {
-    start: DateTime<Utc>,
-    client: client_info::Client,
+    start: DateTimeUtc,
+    client_name: String,
     failures: i64,
 }
 
@@ -1321,17 +1322,23 @@ pub async fn weekly_transfer_failures(
             DbBackend::Postgres,
             "
             SELECT
-                DATE_BIN('15 minutes', audit.created_at, TIMESTAMP '2001-01-01') AS start,
-                census_node.client_name AS client,
+                DATE_BIN('1 hour', audit.created_at, TIMESTAMP '2001-01-01') AS start,
+                COALESCE(census_node.client_name, 'unknown') as client_name,
                 count(*) AS failures
             FROM audit_transfer_failure
             LEFT JOIN audit ON audit_transfer_failure.audit_id = audit.id
-            LEFT JOIN census_node ON audit_transfer_failure.sender_node_enr_id = census_node.id
+            LEFT JOIN census_node ON census_node.id = (
+                SELECT id
+                FROM census_node
+                WHERE node_enr_id = audit_transfer_failure.sender_node_enr_id
+                ORDER BY id DESC
+                LIMIT 1
+            )
             WHERE
                 audit.created_at IS NOT NULL AND
                 audit.created_at > NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 audit.created_at < NOW() - INTERVAL '1 week' * $1
-            GROUP BY start, client
+            GROUP BY start, client_name
             ORDER BY start;
         ",
             vec![weeks_ago.into()],
@@ -1608,12 +1615,12 @@ async fn get_created_data_from_census_id(state: &Arc<State>, census_id: i32) -> 
 pub struct PaginatedCensusListResult {
     pub census_id: i32,
     pub node_count: i64,
-    pub created_at: DateTime<Utc>,
+    pub created_at: DateTimeUtc,
 }
 
 #[derive(FromQueryResult, Debug, Clone)]
 pub struct CensusCreatedAt {
-    pub created_at: DateTime<Utc>,
+    pub created_at: DateTimeUtc,
 }
 
 #[derive(FromQueryResult, Debug)]
@@ -1772,7 +1779,7 @@ async fn generate_client_diversity_data(
 
 #[derive(FromQueryResult, Debug, Clone)]
 pub struct TransferFailure {
-    pub audit: i32,
+    pub audit_id: i32,
     pub client: Client,
     pub created_at: DateTimeUtc,
     pub failure_type: TransferFailureType,
@@ -1796,7 +1803,13 @@ pub async fn diagnostics(
             FROM audit_transfer_failure
             LEFT JOIN audit ON audit_transfer_failure.audit_id = audit.id
             LEFT JOIN content ON audit.content_id = content.id
-            LEFT JOIN census_node ON audit_transfer_failure.sender_node_enr_id = census_node.node_enr_id
+            LEFT JOIN census_node ON census_node.id = (
+                SELECT id
+                FROM census_node
+                WHERE node_enr_id = audit_transfer_failure.sender_node_enr_id
+                ORDER BY id DESC
+                LIMIT 1
+            )
             WHERE content.sub_protocol = $1
             ORDER BY audit.created_at DESC
             LIMIT 20;",

@@ -25,6 +25,7 @@ pub struct IndexTemplate {
     pub average_radius_chart: Vec<CalculatedRadiusChartData>,
     pub stats: [AuditStats; 3],
     pub content_types: Vec<ContentType>,
+    pub clients: Vec<Client>,
 }
 
 #[derive(Template)]

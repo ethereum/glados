@@ -185,7 +185,7 @@
                 <div class="card-body">
                     <button class="question-mark" aria-label="Toggle explanation"></button>
                     <div class="explanation">
-                        This graph shows every transfer failure during a content audit, grouped into 15-minute buckets, by client. This includes failures that did not result in a full audit failure, because the client found another peer that had a transfer success. It uses the ENR client field which is deprecated.
+                        This graph shows every transfer failure during a content audit, grouped into 1 hour buckets, by client. This includes failures that did not result in a full audit failure, because the client found another peer that had a transfer success.
                     </div>
                     <div class="table-responsive">
                         <div id="transfer-failures-graph-container">
@@ -287,40 +287,9 @@
         labelY: "# of failures",
         kind: "weekly",
         dataShape: "long",
-        keyAttribute: "client",
+        keyAttribute: "client_name",
         valueAttribute: "failures",
-        seriesMetadata: [
-          {
-            slug: "f",
-            color: "#3498DB",
-            name: "Nimbus",
-          },
-          {
-            slug: "t",
-            color: "#9B59B6",
-            name: "Trin",
-          },
-          {
-            slug: "a",
-            color: "#2E8C47",
-            name: "Samba",
-          },          
-          {
-            slug: "s",
-            color: "#DA251D",
-            name: "Shisui",
-          },
-          {
-            slug: "u",
-            color: "#E67E22",
-            name: "Ultralight",
-          },
-          {
-            slug: "unknown",
-            color: "#BBBBBB",
-            name: "Unknown",
-          },
-        ],
+        seriesMetadata: {{ clients | json | safe }},
         initialRanges: {
             x: [Date.now() - 7 * 24 * 60 * 60 * 1000, Date.now()],
             y: [0, 20],
