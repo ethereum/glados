@@ -5,6 +5,7 @@ use ethportal_api::{
     utils::bytes::{hex_encode, hex_encode_compact},
     OverlayContentKey,
 };
+use num_format::{Locale, ToFormattedString};
 use sea_orm::{entity::prelude::*, NotSet, Set};
 
 use crate::{ContentType, SubProtocol};
@@ -118,7 +119,7 @@ impl Model {
 
     pub fn block_number_as_html(&self) -> String {
         match self.block_number {
-            Some(block_number) => format!("{block_number}"),
+            Some(block_number) => block_number.to_formatted_string(&Locale::en),
             None => String::new(),
         }
     }

@@ -17,7 +17,7 @@
                 {% if let Some(block_number) = content.block_number() %}
                 <li>Block:
                     <a href="https://etherscan.io/block/{{ block_number }}">
-                        {{ block_number }}
+                        {{ content.block_number_as_html() }}
                     </a>
                 </li>
                 {% endif %}

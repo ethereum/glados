@@ -40,6 +40,7 @@ glados-core = { path = "glados-core" }
 glados-audit = { path = "glados-audit" }
 glados-web = { path = "glados-web" }
 migration = { path = "migration" }
+num-format = "0.4.4"
 pgtemp = "0.2.1"
 rand = "0.9.1"
 reqwest = { version = "0.11.6", default-features = false, features = ["rustls-tls", "blocking", "stream"] }

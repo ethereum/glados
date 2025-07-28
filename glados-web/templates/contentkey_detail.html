@@ -14,7 +14,7 @@
             <li>Content Id: <a href="/content/id/{{ content.id_as_hex() }}/">{{ content.id_as_hex() }}</a></li>
             <li>Kind: {{ content_kind }}</li>
             {% if let Some(block_number) = content.block_number() %}
-            <li>Block number: <a href="https://etherscan.io/block/{{ block_number }}">{{ block_number }}</a></li>
+            <li>Block number: <a href="https://etherscan.io/block/{{ block_number }}">{{ content.block_number_as_html() }}</a></li>
             {% else %}{% endif %}
             <li>Nodes on the network that will accept this content: 
                 <a href="/api/is-content-in-deadzone/{{ content.key_as_hex() }}" id="nodes_that_will_accept_this_account">Loading...</a>
