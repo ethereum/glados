@@ -2,14 +2,14 @@ use std::{collections::HashMap, fmt::Display};
 
 use chrono::{DateTime, Utc};
 use sea_orm::{
-    sea_query::{Expr, IntoCondition},
-    ColumnTrait, DatabaseConnection, DbErr, EntityTrait, JoinType, QueryFilter, QuerySelect,
-    RelationTrait, Select,
+    sea_query::IntoCondition, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, JoinType,
+    QueryFilter, QuerySelect, RelationTrait, Select,
 };
 use serde::Deserialize;
 
 use entity::{
-    audit, content, AuditResult, HistorySelectionStrategy, SelectionStrategy, SubProtocol,
+    audit, content, AuditResult, ContentType, HistorySelectionStrategy, SelectionStrategy,
+    SubProtocol,
 };
 
 /// Generates a SeaORM select query for audits based on the provided filters.
@@ -47,14 +47,13 @@ pub fn filter_audits(filters: AuditFilters) -> Select<audit::Entity> {
         SuccessFilter::Failure => audits.filter(audit::Column::Result.eq(AuditResult::Failure)),
     };
     // Content type filters
-    // TODO(milos): Update to new content keys
     match filters.content_type {
         ContentTypeFilter::All => audits,
         ContentTypeFilter::Bodies => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x03").into_condition())
+            audits.filter(content::Column::ContentType.eq(ContentType::BlockBodies))
         }
         ContentTypeFilter::Receipts => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x01").into_condition())
+            audits.filter(content::Column::ContentType.eq(ContentType::BlockReceipts))
         }
     }
 }

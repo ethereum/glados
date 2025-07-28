@@ -1323,17 +1323,19 @@ pub async fn weekly_transfer_failures(
             "
             SELECT
                 DATE_BIN('1 hour', audit.created_at, TIMESTAMP '2001-01-01') AS start,
-                COALESCE(census_node.client_name, 'unknown') as client_name,
+                COALESCE(closest_census_node.client_name, 'unknown') as client_name,
                 count(*) AS failures
             FROM audit_transfer_failure
             LEFT JOIN audit ON audit_transfer_failure.audit_id = audit.id
-            LEFT JOIN census_node ON census_node.id = (
-                SELECT id
+            CROSS JOIN LATERAL (
+                SELECT census_node.client_name
                 FROM census_node
-                WHERE node_enr_id = audit_transfer_failure.sender_node_enr_id
-                ORDER BY id DESC
+                WHERE
+                    census_node.node_enr_id = audit_transfer_failure.sender_node_enr_id AND
+                    census_node.surveyed_at <= audit.created_at + INTERVAL '15 minutes'
+                ORDER BY census_node.surveyed_at DESC
                 LIMIT 1
-            )
+            ) closest_census_node
             WHERE
                 audit.created_at IS NOT NULL AND
                 audit.created_at > NOW() - INTERVAL '1 week' * ($1 + 1) AND
@@ -1797,19 +1799,21 @@ pub async fn diagnostics(
             "
             SELECT
                 audit_transfer_failure.audit_id,
-                COALESCE(census_node.client_name, 'unknown') as client,
+                closest_census_node.client,
                 audit.created_at,
                 audit_transfer_failure.failure_type
             FROM audit_transfer_failure
             LEFT JOIN audit ON audit_transfer_failure.audit_id = audit.id
             LEFT JOIN content ON audit.content_id = content.id
-            LEFT JOIN census_node ON census_node.id = (
-                SELECT id
+            CROSS JOIN LATERAL (
+                SELECT census_node.client_name as client
                 FROM census_node
-                WHERE node_enr_id = audit_transfer_failure.sender_node_enr_id
-                ORDER BY id DESC
+                WHERE
+                    census_node.node_enr_id = audit_transfer_failure.sender_node_enr_id AND
+                    census_node.surveyed_at <= audit.created_at + INTERVAL '15 minutes'
+                ORDER BY census_node.surveyed_at DESC
                 LIMIT 1
-            )
+            ) closest_census_node
             WHERE content.sub_protocol = $1
             ORDER BY audit.created_at DESC
             LIMIT 20;",

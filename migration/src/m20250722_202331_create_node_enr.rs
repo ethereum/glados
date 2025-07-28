@@ -36,6 +36,7 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 Index::create()
+                    .unique()
                     .table(NodeEnr::Table)
                     .name(IDX_NODE_ID_SEQ)
                     .col(NodeEnr::NodeId)

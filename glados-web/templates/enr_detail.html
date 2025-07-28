@@ -75,7 +75,7 @@
             }
             return field
         } else if (key === "c") {
-            return value
+            return String.fromCharCode(...value);
         } else {
             // default to assuming binary data            
             return toHexString(value)
