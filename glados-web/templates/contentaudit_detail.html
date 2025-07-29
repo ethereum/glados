@@ -27,9 +27,14 @@
             </ul>
         </div>
     </div>
-    <div id="no-trace" hidden="true">No Trace Available</div>
+
+    {% if audit.trace.is_none() %}
+    <div id="no-trace">Trace Not Available</div>
+    {% endif %}
+
 </div>
 
+{% if audit.trace.is_some() %}
 <div id="trace" class="row">
     <div id="graph" class="w-66">
         <div id="legend-container">
@@ -78,6 +83,7 @@
     </div>
 
 </div>
+
 <style>
     #sort-toggle {
         text-align: left;  /* Align with the legend */
@@ -92,6 +98,7 @@
 <script>
 $(document).ready(function () {
     let trace_string = "{{ audit.trace_as_html() }}".replace(/(&#34;|&quot;)/g, '"');
+
     let trace = JSON.parse(trace_string);
     let graphData, graphSvg;
     
@@ -146,5 +153,6 @@ $(document).ready(function () {
 
 });
 </script>
+{% endif %}
 
 {% endblock %}
