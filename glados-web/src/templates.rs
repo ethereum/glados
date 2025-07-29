@@ -9,7 +9,7 @@ use entity::{
     content, node, node_enr, ContentType, SubProtocol,
 };
 use glados_core::stats::{AuditStats, StrategyFilter};
-use strum::{EnumMessage, EnumProperty};
+use strum::EnumProperty;
 
 use crate::routes::{
     CalculatedRadiusChartData, ClientDiversityResult, NodeEnr, PaginatedCensusListResult,

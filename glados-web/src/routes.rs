@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::io;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use alloy_primitives::{hex, B256, U256};
@@ -1422,107 +1421,6 @@ pub async fn census_protocol_versions_clients(
         })?;
 
     Ok(Json(nest_protocol_versions_clients(census)))
-}
-
-#[derive(Debug, Clone, Serialize, FromQueryResult)]
-#[serde(rename_all = "camelCase")]
-pub struct AuditBlockStatusData {
-    start: i64,
-    success: i64,
-    error: i64,
-    unaudited: i64,
-}
-// TODO(milos): fix
-pub async fn audit_block_status(
-    http_args: HttpQuery<HashMap<String, String>>,
-    Extension(_state): Extension<Arc<State>>,
-) -> Result<Json<Vec<AuditBlockStatusData>>, StatusCode> {
-    const BIN_COUNT: i64 = 80; // ~200k blocks per bin for all pre-merge data
-
-    let start = match http_args.get("start").map(|start| i64::from_str(start)) {
-        Some(Ok(start)) => start,
-        Some(Err(err)) => {
-            error!(%err, "Audit Block Status: invalid start argument");
-            return Err(StatusCode::BAD_REQUEST);
-        }
-        None => 0,
-    };
-
-    let end = match http_args.get("end").map(|end| i64::from_str(end)) {
-        Some(Ok(end)) => end,
-        Some(Err(err)) => {
-            error!(%err, "Audit Block Status: invalid end argument");
-            return Err(StatusCode::BAD_REQUEST);
-        }
-        None => 15000000, // TODO(milos)
-    };
-
-    if end < start {
-        error!("Audit Block Status: invalid start ({start}) and end ({end}) arguments");
-        return Err(StatusCode::BAD_REQUEST);
-    }
-
-    let _interval_size_seconds: i64 = (end - start) / BIN_COUNT;
-
-    // let Ok(content_type) =
-    //     ContentType::from_str(http_args.get("content_type").unwrap_or(&("".to_string())))
-    // else {
-    //     debug!("Audit Block Status: invalid content_type argument");
-    //     return Err(StatusCode::BAD_REQUEST);
-    // };
-
-    // let audit_block_status: Vec<AuditBlockStatusData> =
-    // AuditBlockStatusData::find_by_statement(Statement::from_sql_and_values(
-    //         DbBackend::Postgres,
-    //         "
-    //         SELECT
-    //           start,
-    //           success,
-    //           error,
-    //           (COALESCE((LEAD(number) OVER (ORDER BY start)), last_block) - number) - (success + error) AS unaudited
-    //         FROM (
-    //           SELECT
-    //              date_bin($1 * INTERVAL '1 second' , first_available_at, TO_TIMESTAMP($2)) AS start,
-    //              SUM(CASE WHEN RESULT = 1 THEN 1 ELSE 0 END) AS success,
-    //              SUM(CASE WHEN RESULT = 0 THEN 1 ELSE 0 END) AS error,
-    //              0::INT8 AS unaudited
-    //           FROM public.audit_result_latest
-    //           WHERE
-    //              content_type = $4 AND
-    //              first_available_at >= TO_TIMESTAMP($2) AND
-    //              first_available_at <= TO_TIMESTAMP($3)
-    //           GROUP BY 1
-    //         ) ranges,
-    //         LATERAL (
-    //           SELECT
-    //             number,
-    //             timestamp
-    //           FROM block
-    //           WHERE ranges.start <= block.timestamp
-    //           ORDER BY timestamp
-    //           LIMIT 1
-    //         )
-    //         CROSS JOIN (
-    //           SELECT number AS last_block
-    //             FROM block
-    //             WHERE timestamp <= TO_TIMESTAMP($3)
-    //             ORDER BY timestamp DESC
-    //             LIMIT 1
-    //         ) AS max_block_number
-    //         ORDER BY start
-    //         ",
-    //         vec![interval_size_seconds.into(), start.into(), end.into(), content_type.into()],
-    //     ))
-    //     .all(&state.database_connection)
-    //     .await
-    //     .map_err(|e| {
-    //         error!(err=?e, "Failed to lookup audit block status data");
-    //         StatusCode::INTERNAL_SERVER_ERROR
-    //     })?;
-
-    // Ok(Json(audit_block_status))
-
-    Ok(Json(vec![]))
 }
 
 pub async fn single_census_view(
