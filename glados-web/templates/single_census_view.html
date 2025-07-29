@@ -38,33 +38,43 @@
                             <div class="d-grid gap-2">
                                 <nav aria-label="census explorer navigation">
                                     <ul class="pagination justify-content-center">
-                                        <li class="page-item {% if census_id == 1 %}disabled{% endif %}">
-                                            <a class="page-link"
-                                                href="/census/?census-id={{ census_id - 1}}">Previous</a>
-                                        </li>
-                                        <li class="page-item {% if census_id == 1 %}active{% endif -%}"><a
-                                                class="page-link" href="/census/1">1</a></li>
-                                        {% if max_census_id != 1 %}
-                                        <li
-                                            class="page-item {% if census_id != 1 && census_id != max_census_id %}active{% endif %}">
-                                            {% if census_id == 1 %}
-                                            <a class="page-link" href="/census/?census-id={{ census_id + 1 }}">{{
-                                                census_id + 1 }}</a>
-                                            {% else if census_id == max_census_id %}
-                                            <a class="page-link" href="/census/?census-id={{ census_id - 1 }}">{{
-                                                census_id - 1 }}</a>
-                                            {% else %}
-                                            <a class="page-link" href="/census/?census-id={{ census_id }}">{{ census_id
-                                                }}</a>
+                                        {% if census_id > 1 %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="/census/?census-id=1">1</a>
+                                            </li>
+                                            {% if census_id > 2 %}
+                                                {% if census_id > 3 %}
+                                                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                                                {% endif %}
+                                                <li class="page-item">
+                                                    <a class="page-link" href="/census/?census-id={{ census_id - 1 }}">
+                                                        {{ census_id - 1 }}
+                                                    </a>
+                                                </li>
                                             {% endif %}
-                                        </li>
-                                        <li class="page-item {% if census_id == max_census_id %}active{% endif %}"><a
-                                                class="page-link" href="/census/?census-id={{ max_census_id }}">{{
-                                                max_census_id }}</a></li>
                                         {% endif %}
-                                        <li class="page-item {% if census_id == max_census_id %}disabled{% endif %}">
-                                            <a class="page-link" href="/census/?census-id={{ census_id + 1 }}">Next</a>
+
+                                        <li class="page-item active">
+                                            <a class="page-link" href="/census/?census-id={{ census_id }}">{{ census_id }}</a>
                                         </li>
+
+                                        {% if census_id < max_census_id %}
+                                            {% if census_id < max_census_id - 1 %}
+                                                <li class="page-item">
+                                                    <a class="page-link" href="/census/?census-id={{ census_id + 1 }}">
+                                                        {{ census_id + 1 }}
+                                                    </a>
+                                                </li>
+                                                {% if census_id < max_census_id - 2 %}
+                                                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                                                {% endif %}
+                                            {% endif %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="/census/?census-id={{ max_census_id }}">
+                                                    {{ max_census_id }}
+                                                </a>
+                                            </li>
+                                        {% endif %}
                                     </ul>
                                 </nav>
                                 <a href="/census/census-list/?page=1" class="btn btn-outline-secondary"
@@ -97,7 +107,11 @@
                             <tbody>
                                 {% for enr in enr_list %}
                                 <tr>
-                                    <td>{{ enr.raw }}</td>
+                                    <td>
+                                        <a href="/network/node/{{ enr.node_id() }}/enr/{{ enr.sequence_number }}/">
+                                            {{ enr.raw }}
+                                        </a>
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>

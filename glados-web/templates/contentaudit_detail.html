@@ -14,17 +14,16 @@
             <ul>
                 <li>Content Key: <a href="/content/key/{{content.key_as_hex() }}/">{{ content.key_as_hex() }}</a></li>
                 <li>Content ID: <a href="/content/id/{{content.id_as_hex() }}/">{{ content.id_as_hex() }}</a></li>
-                {% if execution_metadata.is_some() %}
-                {% let block_num = execution_metadata.as_ref().unwrap().block_number %}
+                {% if let Some(block_number) = content.block_number() %}
                 <li>Block:
-                    <a href="https://etherscan.io/block/{{ block_num }}">
-                        {{ block_num }}
+                    <a href="https://etherscan.io/block/{{ block_number }}">
+                        {{ content.block_number_as_html() }}
                     </a>
                 </li>
                 {% endif %}
                 <li>Started: {{ audit.created_at }}</li>
-                <li>Result: {{ audit.result.as_text() }}</li>
-                <li>Strategy: {{ audit.strategy_as_text() }}</li>
+                <li>Result: {{ audit.result.to_string() }}</li>
+                <li>Strategy: {{ audit.strategy.as_str() }}</li>
             </ul>
         </div>
     </div>
@@ -92,7 +91,7 @@
 </style>
 <script>
 $(document).ready(function () {
-   let trace_string = "{{ audit.trace }}".replace(/&quot;/g, '"');
+    let trace_string = "{{ audit.trace_as_html() }}".replace(/(&#34;|&quot;)/g, '"');
     let trace = JSON.parse(trace_string);
     let graphData, graphSvg;
     

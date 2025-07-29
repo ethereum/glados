@@ -185,7 +185,7 @@
                 <div class="card-body">
                     <button class="question-mark" aria-label="Toggle explanation"></button>
                     <div class="explanation">
-                        This graph shows every transfer failure during a content audit, grouped into 15-minute buckets, by client. This includes failures that did not result in a full audit failure, because the client found another peer that had a transfer success. It uses the ENR client field which is deprecated.
+                        This graph shows every transfer failure during a content audit, grouped into 1 hour buckets, by client. This includes failures that did not result in a full audit failure, because the client found another peer that had a transfer success.
                     </div>
                     <div class="table-responsive">
                         <div id="transfer-failures-graph-container">
@@ -196,34 +196,6 @@
             </div>
         </div>
     </div>
-  {% if subprotocol == SubProtocol::History %}
-    <div class="row">
-        <div class="col-lg-12 col-md-12 col-sm-12 margin-bottom">
-            <div class="card pie-box h-100">
-                <div class="card-body">
-                    <button class="question-mark" aria-label="Toggle explanation"></button>
-                    <div class="explanation">
-                        This graph shows the result of the latest audit for each block
-                    </div>
-                    <div class="table-responsive">
-                        <select
-                            id="audit-block-status-select"
-                            class="form-select"
-                            style="width: auto"
-                        >
-                        {% for content_type in content_types %}
-                            <option value = "{{content_type.get_serializations()[0]}}">{{content_type.get_message().unwrap()}}</option>
-                        {% endfor %}
-                        </select>
-                        <div id="audit-block-status-graph-container" style="position: relative">
-                            <div id="audit-block-status-graph"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-  {% endif %}
 </div>
 <script>
     pie_chart_count({{ client_diversity_data| json | safe }});
@@ -287,83 +259,14 @@
         labelY: "# of failures",
         kind: "weekly",
         dataShape: "long",
-        keyAttribute: "client",
+        keyAttribute: "client_name",
         valueAttribute: "failures",
-        seriesMetadata: [
-          {
-            slug: "f",
-            color: "#3498DB",
-            name: "Nimbus",
-          },
-          {
-            slug: "t",
-            color: "#9B59B6",
-            name: "Trin",
-          },
-          {
-            slug: "a",
-            color: "#2E8C47",
-            name: "Samba",
-          },          
-          {
-            slug: "s",
-            color: "#DA251D",
-            name: "Shisui",
-          },
-          {
-            slug: "u",
-            color: "#E67E22",
-            name: "Ultralight",
-          },
-          {
-            slug: "unknown",
-            color: "#BBBBBB",
-            name: "Unknown",
-          },
-        ],
+        seriesMetadata: {{ clients | json | safe }},
         initialRanges: {
             x: [Date.now() - 7 * 24 * 60 * 60 * 1000, Date.now()],
             y: [0, 20],
         }
     });
-
-  {% if subprotocol == SubProtocol::History %}
-    areaGraph({
-      baseName: "audit-block-status",
-      baseUrl: "/api/audit-block-status/?",
-      graphTitle: "Status of latest 4444 audit per block",
-      labelY: "% of blocks",
-      kind: "zoom",
-      dataShape: "wide",
-      valueAttribute: "nodeCount",
-      stackHundrethPercent: true,
-      selectParam: "content_type",
-      seriesMetadata: [
-        {
-          slug: "success",
-          color: "#90ee90",
-          name: "Success",
-        },
-        {
-          slug: "error",
-          color: "#ffc0cb",
-          name: "Error",
-        },
-        {
-          slug: "unaudited",
-          color: "#dddddd",
-          name: "Unaudited"
-        },
-      ],
-      initialRanges: {
-        x: [
-             new Date(Date.UTC(2015, 6, 30, 15, 26, 13)), // GENESIS_TIMESTAMP: 2015-07-30T15:26:13Z
-             new Date(Date.UTC(2022, 8, 15, 6, 42, 42)),  // LAST_MINED_BLOCK_TIMESTAMP: 2022-09-15T06:42:42Z
-        ],
-        y: [0, 1],
-      }
-  });
-  {% endif %}
 </script>
 
 {% endblock %}

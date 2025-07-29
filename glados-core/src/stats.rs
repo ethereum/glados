@@ -2,31 +2,30 @@ use std::{collections::HashMap, fmt::Display};
 
 use chrono::{DateTime, Utc};
 use sea_orm::{
-    sea_query::{Expr, IntoCondition},
-    ColumnTrait, DatabaseConnection, DbErr, EntityTrait, JoinType, QueryFilter, QuerySelect,
-    RelationTrait, Select,
+    sea_query::IntoCondition, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, JoinType,
+    QueryFilter, QuerySelect, RelationTrait, Select,
 };
 use serde::Deserialize;
 
 use entity::{
-    content::{self, SubProtocol},
-    content_audit::{self, AuditResult, HistorySelectionStrategy, SelectionStrategy},
+    audit, content, AuditResult, ContentType, HistorySelectionStrategy, SelectionStrategy,
+    SubProtocol,
 };
 
 /// Generates a SeaORM select query for audits based on the provided filters.
 ///
 /// User can decide whether to retrieve or only count results.
 /// TODO: add support for filtering by portal client
-pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
+pub fn filter_audits(filters: AuditFilters) -> Select<audit::Entity> {
     // This base query will have filters added to it
-    let audits = content_audit::Entity::find();
+    let audits = audit::Entity::find();
     let audits = audits.join(
         JoinType::Join,
-        content_audit::Relation::Content
+        audit::Relation::Content
             .def()
             .on_condition(move |_left, _right| {
-                content::Column::ProtocolId
-                    .eq(filters.network)
+                content::Column::SubProtocol
+                    .eq(filters.sub_protocol)
                     .into_condition()
             }),
     );
@@ -34,40 +33,34 @@ pub fn filter_audits(filters: AuditFilters) -> Select<content_audit::Entity> {
     let audits = match filters.strategy {
         StrategyFilter::All => audits,
         StrategyFilter::Sync => audits.filter(
-            content_audit::Column::StrategyUsed
-                .eq(SelectionStrategy::History(HistorySelectionStrategy::Sync)),
+            audit::Column::Strategy.eq(SelectionStrategy::History(HistorySelectionStrategy::Sync)),
         ),
         StrategyFilter::Random => audits.filter(
-            content_audit::Column::StrategyUsed
+            audit::Column::Strategy
                 .eq(SelectionStrategy::History(HistorySelectionStrategy::Random)),
         ),
     };
     // Success filters
     let audits = match filters.success {
         SuccessFilter::All => audits,
-        SuccessFilter::Success => {
-            audits.filter(content_audit::Column::Result.eq(AuditResult::Success))
-        }
-        SuccessFilter::Failure => {
-            audits.filter(content_audit::Column::Result.eq(AuditResult::Failure))
-        }
+        SuccessFilter::Success => audits.filter(audit::Column::Result.eq(AuditResult::Success)),
+        SuccessFilter::Failure => audits.filter(audit::Column::Result.eq(AuditResult::Failure)),
     };
     // Content type filters
-    // TODO(milos): Update to new content keys
     match filters.content_type {
         ContentTypeFilter::All => audits,
         ContentTypeFilter::Bodies => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x03").into_condition())
+            audits.filter(content::Column::ContentType.eq(ContentType::BlockBodies))
         }
         ContentTypeFilter::Receipts => {
-            audits.filter(Expr::cust("get_byte(content.content_key, 0) = 0x01").into_condition())
+            audits.filter(content::Column::ContentType.eq(ContentType::BlockReceipts))
         }
     }
 }
 
 /// Calculates stats for the given set of audits over the given period.
 pub async fn get_audit_stats(
-    filtered: Select<content_audit::Entity>,
+    filtered: Select<audit::Entity>,
     period: Period,
     conn: &DatabaseConnection,
 ) -> Result<AuditStats, DbErr> {
@@ -75,11 +68,11 @@ pub async fn get_audit_stats(
 
     let audit_result_count: HashMap<AuditResult, i64> = filtered
         .clone()
-        .filter(content_audit::Column::CreatedAt.gt(cutoff))
+        .filter(audit::Column::CreatedAt.gt(cutoff))
         .select_only()
-        .column(content_audit::Column::Result)
-        .column_as(content_audit::Column::Result.count(), "count")
-        .group_by(content_audit::Column::Result)
+        .column(audit::Column::Result)
+        .column_as(audit::Column::Result.count(), "count")
+        .group_by(audit::Column::Result)
         .into_tuple::<(AuditResult, i64)>()
         .all(conn)
         .await?
@@ -159,7 +152,7 @@ pub struct AuditFilters {
     pub strategy: StrategyFilter,
     pub content_type: ContentTypeFilter,
     pub success: SuccessFilter,
-    pub network: SubProtocol,
+    pub sub_protocol: SubProtocol,
 }
 
 #[derive(Deserialize, Copy, Clone)]

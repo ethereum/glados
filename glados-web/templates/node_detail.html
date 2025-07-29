@@ -14,46 +14,22 @@
         </div>
     </div>
     <br />
-    {% if node.get_nickname().is_some() %}
-    <div class="row">
-        <div class="col">
-            <div class="card shadow-sm enr-card">
-                <div class="card-body">
-                    <h2>{{ node.get_nickname().unwrap() }}</h2>
-                    <p><a
-                            href="https://trin-bench.ethdevops.io/d/e23mBdEVkb/trin-metrics?orgId=1&var-protocol=All&var-node={{ node.get_nickname().unwrap() }}">
-                            Trin Metrics</a></p>
-
-                    <p><a
-                            href="https://trin-bench.ethdevops.io/d/rYdddlPWk/node-exporter-full?orgId=1&refresh=1m&var-DS_PROMETHEUS=default&var-job=node&var-node={{ node.get_nickname().unwrap() }}">
-                            Node Metrics</a></p>
-                </div>
-            </div>
-        </div>
-    </div>
-    <br />
-    {% endif %}
     <div class="row">
         <div class="col">
             {% match latest_enr %}
-            {% when Some with (enr) %}
-            <div class="card shadow-sm enr-card">
-                <div class="card-body">
-                    <h2>Latest ENR</h2>
-                    <ul>
-                        <li>Sequence Number: {{ enr.sequence_number }}</li>
-                    </ul>
-                    <pre>{{ enr.raw }}</pre>
-                    <div id="enr-data-box" class="form-group"></div>
-                </div>
-            </div>
-            {% match latest_enr_key_value_list %}
-            {% when Some with (key_value_list) %}
-            {% when None %}
-            <p>This shouldn't happen</p>
-            {% endmatch %}
-            {% when None %}
-            <p>No latest ENR found</p>
+                {% when Some with (enr) %}
+                    <div class="card shadow-sm enr-card">
+                        <div class="card-body">
+                            <h2>Latest ENR</h2>
+                            <ul>
+                                <li>Sequence Number: {{ enr.sequence_number }}</li>
+                            </ul>
+                            <pre>{{ enr.raw }}</pre>
+                            <div id="enr-data-box" class="form-group"></div>
+                        </div>
+                    </div>
+                {% when None %}
+                    <p>No latest ENR found</p>
             {% endmatch %}
         </div>
     </div>
@@ -70,12 +46,12 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for record in enr_list %}
+                            {% for enr in enr_list %}
                             <tr>
                                 <td>
-                                    <a
-                                        href="/network/node/{{ node.node_id_as_hex() }}/enr/{{ record.sequence_number }}/">{{
-                                        record.sequence_number }}</a>
+                                    <a href="/network/node/{{ node.node_id_as_hex() }}/enr/{{ enr.sequence_number }}/">
+                                        {{ enr.sequence_number }}
+                                    </a>
                                 </td>
                             </tr>
                             {% else %}
@@ -171,7 +147,7 @@
         div.className = "input-group mb-3";
         div.innerHTML = `
         <span class="input-group-text">${key}</span>
-        <input type="text" class="form-control" value="${displayValue}">
+        <input type="text" class="form-control" value="${displayValue}" disabled>
     `;
 
         container.appendChild(div);

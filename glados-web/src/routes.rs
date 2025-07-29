@@ -1,10 +1,7 @@
 use std::collections::{HashMap, HashSet};
-use std::fmt::Formatter;
-use std::str::FromStr;
+use std::io;
 use std::sync::Arc;
-use std::{fmt::Display, io};
 
-use alloy::rlp::Decodable;
 use alloy_primitives::{hex, B256, U256};
 use axum::{
     extract::{Extension, Path, Query as HttpQuery},
@@ -12,28 +9,29 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 use clap::ValueEnum;
 use enr::NodeId;
-use entity::audit_internal_failure::TransferFailureType;
-use entity::census_node::client_from_short_name;
+use entity::{client, client_info, SelectionStrategy};
 use ethportal_api::{
     jsonrpsee::core::__reexports::serde_json,
     types::{
         distance::{Distance, Metric, XorMetric},
-        protocol_versions::ProtocolVersionList,
         query_trace::QueryTrace,
     },
     utils::bytes::{hex_decode, hex_encode},
     HistoryContentKey, OverlayContentKey,
 };
+use sea_orm::prelude::DateTimeUtc;
+use sea_orm::sea_query::Alias;
 use sea_orm::{
     sea_query::{Expr, Query, SimpleExpr},
     ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult,
     Iterable, LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, Statement,
 };
+use sea_orm::{Order, QueryTrait};
 use serde::Serialize;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 
 use crate::templates::{
     AuditDashboardTemplate, AuditTableTemplate, CensusExplorerTemplate, ClientsTemplate,
@@ -44,18 +42,14 @@ use crate::templates::{
 };
 use crate::{state::State, templates::AuditTuple};
 use entity::{
-    audit_result_latest::ContentType,
-    audit_stats, census, census_node,
-    census_node::{Client, OperatingSystem, Version},
-    client_info, content,
-    content::SubProtocol,
-    content_audit, execution_metadata, key_value, node, record,
+    audit, audit_stats, census, census_node,
+    client_info::{Client, OperatingSystem, Version},
+    content, node, node_enr, ContentType, SubProtocol, TransferFailureType,
 };
 use glados_core::stats::{
     filter_audits, get_audit_stats, AuditFilters, ContentTypeFilter, Period, StrategyFilter,
     SuccessFilter,
 };
-use migration::{Alias, Order};
 
 //
 // Routes
@@ -76,18 +70,18 @@ pub async fn network_overview(
     params: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
-    let subprotocol = get_subprotocol_from_params(&params);
+    let sub_protocol = get_subprotocol_from_params(&params);
 
-    let client_diversity_data = match get_max_census_id(&state, subprotocol).await {
+    let client_diversity_data = match get_max_census_id(&state, sub_protocol).await {
         None => vec![],
-        Some(max_census_id) => generate_client_diversity_data(&state, max_census_id.id)
+        Some(max_census_id) => generate_client_diversity_data(&state, max_census_id)
             .await
-            .unwrap(),
+            .unwrap_or_default(),
     };
 
-    let radius_percentages = generate_radius_graph_data(&state, subprotocol).await;
+    let radius_percentages = generate_radius_graph_data(&state, sub_protocol).await;
 
-    let strategy: StrategyFilter = match subprotocol {
+    let strategy: StrategyFilter = match sub_protocol {
         SubProtocol::History => StrategyFilter::Sync,
     };
 
@@ -98,7 +92,7 @@ pub async fn network_overview(
                 strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
-                network: subprotocol,
+                sub_protocol,
             },),
             Period::Hour,
             &state.database_connection,
@@ -108,7 +102,7 @@ pub async fn network_overview(
                 strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
-                network: subprotocol,
+                sub_protocol,
             },),
             Period::Day,
             &state.database_connection,
@@ -118,7 +112,7 @@ pub async fn network_overview(
                 strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
-                network: subprotocol,
+                sub_protocol,
             },),
             Period::Week,
             &state.database_connection,
@@ -126,12 +120,13 @@ pub async fn network_overview(
     );
 
     let template = IndexTemplate {
-        subprotocol,
+        subprotocol: sub_protocol,
         strategy,
         client_diversity_data,
         average_radius_chart: radius_percentages,
         stats: [hour_stats.unwrap(), day_stats.unwrap(), week_stats.unwrap()],
         content_types: ContentType::iter().collect(),
+        clients: Client::iter().collect(),
     };
     HtmlTemplate(template)
 }
@@ -165,9 +160,9 @@ pub async fn node_detail(
         })
         .unwrap()
         .unwrap();
-    let enr_list = record::Entity::find()
-        .filter(record::Column::NodeId.eq(node_model.id))
-        .order_by_desc(record::Column::SequenceNumber)
+    let enr_list = node_enr::Entity::find()
+        .filter(node_enr::Column::NodeId.eq(node_model.id))
+        .order_by_desc(node_enr::Column::SequenceNumber)
         .all(&state.database_connection)
         .await
         .map_err(|e| {
@@ -180,24 +175,9 @@ pub async fn node_detail(
 
     let latest_enr = enr_list.first().cloned();
 
-    let latest_enr_key_value_list = match &latest_enr {
-        Some(enr) => Some(
-            key_value::Entity::find()
-                .filter(key_value::Column::RecordId.eq(enr.id))
-                .order_by_asc(key_value::Column::Key)
-                .all(&state.database_connection)
-                .await
-                .map_err(|e| {
-                    error!(enr.id=enr.id, err=?e, "Error looking up key_value pairs");
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?,
-        ),
-        None => None,
-    };
     let template = NodeDetailTemplate {
         node: node_model,
         latest_enr,
-        latest_enr_key_value_list,
         enr_list,
         closest_node_list,
     };
@@ -222,9 +202,9 @@ pub async fn enr_detail(
         })
         .unwrap()
         .unwrap();
-    let enr = record::Entity::find()
-        .filter(record::Column::NodeId.eq(node_model.id.to_owned()))
-        .filter(record::Column::SequenceNumber.eq(enr_seq))
+    let enr = node_enr::Entity::find()
+        .filter(node_enr::Column::NodeId.eq(node_model.id.to_owned()))
+        .filter(node_enr::Column::SequenceNumber.eq(enr_seq))
         .one(&state.database_connection)
         .await
         .map_err(|e| {
@@ -233,25 +213,16 @@ pub async fn enr_detail(
         })
         .unwrap()
         .unwrap();
-    let key_value_list = key_value::Entity::find()
-        .filter(key_value::Column::RecordId.eq(enr.id))
-        .all(&state.database_connection)
-        .await
-        .map_err(|e| {
-            error!(enr.id=enr.id, enr.node_id=node_id_hex, err=?e, "Error looking up key_value pairs");
-            StatusCode::NOT_FOUND
-        })?;
 
     let template = EnrDetailTemplate {
         node: node_model,
         enr,
-        key_value_list,
     };
     Ok(HtmlTemplate(template))
 }
 
 pub async fn get_audit_tuples_from_audit_models(
-    audits: Vec<content_audit::Model>,
+    audits: Vec<audit::Model>,
     conn: &DatabaseConnection,
 ) -> Result<Vec<AuditTuple>, StatusCode> {
     // Get the corresponding content for each audit.
@@ -262,8 +233,8 @@ pub async fn get_audit_tuples_from_audit_models(
         })?;
 
     // Get the corresponding client_info for each audit.
-    let client_info: Vec<Option<client_info::Model>> = audits
-        .load_one(client_info::Entity, conn)
+    let client: Vec<Option<client::Model>> = audits
+        .load_one(client::Entity, conn)
         .await
         .map_err(|e| {
             error!(key.count=audits.len(), err=?e, "Could not look up client info for recent audits");
@@ -272,7 +243,7 @@ pub async fn get_audit_tuples_from_audit_models(
 
     // Zip up the audits with their corresponding content and client info.
     // Filter out the (ideally zero) audits that do not have content or client info.
-    let audit_tuples: Vec<AuditTuple> = itertools::izip!(audits, content, client_info)
+    let audit_tuples: Vec<AuditTuple> = itertools::izip!(audits, content, client)
         .filter_map(|(audit, content, info)| content.map(|c| (audit, c, info.unwrap())))
         .collect();
 
@@ -368,7 +339,7 @@ pub async fn census_explorer() -> Result<HtmlTemplate<CensusExplorerTemplate>, S
 pub async fn hourly_success_rate(
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<f32>, StatusCode> {
-    let open_filter = content_audit::Entity::find();
+    let open_filter = audit::Entity::find();
     let stats = get_audit_stats(open_filter, Period::Hour, &state.database_connection)
         .await
         .map_err(|e| {
@@ -390,7 +361,7 @@ pub async fn contentkey_detail(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    let content_key_model = content::Entity::find()
+    let content_model = content::Entity::find()
         .filter(content::Column::ContentKey.eq(content_key_raw))
         .one(&state.database_connection)
         .await
@@ -403,8 +374,8 @@ pub async fn contentkey_detail(
             StatusCode::NOT_FOUND
         })?;
 
-    let contentaudit_list = content_key_model
-        .find_related(content_audit::Entity)
+    let audit_list = content_model
+        .find_related(audit::Entity)
         .all(&state.database_connection)
         .await
         .map_err(|e| {
@@ -412,35 +383,18 @@ pub async fn contentkey_detail(
             StatusCode::NOT_FOUND
         })?;
 
-    let (content_id, content_kind) =
-        if let Ok(content_key) = HistoryContentKey::try_from_hex(&content_key_hex) {
-            let content_id = hex_encode(content_key.content_id());
-            let content_kind = content_key.to_string();
-            (content_id, content_kind)
-        } else {
-            error!(
-                content.key = content_key_hex,
-                "Could not create key from bytes"
-            );
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        };
-    let metadata_model = execution_metadata::Entity::find()
-        .filter(execution_metadata::Column::Content.eq(content_key_model.id))
-        .one(&state.database_connection)
-        .await
-        .map_err(|e| {
-            error!(content.key=content_key_hex, err=?e, "No content metadata found");
-            StatusCode::NOT_FOUND
-        })?;
-    let block_number = metadata_model.map(|m| m.block_number);
+    let Ok(content_key) = HistoryContentKey::try_from_hex(&content_key_hex) else {
+        error!(
+            content.key = content_key_hex,
+            "Could not create key from bytes"
+        );
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    };
 
     let template = ContentKeyDetailTemplate {
-        content_key: content_key_hex,
-        content_key_model,
-        contentaudit_list,
-        content_id,
-        content_kind,
-        block_number,
+        content: content_model,
+        content_kind: content_key.to_string(),
+        audit_list,
     };
     Ok(HtmlTemplate(template))
 }
@@ -451,7 +405,7 @@ pub async fn contentaudit_detail(
 ) -> Result<HtmlTemplate<ContentAuditDetailTemplate>, StatusCode> {
     let audit_id = audit_id.parse::<i32>().unwrap();
     info!("Audit ID: {}", audit_id);
-    let mut audit = match content_audit::Entity::find_by_id(audit_id)
+    let mut audit = match audit::Entity::find_by_id(audit_id)
         .one(&state.database_connection)
         .await
     {
@@ -463,19 +417,21 @@ pub async fn contentaudit_detail(
         }
     };
 
-    let trace_string = &audit.trace;
-    let mut trace: Option<QueryTrace> = match serde_json::from_str(trace_string) {
-        Ok(trace) => Some(trace),
-        Err(err) => {
-            error!(trace=?trace_string, err=?err, "Failed to deserialize query trace.");
-            None
-        }
+    let mut trace: Option<QueryTrace> = match &audit.trace {
+        Some(trace) => match serde_json::from_str::<QueryTrace>(trace) {
+            Ok(trace) => Some(trace),
+            Err(err) => {
+                error!(trace=?audit.trace, err=?err, "Failed to deserialize query trace.");
+                None
+            }
+        },
+        None => None,
     };
 
     // If we were able to deserialize the trace, we can look up & interpolate the radius for the nodes in the trace.
     if let Some(trace) = &mut trace {
         // Get the timestamp of the query
-        let timestamp: DateTime<Utc> = Utc
+        let timestamp: DateTimeUtc = Utc
             .timestamp_millis_opt(trace.started_at_ms as i64)
             .single()
             .expect("Failed to convert timestamp to DateTime");
@@ -499,24 +455,24 @@ pub async fn contentaudit_detail(
             match NodeWithRadius::find_by_statement(Statement::from_sql_and_values(
                 DbBackend::Postgres,
                 "
-                SELECT DISTINCT ON (n.node_id)
-                    n.node_id,
-                    closest_cn.data_radius
+                SELECT DISTINCT ON (node.node_id)
+                    node.node_id,
+                    closest_census_node.data_radius
                 FROM
-                    node n
-                    JOIN record r ON r.node_id = n.id
+                    node
+                    JOIN node_enr ON node_enr.node_id = node.id
                     CROSS JOIN LATERAL (
-                        SELECT cn.data_radius, cn.surveyed_at
-                        FROM census_node cn
-                        WHERE cn.record_id = r.id AND cn.surveyed_at <= $2::timestamp + INTERVAL '15 minutes'
-                        ORDER BY cn.surveyed_at DESC
+                        SELECT census_node.data_radius, census_node.surveyed_at
+                        FROM census_node
+                        WHERE census_node.node_enr_id = node_enr.id AND census_node.surveyed_at <= $2::timestamp + INTERVAL '15 minutes'
+                        ORDER BY census_node.surveyed_at DESC
                         LIMIT 1
-                    ) closest_cn
+                    ) closest_census_node
                 WHERE
-                    n.node_id = ANY($1::bytea[])
+                    node.node_id = ANY($1::bytea[])
                 ORDER BY
-                    n.node_id,
-                    closest_cn.surveyed_at DESC
+                    node.node_id,
+                    closest_census_node.surveyed_at DESC
                 ",
                 vec![node_ids_str.into(), timestamp.into()],
             ))
@@ -550,7 +506,7 @@ pub async fn contentaudit_detail(
         });
         // Update the trace with radius metadata.
         audit.trace =
-            serde_json::to_string(&trace).expect("Failed to serialize updated query trace.");
+            Some(serde_json::to_string(&trace).expect("Failed to serialize updated query trace."));
     }
 
     let content = audit
@@ -560,17 +516,7 @@ pub async fn contentaudit_detail(
         .unwrap()
         .expect("Failed to get audit content key");
 
-    let execution_metadata = content
-        .find_related(execution_metadata::Entity)
-        .one(&state.database_connection)
-        .await
-        .unwrap();
-
-    let template = ContentAuditDetailTemplate {
-        audit,
-        content,
-        execution_metadata,
-    };
+    let template = ContentAuditDetailTemplate { audit, content };
     Ok(HtmlTemplate(template))
 }
 
@@ -592,7 +538,7 @@ pub async fn contentaudit_filter(
         get_audit_stats(audits.clone(), Period::Day, &state.database_connection),
         get_audit_stats(audits.clone(), Period::Week, &state.database_connection),
         audits
-            .order_by_desc(content_audit::Column::CreatedAt)
+            .order_by_desc(audit::Column::CreatedAt)
             .limit(30)
             .all(&state.database_connection),
     );
@@ -649,15 +595,15 @@ pub async fn is_content_in_deadzone(
         "
             SELECT
                 census_node.data_radius,
-                node.node_id,
-                record.raw
+                node_enr.raw,
+                node.node_id
             FROM census_node
-            JOIN record ON census_node.record_id = record.id
-            JOIN node ON record.node_id = node.id
+            JOIN node_enr ON census_node.node_enr_id = node_enr.id
+            JOIN node ON node_enr.node_id = node.id
             WHERE census_node.census_id = (
                 SELECT MAX(id)
                 FROM census
-                WHERE sub_network = $1
+                WHERE sub_protocol = $1
             )
         ",
         vec![sub_protocol.into()],
@@ -704,29 +650,34 @@ pub async fn get_failed_keys_handler(
     http_args: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<Vec<String>>, StatusCode> {
-    let subprotocol = get_subprotocol_from_params(&http_args);
+    let sub_protocol = get_subprotocol_from_params(&http_args);
 
-    let strategy: String = match http_args.get("strategy") {
+    let strategy: &str = match http_args.get("strategy") {
         // Set a default for each subprotocol
-        None => match subprotocol {
-            SubProtocol::History => "FourFours".to_string(),
+        None => match sub_protocol {
+            SubProtocol::History => "Sync",
         },
-        Some(strategy) => strategy.to_string(),
+        Some(strategy) => &strategy.to_string(),
     };
+    let strategy = SelectionStrategy::try_from_str(sub_protocol, strategy).map_err(|err| {
+        error!(?sub_protocol, %strategy, %err, "Unkown strategy");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let page: u32 = match http_args.get("page") {
         None => 1,
         Some(page) => page.parse::<u32>().unwrap_or(1),
     };
 
-    let failed_keys =
-        content_audit::get_failed_keys(subprotocol, strategy, page, &state.database_connection)
-            .await
-            .map_err(|e| {
-                error!(err=?e, "Could not fetch failed keys");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-
+    let failed_keys = audit::get_failed_keys(strategy, page, &state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Could not fetch failed keys");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .into_iter()
+        .map(|failed_key| hex_encode(failed_key.content_key))
+        .collect::<Vec<_>>();
     Ok(Json(failed_keys))
 }
 
@@ -748,8 +699,8 @@ pub async fn census_explorer_list(
         },
     };
 
-    if list_census_page_id > max_census_id.id / 50 + 1 {
-        list_census_page_id = max_census_id.id / 50 + 1;
+    if list_census_page_id > max_census_id / 50 + 1 {
+        list_census_page_id = max_census_id / 50 + 1;
     }
     if list_census_page_id < 1 {
         list_census_page_id = 1;
@@ -773,7 +724,7 @@ pub async fn census_explorer_list(
         .from(census::Entity)
         .from(census_node::Entity)
         .and_where(
-            Expr::col((census::Entity, census_node::Column::Id)).eq(Expr::col((
+            Expr::col((census::Entity, census::Column::Id)).eq(Expr::col((
                 census_node::Entity,
                 census_node::Column::CensusId,
             ))),
@@ -798,7 +749,7 @@ pub async fn census_explorer_list(
     let template = PaginatedCensusListTemplate {
         census_data: paginated_census_list,
         list_census_page_id,
-        max_census_id: max_census_id.id,
+        max_census_id,
     };
 
     Ok(HtmlTemplate(template))
@@ -807,14 +758,14 @@ pub async fn census_explorer_list(
 #[derive(Debug, Clone, FromQueryResult)]
 pub struct NodeStatus {
     enr_id: Option<i32>,
-    census_time: DateTime<Utc>,
+    census_time: DateTimeUtc,
     census_id: i32,
     node_id: Option<Vec<u8>>,
     present: bool,
 }
 
 #[derive(Debug, Clone, FromQueryResult)]
-pub struct RecordInfo {
+pub struct NodeEnrInfo {
     id: i32,
     raw: String,
 }
@@ -829,7 +780,7 @@ pub struct CensusTimeSeriesData {
 #[derive(Debug, Clone, Serialize)]
 pub struct CensusStatuses {
     census_id: i32,
-    time: DateTime<Utc>,
+    time: DateTimeUtc,
     enr_statuses: Vec<Option<i32>>,
 }
 
@@ -850,29 +801,29 @@ pub async fn census_timeseries(
             DbBackend::Postgres,
             "
             SELECT
-                c.started_at AS census_time,
-                c.id AS census_id,
-                n.node_id,
-                r.id as enr_id,
+                census.started_at AS census_time,
+                census.id AS census_id,
+                node.node_id,
+                node_enr.id as enr_id,
                 CASE
-                    WHEN r.id IS NOT NULL THEN true
+                    WHEN node_enr.id IS NOT NULL THEN true
                     ELSE false
                 END AS present
             FROM
                 (
                     SELECT * FROM census
-                    WHERE sub_network = $2
+                    WHERE sub_protocol = $2
                     AND started_at >= NOW() - INTERVAL '1 day' * ($1 + 1)
                     AND started_at < NOW() - INTERVAL '1 day' * $1
-                ) AS c
+                ) AS census
             LEFT JOIN
-                census_node AS cn ON c.id = cn.census_id
+                census_node ON census.id = census_node.census_id
             LEFT JOIN
-                record AS r ON r.id = cn.record_id
+                node_enr ON node_enr.id = census_node.node_enr_id
             LEFT JOIN
-                node AS n ON n.id = r.node_id
+                node ON node.id = node_enr.node_id
             ORDER BY
-                c.started_at, n.node_id;",
+                census.started_at, node.node_id;",
             vec![days_ago.into(), subprotocol.into()],
         ))
         .all(&state.database_connection)
@@ -883,33 +834,35 @@ pub async fn census_timeseries(
         })?;
 
     // Load all ENRs found in the census
-    let record_ids = node_statuses
+    let node_enr_ids = node_statuses
         .iter()
         .filter_map(|n| n.enr_id)
         .collect::<HashSet<i32>>() // Collect into a HashSet to remove duplicates
         .into_iter()
         .collect::<Vec<i32>>();
-    let record_ids_str = format!(
+    let node_enr_ids_str = format!(
         "{{{}}}",
-        record_ids
+        node_enr_ids
             .iter()
             .map(|id| id.to_string())
             .collect::<Vec<_>>()
             .join(",")
     );
-    let records: Vec<RecordInfo> = RecordInfo::find_by_statement(Statement::from_sql_and_values(
-        DbBackend::Postgres,
-        "SELECT id, raw
-            FROM record
-            WHERE id = ANY($1::int[]);",
-        vec![record_ids_str.into()],
-    ))
-    .all(&state.database_connection)
-    .await
-    .map_err(|e| {
-        error!(err=?e, "Failed to lookup census node timeseries data");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let node_enrs: Vec<NodeEnrInfo> =
+        NodeEnrInfo::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "
+        SELECT id, raw
+        FROM node_enr
+        WHERE id = ANY($1::int[]);",
+            vec![node_enr_ids_str.into()],
+        ))
+        .all(&state.database_connection)
+        .await
+        .map_err(|e| {
+            error!(err=?e, "Failed to lookup census node timeseries data");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let (node_ids, censuses) = decouple_nodes_and_censuses(node_statuses);
     let found_node_ids_with_nicknames: Vec<(String, Option<String>)> = node_ids
@@ -946,7 +899,7 @@ pub async fn census_timeseries(
     ]
     .concat();
 
-    let enr_id_map: HashMap<i32, String> = records
+    let enrs: HashMap<i32, String> = node_enrs
         .into_iter()
         .map(|r| (r.id, r.raw))
         .chain(missing_bootnodes_enrs)
@@ -955,7 +908,7 @@ pub async fn census_timeseries(
     Ok(Json(CensusTimeSeriesData {
         node_ids_with_nicknames,
         censuses,
-        enrs: enr_id_map,
+        enrs,
     }))
 }
 
@@ -967,7 +920,7 @@ fn decouple_nodes_and_censuses(
     let mut node_set: HashSet<String> = HashSet::new();
 
     type NodeEnrIdStatuses = HashMap<String, Option<i32>>;
-    let mut census_map: HashMap<i32, (DateTime<Utc>, NodeEnrIdStatuses)> = HashMap::new();
+    let mut census_map: HashMap<i32, (DateTimeUtc, NodeEnrIdStatuses)> = HashMap::new();
 
     for status in node_statuses {
         let entry = census_map
@@ -1009,7 +962,7 @@ fn decouple_nodes_and_censuses(
 #[serde(rename_all = "camelCase")]
 pub struct CensusHistoryData {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     node_count: i64,
 }
 pub async fn weekly_census_history(
@@ -1034,12 +987,9 @@ pub async fn weekly_census_history(
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
             WHERE
-                census.sub_network = $2 AND
+                census.sub_protocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census.started_at < NOW() - INTERVAL '1 week' * $1 AND
-                census_node.sub_network = $2 AND
-                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes'
+                census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
                 census.id
             ORDER BY census.started_at
@@ -1058,7 +1008,7 @@ pub async fn weekly_census_history(
 #[derive(FromQueryResult)]
 pub struct WeeklyCensusClientsData {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     client: Client,
     node_count: i64,
 }
@@ -1067,7 +1017,7 @@ pub struct WeeklyCensusClientsData {
 #[serde(rename_all = "camelCase")]
 pub struct WeeklyCensusClientsDataCompact {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     client_slug: String,
     node_count: i64,
 }
@@ -1106,12 +1056,9 @@ pub async fn weekly_census_clients(
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
             WHERE
-                census.sub_network = $2 AND
+                census.sub_protocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census.started_at < NOW() - INTERVAL '1 week' * $1 AND
-                census_node.sub_network = $2 AND
-                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes'
+                census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
               census.id,
               census_node.client_name
@@ -1136,7 +1083,7 @@ pub async fn weekly_census_clients(
 #[serde(rename_all = "camelCase")]
 pub struct WeeklyCensusClientVersionsData {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     version: Version,
     node_count: i64,
 }
@@ -1170,12 +1117,9 @@ pub async fn weekly_census_client_versions(
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
             WHERE
-                census.sub_network = $2 AND
+                census.sub_protocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 census.started_at < NOW() - INTERVAL '1 week' * $1 AND
-                census_node.sub_network = $2 AND
-                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes' AND
                 census_node.client_name = $3
              GROUP BY
               census.id,
@@ -1201,7 +1145,7 @@ pub async fn weekly_census_client_versions(
 #[derive(FromQueryResult)]
 pub struct CensusHistoryOperatinSytemData {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     operating_system: OperatingSystem,
     node_count: i64,
 }
@@ -1210,7 +1154,7 @@ pub struct CensusHistoryOperatinSytemData {
 #[serde(rename_all = "camelCase")]
 pub struct CensusHistoryOperatinSytemDataCompact {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     operating_system_slug: String,
     node_count: i64,
 }
@@ -1248,12 +1192,9 @@ pub async fn weekly_census_operating_systems(
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
             WHERE
-                census.sub_network = $2 AND
+                census.sub_protocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census.started_at < NOW() - INTERVAL '1 week' * $1 AND
-                census_node.sub_network = $2 AND
-                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes'
+                census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
               census.id,
               census_node.operating_system
@@ -1277,7 +1218,7 @@ pub async fn weekly_census_operating_systems(
 #[derive(FromQueryResult)]
 pub struct CensusHistoryProtocolVersionsData {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     protocol_versions: Vec<u8>,
     node_count: i64,
 }
@@ -1285,7 +1226,7 @@ pub struct CensusHistoryProtocolVersionsData {
 #[serde(rename_all = "camelCase")]
 pub struct CensusHistoryProtocolVersionsDataCompact {
     census_id: i32,
-    start: DateTime<Utc>,
+    start: DateTimeUtc,
     min_protocol_version: u8,
     max_protocol_version: u8,
     node_count: i64,
@@ -1293,18 +1234,21 @@ pub struct CensusHistoryProtocolVersionsDataCompact {
 
 impl From<CensusHistoryProtocolVersionsData> for CensusHistoryProtocolVersionsDataCompact {
     fn from(value: CensusHistoryProtocolVersionsData) -> Self {
-        let protocol_version_list: ProtocolVersionList =
-            Decodable::decode(&mut value.protocol_versions.as_slice())
-                .expect("Error decoding supported protocol versions");
-
-        let protocol_versions: Vec<u8> =
-            protocol_version_list.iter().map(|p| u8::from(*p)).collect();
-
         CensusHistoryProtocolVersionsDataCompact {
             census_id: value.census_id,
             start: value.start,
-            min_protocol_version: *protocol_versions.iter().min().unwrap(),
-            max_protocol_version: *protocol_versions.iter().max().unwrap(),
+            min_protocol_version: value
+                .protocol_versions
+                .iter()
+                .min()
+                .cloned()
+                .unwrap_or_default(),
+            max_protocol_version: value
+                .protocol_versions
+                .iter()
+                .max()
+                .cloned()
+                .unwrap_or_default(),
             node_count: value.node_count,
         }
     }
@@ -1327,23 +1271,18 @@ pub async fn weekly_census_protocol_versions(
             SELECT
                 census.id AS census_id,
                 ANY_VALUE(DATE_TRUNC('second', census.started_at)) AS start,
-                key_value.value AS protocol_versions,
+                node_enr.protocol_versions,
                 COUNT(1) AS node_count
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
-            LEFT JOIN record ON census_node.record_id = record.id
-            LEFT JOIN key_value ON record.id = key_value.record_id
+            LEFT JOIN node_enr ON census_node.node_enr_id = node_enr.id
             WHERE
-                census.sub_network = $2 AND
+                census.sub_protocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census.started_at < NOW() - INTERVAL '1 week' * $1 AND
-                census_node.sub_network = $2 AND
-                census_node.surveyed_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                census_node.surveyed_at < NOW() - (INTERVAL '1 week' * $1) + INTERVAL '10 minutes' AND
-                key = '\\x7076' -- hex('pv')
+                census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
               census.id,
-              key_value.value
+              node_enr.protocol_versions
             ORDER BY census.started_at
         ",
             vec![weeks_ago.into(), subprotocol.into()],
@@ -1363,8 +1302,8 @@ pub async fn weekly_census_protocol_versions(
 
 #[derive(FromQueryResult, Debug, Clone, Serialize)]
 pub struct TransferFailureBatches {
-    start: DateTime<Utc>,
-    client: String,
+    start: DateTimeUtc,
+    client_name: String,
     failures: i64,
 }
 
@@ -1382,19 +1321,25 @@ pub async fn weekly_transfer_failures(
             DbBackend::Postgres,
             "
             SELECT
-                DATE_BIN('15 minutes', ca.created_at, TIMESTAMP '2001-01-01') AS start,
-                convert_from(COALESCE(substr(substr(kv.value, 1, 2), length(substr(kv.value, 1, 2)), 1), 'unknown'), 'utf8') AS client,
+                DATE_BIN('1 hour', audit.created_at, TIMESTAMP '2001-01-01') AS start,
+                COALESCE(closest_census_node.client_name, 'unknown') as client_name,
                 count(*) AS failures
-            FROM audit_internal_failure AS aif
-            LEFT JOIN record AS r ON aif.sender_record_id=r.id
-            LEFT JOIN key_value AS kv ON (r.id=kv.record_id AND kv.key = '\x63') -- hex('c')
-            LEFT JOIN content_audit AS ca ON aif.audit=ca.id
+            FROM audit_transfer_failure
+            LEFT JOIN audit ON audit_transfer_failure.audit_id = audit.id
+            CROSS JOIN LATERAL (
+                SELECT census_node.client_name
+                FROM census_node
+                WHERE
+                    census_node.node_enr_id = audit_transfer_failure.sender_node_enr_id AND
+                    census_node.surveyed_at <= audit.created_at + INTERVAL '15 minutes'
+                ORDER BY census_node.surveyed_at DESC
+                LIMIT 1
+            ) closest_census_node
             WHERE
-                ca.strategy_used = 5 AND -- Only consider 4444s audits now, there are too many History validation failures during current protocol transition
-                ca.created_at IS NOT NULL AND
-                ca.created_at > NOW() - INTERVAL '1 week' * ($1 + 1) AND
-                ca.created_at < NOW() - INTERVAL '1 week' * $1
-            GROUP BY start, client
+                audit.created_at IS NOT NULL AND
+                audit.created_at > NOW() - INTERVAL '1 week' * ($1 + 1) AND
+                audit.created_at < NOW() - INTERVAL '1 week' * $1
+            GROUP BY start, client_name
             ORDER BY start;
         ",
             vec![weeks_ago.into()],
@@ -1414,28 +1359,20 @@ fn nest_protocol_versions_clients(
     let mut nested = HashMap::<String, HashMap<String, i64>>::new();
 
     for row in census.into_iter() {
-        let protocol_versions = match row.protocol_versions {
-            Some(raw_protocol_versions) => {
-                let protocol_version_list: ProtocolVersionList =
-                    Decodable::decode(&mut raw_protocol_versions.as_slice())
-                        .expect("Error decoding supported protocol versions");
-
-                let protocol_versions: Vec<u8> =
-                    protocol_version_list.iter().map(|p| u8::from(*p)).collect();
-
-                protocol_versions
-                    .iter()
-                    .map(|pv| "v".to_string() + &pv.to_string())
-                    .collect()
-            }
-            None => vec!["Unknown".to_string()],
+        let protocol_versions = if row.protocol_versions.is_empty() {
+            vec!["Unknown".to_string()]
+        } else {
+            row.protocol_versions
+                .iter()
+                .map(|pv| format!("v{pv}"))
+                .collect()
         };
 
         for protocol_version in protocol_versions.iter() {
             *nested
                 .entry(protocol_version.to_string())
                 .or_default()
-                .entry(row.client.to_string())
+                .entry(row.client_name.to_string())
                 .or_default() += row.node_count;
         }
     }
@@ -1444,8 +1381,8 @@ fn nest_protocol_versions_clients(
 
 #[derive(FromQueryResult, Debug)]
 pub struct CensusProtocolVersionsClientsData {
-    protocol_versions: Option<Vec<u8>>,
-    client: Client,
+    protocol_versions: Vec<u8>,
+    client_name: Client,
     node_count: i64,
 }
 pub async fn census_protocol_versions_clients(
@@ -1456,36 +1393,23 @@ pub async fn census_protocol_versions_clients(
 
     let census: Vec<CensusProtocolVersionsClientsData> =
         CensusProtocolVersionsClientsData::find_by_statement(Statement::from_sql_and_values(
-            DbBackend::Postgres,
+            state.database_connection.get_database_backend(),
             "
             SELECT
-                protocol_versions.versions AS protocol_versions,
-                client_name as client,
-                COUNT(1) AS node_count
-            FROM census
-            LEFT JOIN census_node ON census.id = census_node.census_id
-            LEFT JOIN record ON census_node.record_id = record.id
-            LEFT JOIN (
-                SELECT
-                    record_id,
-                    value AS versions
-                FROM key_value
-                WHERE key = '\\x7076'
-            ) protocol_versions ON record.id = protocol_versions.record_id
+                node_enr.protocol_versions,
+                census_node.client_name,
+                COUNT(*) AS node_count
+            FROM census_node
+            LEFT JOIN node_enr ON census_node.node_enr_id = node_enr.id
             WHERE
-                census.id = (
-                    SELECT MAX(id)
-                    FROM census
-                    WHERE sub_network = $1
-                ) AND
                 census_node.census_id = (
                     SELECT MAX(id)
                     FROM census
-                    WHERE sub_network = $1
+                    WHERE sub_protocol = $1
                 )
             GROUP BY
-                versions,
-                client_name
+                node_enr.protocol_versions,
+                census_node.client_name
         ",
             vec![subprotocol.into()],
         ))
@@ -1499,136 +1423,39 @@ pub async fn census_protocol_versions_clients(
     Ok(Json(nest_protocol_versions_clients(census)))
 }
 
-#[derive(Debug, Clone, Serialize, FromQueryResult)]
-#[serde(rename_all = "camelCase")]
-pub struct AuditBlockStatusData {
-    start: DateTime<Utc>,
-    success: i64,
-    error: i64,
-    unaudited: i64,
-}
-pub async fn audit_block_status(
-    http_args: HttpQuery<HashMap<String, String>>,
-    Extension(state): Extension<Arc<State>>,
-) -> Result<Json<Vec<AuditBlockStatusData>>, StatusCode> {
-    const GENESIS_TIMESTAMP: &str = "1438269976"; // 2015-07-30 15:26:13
-    const LAST_MINED_BLOCK_TIMESTAMP: &str = "1663224162"; // 2022-09-15 06:42:42
-    const BIN_COUNT: i64 = 80; // ~200k blocks per bin for all pre-merge data
-
-    let Ok(start) = i64::from_str(
-        http_args
-            .get("start")
-            .unwrap_or(&(GENESIS_TIMESTAMP.to_string())),
-    ) else {
-        debug!("Audit Block Status: invalid start argument");
-        return Err(StatusCode::BAD_REQUEST);
-    };
-
-    let Ok(end) = i64::from_str(
-        http_args
-            .get("end")
-            .unwrap_or(&(LAST_MINED_BLOCK_TIMESTAMP.to_string())),
-    ) else {
-        debug!("Audit Block Status: invalid end argument");
-        return Err(StatusCode::BAD_REQUEST);
-    };
-
-    let interval_size_seconds: i64 = (end - start) / BIN_COUNT;
-
-    let Ok(content_type) =
-        ContentType::from_str(http_args.get("content_type").unwrap_or(&("".to_string())))
-    else {
-        debug!("Audit Block Status: invalid content_type argument");
-        return Err(StatusCode::BAD_REQUEST);
-    };
-
-    let audit_block_status: Vec<AuditBlockStatusData> =
-    AuditBlockStatusData::find_by_statement(Statement::from_sql_and_values(
-            DbBackend::Postgres,
-            "
-            SELECT
-              start,
-              success,
-              error,
-              (COALESCE((LEAD(number) OVER (ORDER BY start)), last_block) - number) - (success + error) AS unaudited
-            FROM (
-              SELECT
-                 date_bin($1 * INTERVAL '1 second' , first_available_at, TO_TIMESTAMP($2)) AS start,
-                 SUM(CASE WHEN RESULT = 1 THEN 1 ELSE 0 END) AS success,
-                 SUM(CASE WHEN RESULT = 0 THEN 1 ELSE 0 END) AS error,
-                 0::INT8 AS unaudited
-              FROM public.audit_result_latest
-              WHERE
-                 content_type = $4 AND
-                 first_available_at >= TO_TIMESTAMP($2) AND
-                 first_available_at <= TO_TIMESTAMP($3)
-              GROUP BY 1
-            ) ranges,
-            LATERAL (
-              SELECT
-                number,
-                timestamp
-              FROM block
-              WHERE ranges.start <= block.timestamp
-              ORDER BY timestamp
-              LIMIT 1
-            )
-            CROSS JOIN (
-              SELECT number AS last_block
-                FROM block
-                WHERE timestamp <= TO_TIMESTAMP($3)
-                ORDER BY timestamp DESC
-                LIMIT 1
-            ) AS max_block_number
-            ORDER BY start
-            ",
-            vec![interval_size_seconds.into(), start.into(), end.into(), content_type.into()],
-        ))
-        .all(&state.database_connection)
-        .await
-        .map_err(|e| {
-            error!(err=?e, "Failed to lookup audit block status data");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    Ok(Json(audit_block_status))
-}
-
 pub async fn single_census_view(
     params: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<HtmlTemplate<SingleCensusViewTemplate>, StatusCode> {
     let subprotocol = get_subprotocol_from_params(&params);
-    let max_census_id = match get_max_census_id(&state, subprotocol).await {
-        None => return Err(StatusCode::from_u16(404).unwrap()),
-        Some(max_census_id) => max_census_id,
+
+    let Some(max_census_id) = get_max_census_id(&state, subprotocol).await else {
+        return Err(StatusCode::from_u16(404).unwrap());
     };
 
     let census_id: i32 = match params.get("census-id") {
-        None => return Err(StatusCode::from_u16(404).unwrap()),
-        Some(census_id) => match census_id.parse::<i32>() {
-            Ok(census_id) => census_id,
-            Err(_) => max_census_id.id,
-        },
+        Some(census_id) => census_id.parse::<i32>().unwrap_or(max_census_id),
+        None => max_census_id,
+    };
+    if census_id < 1 || census_id > max_census_id {
+        return Err(StatusCode::from_u16(404).unwrap());
+    }
+
+    let Some(client_diversity_data) = generate_client_diversity_data(&state, census_id).await
+    else {
+        return Err(StatusCode::from_u16(404).unwrap());
     };
 
-    let client_diversity_data = match generate_client_diversity_data(&state, census_id).await {
-        None => return Err(StatusCode::from_u16(404).unwrap()),
-        Some(client_diversity_data) => client_diversity_data,
+    let Some(enr_list) = generate_enr_list_from_census_id(&state, census_id).await else {
+        return Err(StatusCode::from_u16(404).unwrap());
     };
-
-    let enr_list =
-        match generate_enr_list_from_census_id(&state, Some(census_id), max_census_id).await {
-            None => return Err(StatusCode::from_u16(404).unwrap()),
-            Some(enr_list) => enr_list,
-        };
 
     let template = SingleCensusViewTemplate {
         client_diversity_data,
         node_count: enr_list.len() as i32,
         enr_list,
         census_id,
-        max_census_id: max_census_id.id,
+        max_census_id,
         created_at: get_created_data_from_census_id(&state, census_id).await,
     };
 
@@ -1637,54 +1464,26 @@ pub async fn single_census_view(
 
 async fn generate_enr_list_from_census_id(
     state: &Arc<State>,
-    census_id: Option<i32>,
-    max_census_id: MaxCensusId,
-) -> Option<Vec<RawEnr>> {
-    let census_selection_query = match census_id {
-        Some(census_id) => {
-            if census_id >= 1 && census_id <= max_census_id.id {
-                Query::select()
-                    .from(census::Entity)
-                    .expr_as(Expr::col(census::Column::Id), Alias::new("id"))
-                    .and_where(SimpleExpr::from(Expr::col(census::Column::Id)).eq(census_id))
-                    .limit(1)
-                    .take()
-            } else {
-                return None;
-            }
-        }
-        None => Query::select()
-            .from(census::Entity)
-            .expr_as(Expr::col(census::Column::Id), Alias::new("id"))
-            .order_by(census::Column::StartedAt, Order::Desc)
-            .limit(1)
-            .take(),
-    };
-
+    census_id: i32,
+) -> Option<Vec<NodeEnr>> {
     let builder = state.database_connection.get_database_backend();
-    let mut enrs_from_census = Query::select();
-    enrs_from_census
-        .expr(Expr::col((record::Entity, record::Column::Raw)))
-        .from(census_node::Entity)
-        .from(record::Entity)
-        .from_subquery(census_selection_query, Alias::new("selected_census_id"))
-        .and_where(
-            Expr::col((census_node::Entity, census_node::Column::CensusId)).eq(Expr::col((
-                Alias::new("selected_census_id"),
-                Alias::new("id"),
-            ))),
-        )
-        .and_where(
-            Expr::col((census_node::Entity, census_node::Column::RecordId))
-                .eq(Expr::col((record::Entity, record::Column::Id))),
-        );
-
-    Some(
-        RawEnr::find_by_statement(builder.build(&enrs_from_census))
-            .all(&state.database_connection)
-            .await
-            .unwrap(),
+    NodeEnr::find_by_statement(
+        census_node::Entity::find()
+            .find_also_related(node_enr::Entity)
+            .and_also_related(node::Entity)
+            .select_only()
+            .column(node_enr::Column::Raw)
+            .column(node::Column::NodeId)
+            .column(node_enr::Column::SequenceNumber)
+            .filter(census_node::Column::CensusId.eq(census_id))
+            .build(builder),
     )
+    .all(&state.database_connection)
+    .await
+    .inspect_err(|err| {
+        error!(census_id, %err, "Error getting enr list for census");
+    })
+    .ok()
 }
 
 async fn get_created_data_from_census_id(state: &Arc<State>, census_id: i32) -> String {
@@ -1712,28 +1511,23 @@ async fn get_created_data_from_census_id(state: &Arc<State>, census_id: i32) -> 
     created_data
 }
 
-#[derive(FromQueryResult, Debug, Clone, Copy)]
-pub struct MaxCensusId {
-    pub id: i32,
-}
-
 #[derive(FromQueryResult, Serialize, Debug, Clone)]
 pub struct PaginatedCensusListResult {
     pub census_id: i32,
     pub node_count: i64,
-    pub created_at: DateTime<Utc>,
+    pub created_at: DateTimeUtc,
 }
 
 #[derive(FromQueryResult, Debug, Clone)]
 pub struct CensusCreatedAt {
-    pub created_at: DateTime<Utc>,
+    pub created_at: DateTimeUtc,
 }
 
 #[derive(FromQueryResult, Debug)]
 pub struct RadiusChartData {
-    pub data_radius: Vec<u8>,
-    pub node_id: Vec<u8>,
     pub raw: String,
+    pub node_id: Vec<u8>,
+    pub data_radius: Vec<u8>,
 }
 
 #[derive(Serialize, Debug)]
@@ -1750,22 +1544,20 @@ pub struct CalculatedRadiusChartData {
 
 #[derive(FromQueryResult, Serialize)]
 pub struct ClientDiversityResult {
-    pub client_name: String,
-    pub client_count: i32,
+    pub client_name: client_info::Client,
+    pub client_count: i64,
 }
 
-#[derive(FromQueryResult, Serialize)]
-pub struct RawEnr {
+#[derive(Debug, FromQueryResult, Serialize)]
+pub struct NodeEnr {
     pub raw: String,
+    pub node_id: Vec<u8>,
+    pub sequence_number: i64,
 }
 
-impl Display for ClientDiversityResult {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Client Name {} Client Count {}",
-            self.client_name, self.client_count
-        )
+impl NodeEnr {
+    pub fn node_id(&self) -> String {
+        hex_encode(&self.node_id)
     }
 }
 
@@ -1773,32 +1565,35 @@ async fn generate_radius_graph_data(
     state: &Arc<State>,
     subprotocol: SubProtocol,
 ) -> Vec<CalculatedRadiusChartData> {
-    let radius_chart_data = RadiusChartData::find_by_statement(Statement::from_sql_and_values( DbBackend::Postgres,
-    "
+    let radius_chart_data = RadiusChartData::find_by_statement(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "
         WITH latest_census AS (
-            SELECT started_at, duration
+            SELECT id
             FROM census
-            WHERE sub_network = $1
-            ORDER BY started_at DESC
+            WHERE sub_protocol = $1
+            ORDER BY id DESC
             LIMIT 1
         )
         SELECT
-            census_node.data_radius,
-            record.raw,
-            node.node_id
+            node_enr.raw,
+            node.node_id,
+            census_node.data_radius
         FROM
             census_node,
             node,
-            record,
+            node_enr,
             latest_census
         WHERE
-            census_node.sub_network = $1
-            AND census_node.surveyed_at >= latest_census.started_at
-            AND census_node.surveyed_at < latest_census.started_at + latest_census.duration * interval '1 second'
-            AND census_node.record_id = record.id
-            AND record.node_id = node.id
+            census_node.census_id = latest_census.id
+            AND census_node.node_enr_id = node_enr.id
+            AND node_enr.node_id = node.id
             ",
-     vec![subprotocol.into()])).all(&state.database_connection).await.unwrap();
+        vec![subprotocol.into()],
+    ))
+    .all(&state.database_connection)
+    .await
+    .unwrap();
 
     let mut radius_percentages: Vec<CalculatedRadiusChartData> = vec![];
     for i in radius_chart_data {
@@ -1852,90 +1647,75 @@ fn xor_distance_to_fraction(radius_high_bytes: [u8; 4]) -> f64 {
     radius_int as f64 / u32::MAX as f64
 }
 
-async fn get_max_census_id(state: &Arc<State>, subprotocol: SubProtocol) -> Option<MaxCensusId> {
-    match MaxCensusId::find_by_statement(Statement::from_sql_and_values(
-        DbBackend::Postgres,
-        "SELECT MAX(id) as id FROM census
-             WHERE sub_network = $1",
-        vec![subprotocol.into()],
-    ))
-    .one(&state.database_connection)
-    .await
-    {
-        Ok(val) => val,
-        Err(err) => {
-            warn!("Census data unavailable: {err}");
-            None
-        }
-    }
+async fn get_max_census_id(state: &Arc<State>, subprotocol: SubProtocol) -> Option<i32> {
+    census::Entity::find()
+        .select_only()
+        .column_as(census::Column::Id.max(), "id")
+        .filter(census::Column::SubProtocol.eq(subprotocol))
+        .into_tuple::<i32>()
+        .one(&state.database_connection)
+        .await
+        .inspect_err(|err| warn!("Census data unavailable: {err}"))
+        .ok()
+        .flatten()
 }
 
 async fn generate_client_diversity_data(
     state: &Arc<State>,
     census_id: i32,
 ) -> Option<Vec<ClientDiversityResult>> {
-    Some(
-        ClientDiversityResult::find_by_statement(Statement::from_sql_and_values(DbBackend::Postgres,
-        "
-            WITH left_table AS (
-                SELECT census_node.record_id
-                FROM census_node
-                WHERE census_node.census_id = $1
-            ),
-            right_table AS (
-                SELECT record_id, value
-                FROM key_value
-                WHERE convert_from(key, 'UTF8') = 'c'
-            )
-            SELECT
-                CAST(COUNT(*) AS INTEGER) AS client_count,
-                CAST(COALESCE(substr(substr(right_table.value, 1, 2), length(substr(right_table.value, 1, 2)), 1), 'unknown') AS TEXT) AS client_name
-            FROM left_table
-            LEFT JOIN right_table ON left_table.record_id = right_table.record_id
-            GROUP BY substr(substr(right_table.value, 1, 2), length(substr(right_table.value, 1, 2)), 1)
-            ", vec![census_id.into()])
-        ).all(&state.database_connection).await.unwrap(),
-    )
-}
-
-#[derive(FromQueryResult, Debug, Clone)]
-pub struct TransferFailurePrimitive {
-    pub audit: i32,
-    pub client: String,
-    pub created_at: DateTime<Utc>,
-    pub failure_type: i32,
+    census_node::Entity::find()
+        .select_only()
+        .column(census_node::Column::ClientName)
+        .column_as(census_node::Column::Id.count(), "client_count")
+        .filter(census_node::Column::CensusId.eq(census_id))
+        .group_by(census_node::Column::ClientName)
+        .into_model()
+        .all(&state.database_connection)
+        .await
+        .inspect_err(|err| error!(census.id = census_id, %err, "Error getting client diversity"))
+        .ok()
 }
 
 #[derive(FromQueryResult, Debug, Clone)]
 pub struct TransferFailure {
-    pub audit: i32,
+    pub audit_id: i32,
     pub client: Client,
-    pub created_at: DateTime<Utc>,
-    pub failure_type: String,
+    pub created_at: DateTimeUtc,
+    pub failure_type: TransferFailureType,
 }
 
 pub async fn diagnostics(
+    params: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<HtmlTemplate<DiagnosticsTemplate>, StatusCode> {
+    let sub_protocol = get_subprotocol_from_params(&params);
     // Query to get the 20 most recent internal failures joined with audits for timestamps
-    // TODO: include more than 4444 errors (or maybe a dropdown to select which kind of error)
-    let transfer_failures: Vec<TransferFailurePrimitive> =
-        TransferFailurePrimitive::find_by_statement(Statement::from_sql_and_values(
+    let transfer_failures: Vec<TransferFailure> =
+        TransferFailure::find_by_statement(Statement::from_sql_and_values(
             DbBackend::Postgres,
             "
             SELECT
-                aif.audit,
-                convert_from(COALESCE(substr(substr(kv.value, 1, 2), length(substr(kv.value, 1, 2)), 1), 'unknown'), 'utf8') AS client,
-                ca.created_at,
-                aif.failure_type
-            FROM audit_internal_failure AS aif
-            LEFT JOIN record AS r ON aif.sender_record_id=r.id
-            LEFT JOIN key_value AS kv ON (r.id=kv.record_id AND kv.key = '\x63') -- hex('c')
-            LEFT JOIN content_audit AS ca ON aif.audit=ca.id
-            WHERE ca.strategy_used = 5 AND ca.created_at IS NOT NULL
-            ORDER BY created_at DESC
+                audit_transfer_failure.audit_id,
+                closest_census_node.client,
+                audit.created_at,
+                audit_transfer_failure.failure_type
+            FROM audit_transfer_failure
+            LEFT JOIN audit ON audit_transfer_failure.audit_id = audit.id
+            LEFT JOIN content ON audit.content_id = content.id
+            CROSS JOIN LATERAL (
+                SELECT census_node.client_name as client
+                FROM census_node
+                WHERE
+                    census_node.node_enr_id = audit_transfer_failure.sender_node_enr_id AND
+                    census_node.surveyed_at <= audit.created_at + INTERVAL '15 minutes'
+                ORDER BY census_node.surveyed_at DESC
+                LIMIT 1
+            ) closest_census_node
+            WHERE content.sub_protocol = $1
+            ORDER BY audit.created_at DESC
             LIMIT 20;",
-            vec![],
+            vec![sub_protocol.into()],
         ))
         .all(&state.database_connection)
         .await
@@ -1943,22 +1723,6 @@ pub async fn diagnostics(
             error!(err=?e, "Failed to lookup weekly transfer failures");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-
-    let transfer_failures: Vec<TransferFailure> = transfer_failures
-        .into_iter()
-        .map(|f| {
-            let failure_type = TransferFailureType::try_from(f.failure_type).map_err(|e| {
-                error!(err=?e, "Failed to convert transfer failure: {}", f.failure_type);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-            Ok::<TransferFailure, StatusCode>(TransferFailure {
-                audit: f.audit,
-                client: client_from_short_name(f.client),
-                created_at: f.created_at,
-                failure_type: format!("{failure_type:?}"),
-            })
-        })
-        .collect::<Result<Vec<_>, StatusCode>>()?;
 
     let template = DiagnosticsTemplate {
         failures: transfer_failures,
@@ -1976,38 +1740,38 @@ mod tests {
     fn test_nest_protocol_versions_clients() {
         let census = vec![
             CensusProtocolVersionsClientsData {
-                client: Client::from("shisui".to_string()),
-                protocol_versions: Some(vec![0u8]),
+                client_name: Client::from("shisui".to_string()),
+                protocol_versions: vec![0u8],
                 node_count: 1,
             },
             CensusProtocolVersionsClientsData {
-                client: Client::from("ultralight".to_string()),
-                protocol_versions: Some(vec![0u8]),
+                client_name: Client::from("ultralight".to_string()),
+                protocol_versions: vec![0u8],
                 node_count: 7,
             },
             CensusProtocolVersionsClientsData {
-                client: Client::from("shisui".to_string()),
-                protocol_versions: Some(vec![130u8, 0u8, 1u8]),
+                client_name: Client::from("shisui".to_string()),
+                protocol_versions: vec![0u8, 1u8],
                 node_count: 8,
             },
             CensusProtocolVersionsClientsData {
-                client: Client::from("trin".to_string()),
-                protocol_versions: Some(vec![130u8, 0u8, 1u8]),
+                client_name: Client::from("trin".to_string()),
+                protocol_versions: vec![0u8, 1u8],
                 node_count: 213,
             },
             CensusProtocolVersionsClientsData {
-                client: Client::from(None),
-                protocol_versions: Some(vec![130u8, 0u8, 1u8]),
+                client_name: Client::from(None),
+                protocol_versions: vec![0u8, 1u8],
                 node_count: 191,
             },
             CensusProtocolVersionsClientsData {
-                client: Client::from("trin".to_string()),
-                protocol_versions: None,
+                client_name: Client::from("trin".to_string()),
+                protocol_versions: vec![],
                 node_count: 21,
             },
             CensusProtocolVersionsClientsData {
-                client: Client::from(None),
-                protocol_versions: None,
+                client_name: Client::from(None),
+                protocol_versions: vec![],
                 node_count: 1,
             },
         ];

@@ -43,8 +43,7 @@
                                     <th scope="col">Sub-protocol</th>
                                     <th scope="col">Strategy</th>
                                     <th scope="col">Content Key</th>
-                                    <th scope="col">Content ID</th>
-                                    <th scope="col">Content first available</th>
+                                    <th scope="col">Block number</th>
                                     <th scope="col">Audited at</th>
                                     <th scope="col">Client</th>
                                 </tr>
@@ -52,7 +51,7 @@
                                 <tbody>
                                 {% for (audit, content, client_info) in audits %}
                                 <tr>
-                                    <td>{% if audit.trace != "" %}<a href="/audit/id/{{ audit.id }}">{{ audit.id
+                                    <td>{% if audit.trace.is_some() %}<a href="/audit/id/{{ audit.id }}">{{ audit.id
                                         }}</a>{%
                                         else
                                         %}
@@ -61,17 +60,14 @@
                                     <td><span
                                             class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
                                             if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
-                                    <td>{{ content.protocol_id.as_text() }}</td>
-                                    <td>{{ audit.strategy_as_text() }}</td>
-                                    <td><a href="/content/key/{{content.key_as_hex()}}/">{{ content.key_as_hex_short()
-                                        }}</a>
+                                    <td>{{ content.sub_protocol.as_text() }}</td>
+                                    <td>{{ audit.strategy.as_str() }}</td>
+                                    <td>
+                                        <a href="/content/key/{{content.key_as_hex()}}/">
+                                            {{ content.key_as_hex_short() }}
+                                        </a>
                                     </td>
-                                    <td><a href="/content/id/{{content.id_as_hex()}}/">{{ content.id_as_hex_short()
-                                        }}</a>
-                                    </td>
-                                    <td title="{{ content.available_at_local_time() }}">{{
-                                        content.available_at_humanized()
-                                        }}</td>
+                                    <td>{{ content.block_number_as_html() }}</td>
                                     <td title="{{ audit.created_at_local_time() }}">{{ audit.created_at_humanized() }}
                                     </td>
                                     <td>{{ client_info.version_info }}</td>

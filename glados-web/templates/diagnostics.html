@@ -34,7 +34,7 @@
                                 {% for failure in failures %}
                                 <tr>
                                     <td>{{ failure.client }}</td>
-                                    <td><a href="/audit/id/{{ failure.audit }}">{{ failure.audit }}</a></td>
+                                    <td><a href="/audit/id/{{ failure.audit_id }}">{{ failure.audit_id }}</a></td>
                                     <td>{{ failure.failure_type }}</td>
                                     <td>{{ failure.created_at }}</td>
                                 </tr>

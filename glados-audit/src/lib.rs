@@ -1,35 +1,23 @@
 use std::{sync::Arc, vec};
 
-use entity::{
-    audit_internal_failure, content,
-    content_audit::{self, SelectionStrategy},
-};
-use ethportal_api::{types::query_trace::QueryTrace, utils::bytes::hex_encode};
-use glados_core::jsonrpc::{JsonRpcError, PortalClient};
-use sea_orm::DatabaseConnection;
-use serde_json::json;
+use entity::SelectionStrategy;
 use tokio::{
     sync::{
         mpsc::{self, Receiver},
-        OwnedSemaphorePermit, Semaphore,
+        Semaphore,
     },
     time::{interval, Duration, MissedTickBehavior},
 };
-use tracing::{debug, error, info, warn};
+use tracing::debug;
 
-use crate::{config::AuditConfig, strategy::execute_audit_strategy, validation::content_is_valid};
+use crate::{config::AuditConfig, strategy::execute_audit_strategy, task::AuditTask};
 
 pub mod cli;
 pub mod config;
 pub mod stats;
 mod strategy;
+mod task;
 pub(crate) mod validation;
-
-#[derive(Clone, Debug)]
-pub struct AuditTask {
-    pub strategy: SelectionStrategy,
-    pub content: content::Model,
-}
 
 // Associates strategies with their channels and weights.
 #[derive(Debug)]
@@ -110,145 +98,13 @@ async fn perform_content_audits(config: AuditConfig, mut rx: mpsc::Receiver<Audi
 
         match rx.recv().await {
             Some(task) => {
-                let client = clients.next().expect("No clients");
-
-                tokio::spawn(perform_single_audit(
-                    audit_permit,
-                    task,
-                    client.clone(),
-                    config.database_connection.clone(),
-                ))
+                let client = clients.next().expect("No clients").clone();
+                let conn = config.database_connection.clone();
+                tokio::spawn(async move { task.perform_audit(audit_permit, client, conn).await })
             }
             None => {
                 continue;
             }
         };
-    }
-}
-
-/// Performs a single audit task and saves the result.
-///
-/// The audit permit is released at the end.
-async fn perform_single_audit(
-    audit_permit: OwnedSemaphorePermit,
-    task: AuditTask,
-    client: PortalClient,
-    conn: DatabaseConnection,
-) {
-    debug!(
-        strategy = ?task.strategy,
-        content.key = hex_encode(&task.content.content_key),
-        client.url =? client.api.client,
-        "Audit started",
-    );
-
-    let (audit_result, trace) = get_and_validate_content(&task, &client).await;
-
-    save_audit_result(&task, audit_result, trace, &client, &conn).await;
-
-    info!(
-        strategy = ?task.strategy,
-        content.key = hex_encode(&task.content.content_key),
-        pass = audit_result,
-        "Audit finished",
-    );
-
-    drop(audit_permit);
-}
-
-async fn get_and_validate_content(
-    task: &AuditTask,
-    client: &PortalClient,
-) -> (bool, Option<QueryTrace>) {
-    match client.get_content(&task.content).await {
-        Ok((content_bytes, trace)) => (content_is_valid(&task.content, &content_bytes), trace),
-        Err(JsonRpcError::ContentNotFound { trace }) => {
-            warn!(
-                content.key = hex_encode(&task.content.content_key),
-                "Content not found."
-            );
-            (false, trace)
-        }
-        Err(err) => {
-            error!(
-                content.key = hex_encode(&task.content.content_key),
-                %err,
-                "Problem requesting content from Portal node."
-            );
-            (false, None)
-        }
-    }
-}
-
-async fn save_audit_result(
-    task: &AuditTask,
-    audit_result: bool,
-    trace: Option<QueryTrace>,
-    client: &PortalClient,
-    conn: &DatabaseConnection,
-) {
-    let audit = content_audit::create(
-        task.content.id,
-        client.client_info.id,
-        client.node_info.id,
-        audit_result,
-        task.strategy.clone(),
-        json!(trace).to_string(),
-        conn,
-    )
-    .await;
-
-    let audit: content_audit::Model = match audit {
-        Ok(audit) => audit,
-        Err(err) => {
-            error!(
-                content.key = hex_encode(&task.content.content_key),
-                %err,
-                "Could not save audit in db."
-            );
-            return;
-        }
-    };
-
-    if let Some(trace) = trace {
-        save_transfer_failures(audit, trace, client, conn).await
-    }
-}
-
-async fn save_transfer_failures(
-    audit: content_audit::Model,
-    trace: QueryTrace,
-    client: &PortalClient,
-    conn: &DatabaseConnection,
-) {
-    // Create a list of the failures from the parsed trace json
-    for (sender_node_id, failure_entry) in trace.failures {
-        let fail_type = failure_entry.failure;
-        info!(
-            audit.id = audit.id,
-            failure.type = ?fail_type,
-            sender.node_id = %sender_node_id,
-            receiver = client.client_info.version_info,
-            "Found new transfer failure",
-        );
-
-        // Get the ENR for the sender node
-        let sender_enr = match trace.metadata.get(&sender_node_id) {
-            Some(node_info) => &node_info.enr,
-            None => {
-                error!(
-                    audit.id = audit.id,
-                    sender.node_id = %sender_node_id,
-                    "Sender ENR not found in trace metadata",
-                );
-                continue;
-            }
-        };
-
-        if let Err(err) =
-            audit_internal_failure::create(audit.id, sender_enr, fail_type.into(), conn).await
-        {
-            error!(%err, "Failed to insert audit transfer failure into database");
-        }
     }
 }

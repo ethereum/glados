@@ -1,7 +1,7 @@
 use std::{path::PathBuf, time::Duration};
 
 use alloy_primitives::hex::FromHexError;
-use entity::{client_info, content, node};
+use entity::{client, content, node, SubProtocol};
 use ethportal_api::{
     types::query_trace::QueryTrace, utils::bytes::ByteUtilsError, ContentKeyError, Discv5ApiClient,
     HistoryContentKey, HistoryNetworkApiClient, NodeInfo, OverlayContentKey, RawContentValue,
@@ -27,8 +27,8 @@ pub struct PortalApi {
 #[derive(Clone, Debug)]
 pub struct PortalClient {
     pub api: PortalApi,
-    pub client_info: client_info::Model,
-    pub node_info: node::Model,
+    pub client: client::Model,
+    pub node: node::Model,
 }
 
 const CONTENT_NOT_FOUND_ERROR_CODE: i32 = -39001;
@@ -131,23 +131,17 @@ impl PortalClient {
     pub async fn new(portal_client_url: String, conn: &DatabaseConnection) -> anyhow::Result<Self> {
         let api = PortalApi::new(portal_client_url).await?;
 
-        let client_version = api.get_client_version().await?;
+        let client_version_info = api.get_client_version().await?;
         let node_info = api.get_node_info().await?;
 
-        let client_info = client_info::get_or_create(client_version, conn).await?;
-        let node_info = node::get_or_create(node_info.enr.node_id(), conn).await?;
+        let client = client::get_or_create(client_version_info, conn).await?;
+        let node = node::get_or_create(node_info.enr.node_id(), conn).await?;
 
-        Ok(PortalClient {
-            api,
-            client_info,
-            node_info,
-        })
+        Ok(PortalClient { api, client, node })
     }
 
     pub fn supports_trace(&self) -> bool {
-        self.client_info.version_info.contains("trin")
-            || self.client_info.version_info.contains("nimbus")
-            || self.client_info.version_info.contains("ultralight")
+        self.client.version_info.contains("trin") || self.client.version_info.contains("nimbus")
     }
 
     pub async fn get_content(
@@ -201,8 +195,8 @@ impl PortalApi {
         &self,
         content: &content::Model,
     ) -> Result<RawContentValue, JsonRpcError> {
-        match content.protocol_id {
-            content::SubProtocol::History => {
+        match content.sub_protocol {
+            SubProtocol::History => {
                 let content_info = HistoryNetworkApiClient::get_content(
                     &self.client,
                     HistoryContentKey::try_from_bytes(&content.content_key)?,
@@ -217,8 +211,8 @@ impl PortalApi {
         &self,
         content: &content::Model,
     ) -> Result<(RawContentValue, QueryTrace), JsonRpcError> {
-        match content.protocol_id {
-            content::SubProtocol::History => {
+        match content.sub_protocol {
+            SubProtocol::History => {
                 let trace_content_info = HistoryNetworkApiClient::trace_get_content(
                     &self.client,
                     HistoryContentKey::try_from_bytes(&content.content_key)?,

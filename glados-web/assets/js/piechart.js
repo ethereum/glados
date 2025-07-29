@@ -88,26 +88,12 @@ function PieChart(data, {
 
 function pie_chart_count(client_diversity_data) {
     const char_array = [];
-    let blue = '#3498DB'
-    let purple = '#9B59B6'
-    let orange = '#E67E22'
-    let red = '#DA251D'
-    let green = '#2E8C47'
-    let grey = '#808080'
-    client_diversity_data.forEach(i => {
-        if (i.client_name === "t" || i.client_name === "\\x74") {
-            char_array.push({ name: "Trin", value: i.client_count, color: purple });
-        } else if (i.client_name === "f" || i.client_name === "\\x66" || i.client_name === "n" || i.client_name === "\\x6E") {
-            char_array.push({ name: "Nimbus", value: i.client_count, color: blue });
-        } else if (i.client_name === "u" || i.client_name === "\\x75") {
-            char_array.push({ name: "Ultralight", value: i.client_count, color: orange });
-        } else if (i.client_name === "a" || i.client_name === "\\x61"){
-            char_array.push({ name: "Samba", value: i.client_count, color: green });
-        } else if (i.client_name === "s" || i.client_name === "\\x73"){
-            char_array.push({ name: "Shisui", value: i.client_count, color: red });
-        } else {
-            char_array.push({ name: "Unknown", value: i.client_count, color: grey });
-        }
+    client_diversity_data.forEach(c => {
+        char_array.push({
+            name: c.client_name.name,
+            value: c.client_count,
+            color: c.client_name.color,
+        });
     });
 
     const totalValue = char_array.reduce((sum, entry) => sum + entry.value, 0);

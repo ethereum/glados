@@ -2,7 +2,7 @@ use std::{
     collections::HashMap, ops::RangeInclusive, thread::available_parallelism, time::Duration,
 };
 
-use entity::content_audit::SelectionStrategy;
+use entity::SelectionStrategy;
 use glados_core::jsonrpc::PortalClient;
 use sea_orm::{Database, DatabaseConnection};
 use tracing::{debug, info, warn};
@@ -58,10 +58,7 @@ impl AuditConfig {
         let mut portal_clients: Vec<PortalClient> = vec![];
         for client_url in args.portal_client {
             let client = PortalClient::new(client_url, &database_connection).await?;
-            info!(
-                "Found a portal client: {:?}",
-                client.client_info.version_info
-            );
+            info!("Found a portal client: {:?}", client.client.version_info);
             portal_clients.push(client);
         }
 
