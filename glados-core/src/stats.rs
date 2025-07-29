@@ -20,7 +20,7 @@ pub fn filter_audits(filters: AuditFilters) -> Select<audit::Entity> {
     // This base query will have filters added to it
     let audits = audit::Entity::find();
     let audits = audits.join(
-        JoinType::Join,
+        JoinType::LeftJoin,
         audit::Relation::Content
             .def()
             .on_condition(move |_left, _right| {
@@ -66,13 +66,15 @@ pub async fn get_audit_stats(
 ) -> Result<AuditStats, DbErr> {
     let cutoff = period.cutoff_time();
 
-    let audit_result_count: HashMap<AuditResult, i64> = filtered
-        .clone()
+    let query = filtered
         .filter(audit::Column::CreatedAt.gt(cutoff))
         .select_only()
         .column(audit::Column::Result)
         .column_as(audit::Column::Result.count(), "count")
-        .group_by(audit::Column::Result)
+        .group_by(audit::Column::Result);
+
+    let audit_result_count: HashMap<AuditResult, i64> = query
+        .clone()
         .into_tuple::<(AuditResult, i64)>()
         .all(conn)
         .await?
