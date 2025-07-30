@@ -33,7 +33,7 @@
                             <tbody>
                                 {% for failure in failures %}
                                 <tr>
-                                    <td>{{ failure.client }}</td>
+                                    <td>{{ failure.client.get_str("name").unwrap() }}</td>
                                     <td><a href="/audit/id/{{ failure.audit_id }}">{{ failure.audit_id }}</a></td>
                                     <td>{{ failure.failure_type }}</td>
                                     <td>{{ failure.created_at }}</td>
