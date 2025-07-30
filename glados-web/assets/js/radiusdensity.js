@@ -229,8 +229,7 @@ function radius_node_id_scatter_chart(data) {
     function hoverFeature(event, d) {
         const hoverX = event.pageX + 10;
         const hoverY = event.pageY - 10;
-        let latestClientString = getClientStringFromDecodedEnr(d.raw_enr);
-        hover.html(`Client Name: ${latestClientString}<br>Node ID: ${d.node_id_string}<br>Data Radius: ${d.data_radius}%`)
+        hover.html(`Client Name: ${d.client.name}<br>Node ID: ${d.node_id_string}<br>Data Radius: ${d.data_radius}%`)
             .style("left", hoverX + "px")
             .style("top", hoverY + "px")
             .style("background-color", "#ccc")
@@ -255,57 +254,9 @@ function radius_node_id_scatter_chart(data) {
         .attr("r", 4)
         .style("opacity", 0.9)
         .style("stroke", "white")
-        .attr("fill", function(d) {
-            let blue = '#3498DB'
-            let purple = '#9B59B6'
-            let orange = '#E67E22'
-            let red = '#DA251D'
-            let green = '#2E8C47'
-            let grey = '#808080'
-            const clientString = getClientStringFromDecodedEnr(d.raw_enr);
-                if (clientString[0] === "f" || clientString[0] === "n") {
-                    return blue;
-                } else if (clientString[0] === "t") {
-                    return purple; 
-                } else if (clientString[0] === "u") {
-                    return orange; 
-                } else if (clientString[0] === "a") {
-                    return green; 
-                } else if (clientString[0] === "s") {
-                  return red; 
-                } else {
-                    return grey; 
-                }
-        })
+        .attr("fill", function(d) { return d.client.color; } )
         .on("mouseover", hoverAppear)
         .on("mousemove", hoverFeature)
         .on("mouseout", hoverGone);
 
 }
-
-function getClientStringFromDecodedEnr(enr) {
-    for (let [key, value] of ENR.ENR.decodeTxt(enr).enr.entries()) {
-
-        if (key === "c") {
-            let fullClientString = String.fromCharCode.apply(null, value);
-            if (fullClientString[0] === 'f' || fullClientString[0] === 'n') {
-                return "nimbus";
-            } else if (fullClientString[0] === 'u') {
-                return "ultralight";
-            } else if (fullClientString[0] === 'a') {
-                return "samba";
-            } else if (fullClientString[0] === 's') {
-                return "shisui";
-            } else if (fullClientString[0] === 't') {
-                clientName = "trin ";
-                clientName += fullClientString.substring(2);
-                return clientName;
-            } else {
-                return fullClientString;
-            }        
-        } else {
-            return "unknown";
-        }
-    }
-}
-

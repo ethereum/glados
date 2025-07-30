@@ -139,6 +139,19 @@ lazy_static! {
     pub static ref NODE_NICKNAME_MAP: HashMap<String, String> = {
         let mut nicknames = HashMap::<String, String>::new();
         nicknames.insert(
+            "0x00aaad5ba24375811f58cd56d04050a1b5238cea340005e6a207ea3653ee9d61".to_string(),
+            "trin-ams3-1 (bootnode)".to_string(),
+        );
+        nicknames.insert(
+            "0x556d556773b369686055b1a79b52e0629f3cd4369a0ba505c3eae3c4b97fb0c7".to_string(),
+            "trin-nyc1-1 (bootnode)".to_string(),
+        );
+        nicknames.insert(
+            "0xab4ad0cb9fefd03da68bef18ae96e932eebcdb4bb1b4a763e89c5b2bc4212198".to_string(),
+            "trin-sgp1-1 (bootnode)".to_string(),
+        );
+
+        nicknames.insert(
             "0x5ce3d0e0c0617c0a72b0fa237f8d5913fff0ebd89bc54cd68d95e1669cd9306f".to_string(),
             "trin-ams3-2".to_string(),
         );
@@ -209,10 +222,6 @@ lazy_static! {
         nicknames.insert(
             "0x0632ff9510d10a19587db911d6b5d571fc323e50553c3f5efa2a813a0aadb141".to_string(),
             "trin-sgp1-4".to_string(),
-        );
-        nicknames.insert(
-            "0x00aaad5ba24375811f58cd56d04050a1b5238cea340005e6a207ea3653ee9d61".to_string(),
-            "trin-ams3-1 (bootnode)".to_string(),
         );
         nicknames.insert(
             "0x2dce06489dcb5d604984e9eaa6ab3296b0e3a8c2da612d150ecf0cd736040b2b".to_string(),
@@ -325,10 +334,6 @@ lazy_static! {
         nicknames.insert(
             "0x7f36f2ab4183c5644e999c305a832ed80d1b00c6d12435a39f37dfc8227c34f0".to_string(),
             "trin-ams3-19".to_string(),
-        );
-        nicknames.insert(
-            "0x556d556773b369686055b1a79b52e0629f3cd4369a0ba505c3eae3c4b97fb0c7".to_string(),
-            "trin-nyc1-1 (bootnode)".to_string(),
         );
         nicknames.insert(
             "0xf8368f60ee86532cd3990806a356468fc12139791ebf1e6b29d30eedab89f841".to_string(),
@@ -445,10 +450,6 @@ lazy_static! {
         nicknames.insert(
             "0xa3ba2c8e50620bb5f3691d6974ff19af90b775ccd4198c016db38b1e9af2b4e8".to_string(),
             "trin-nyc1-23".to_string(),
-        );
-        nicknames.insert(
-            "0xab4ad0cb9fefd03da68bef18ae96e932eebcdb4bb1b4a763e89c5b2bc4212198".to_string(),
-            "trin-sgp1-1 (bootnode)".to_string(),
         );
         nicknames.insert(
             "0x95f8b17e1700b74f4ebad4bb5de0564673aeb10b199bd19e65426f7642e9fd3c".to_string(),
@@ -824,66 +825,6 @@ lazy_static! {
         nicknames.insert(
             "0xdcba4606925c9803b8fbfda1d6a354ad195ab801ce6706f3ffd2867d2937c02f".to_string(),
             "nimbus-ih-eu-mda-02-32".to_string(),
-        );
-        nicknames.insert(
-            "0x8148d0278d49015995847572da4fa8f0a981b7fb57774a7d3d40c985529f3237".to_string(),
-            "ultralight bootnode A0".to_string(),
-        );
-        nicknames.insert(
-            "0x95c8df0a57c901c5d4561403a77067996b03b64e7beb1bdee662fae236d2188c".to_string(),
-            "ultralight bootnode A1".to_string(),
-        );
-        nicknames.insert(
-            "0x1139168ab1f65f8f0714911090e58a18e7b1441d4db48be793e88b1bce8dc0f5".to_string(),
-            "ultralight bootnode A2".to_string(),
-        );
-        nicknames.insert(
-            "0x0ff179318daab6bfc0851e5d193598c5725b7cf3e372a5ce6a4b95c8739def22".to_string(),
-            "ultralight bootnode A3".to_string(),
-        );
-        nicknames.insert(
-            "0x811aba898877c23e3b79b76f8f607392756c06ccb36c23bad4d23caf109fc343".to_string(),
-            "ultralight bootnode A4".to_string(),
-        );
-        nicknames.insert(
-            "0x29412e15c3b5fbcb9a564340c1a7fd430b9def54a26dfcadc4f83917033bc888".to_string(),
-            "ultralight bootnode B0".to_string(),
-        );
-        nicknames.insert(
-            "0xdedfdee9cfe1d391f17ad84652cca1e4cdb2d0cb113189dab98564d44bfc31e1".to_string(),
-            "ultralight bootnode B1".to_string(),
-        );
-        nicknames.insert(
-            "0xa232a70530fd6d84f899352f98ee662686bba1baf198b59d91197b3b2c3caca8".to_string(),
-            "ultralight bootnode B2".to_string(),
-        );
-        nicknames.insert(
-            "0xa4d57bf5a5b257d819520887f365d52fa075e264f8b74f135fd503bc9324ff40".to_string(),
-            "ultralight bootnode B3".to_string(),
-        );
-        nicknames.insert(
-            "0xb7c67f23d040346395829f5818d7b2bd4d66dbfd961db2b4c15b93aded406c26".to_string(),
-            "ultralight bootnode B4".to_string(),
-        );
-        nicknames.insert(
-            "0xeef7a92a7386989ef096e39422814b87c6adbc8076d4dd324864348967aebad6".to_string(),
-            "ultralight bootnode B5".to_string(),
-        );
-        nicknames.insert(
-            "0x8675259d5e9ee1344c2e1135ca97a081ab40452c6d872defe9e4159c1f23c7c3".to_string(),
-            "ultralight bootnode B6".to_string(),
-        );
-        nicknames.insert(
-            "0x8f13d0eba75f5bd98bcc5688742d57ca0f695440732e585310544156401db7f3".to_string(),
-            "ultralight bootnode B7".to_string(),
-        );
-        nicknames.insert(
-            "0xef75a4aecf52f34f90f14042bbc002075c3fe323eb24803629953083053c0320".to_string(),
-            "ultralight bootnode B8".to_string(),
-        );
-        nicknames.insert(
-            "0x88b9db5dbae3e62cb9b6248818509b758181addfc200ddae7a95b9a9021e4c6f".to_string(),
-            "ultralight bootnode B9".to_string(),
         );
 
         nicknames

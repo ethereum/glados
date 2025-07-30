@@ -90,9 +90,9 @@ function pie_chart_count(client_diversity_data) {
     const char_array = [];
     client_diversity_data.forEach(c => {
         char_array.push({
-            name: c.client_name.name,
+            name: c.client.name,
             value: c.client_count,
-            color: c.client_name.color,
+            color: c.client.color,
         });
     });
 

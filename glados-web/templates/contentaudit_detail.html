@@ -97,9 +97,9 @@
 </style>
 <script>
 $(document).ready(function () {
-    let trace_string = "{{ audit.trace_as_html() }}".replace(/(&#34;|&quot;)/g, '"');
+    let trace = {{ audit.trace_as_html() | safe }};
+    let node_details = {{ node_details | json | safe }};
 
-    let trace = JSON.parse(trace_string);
     let graphData, graphSvg;
     
     // Retrieve sortByNodeId from localStorage, defaulting to false if not set
@@ -110,7 +110,7 @@ $(document).ready(function () {
         let heightAvailable = Math.floor($(window).height() - heightTaken);
         $('#trace').css('height', `${heightAvailable}px`);
 
-        graphData = createGraphData(trace);
+        graphData = createGraphData(trace, node_details);
         graphSvg = createGraph(graphData, sortByNodeId);
         $('#graph').find('svg').remove();  // Remove existing graph
         $('#graph').append(graphSvg);
