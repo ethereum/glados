@@ -12,7 +12,11 @@ use axum::{
 use chrono::{TimeZone, Utc};
 use clap::ValueEnum;
 use enr::NodeId;
-use entity::{client, client_info, SelectionStrategy};
+use entity::{
+    audit, audit_stats, census, census_node, client,
+    client_info::{Client, OperatingSystem, Version},
+    content, node, node_enr, ContentType, SelectionStrategy, SubProtocol, TransferFailureType,
+};
 use ethportal_api::{
     jsonrpsee::core::__reexports::serde_json,
     types::{
@@ -22,33 +26,30 @@ use ethportal_api::{
     utils::bytes::{hex_decode, hex_encode},
     HistoryContentKey, OverlayContentKey,
 };
-use sea_orm::prelude::DateTimeUtc;
-use sea_orm::sea_query::Alias;
-use sea_orm::{
-    sea_query::{Expr, Query, SimpleExpr},
-    ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult,
-    Iterable, LoaderTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, Statement,
-};
-use sea_orm::{Order, QueryTrait};
-use serde::Serialize;
-use tracing::{error, info, warn};
-
-use crate::templates::{
-    AuditDashboardTemplate, AuditTableTemplate, CensusExplorerTemplate, ClientsTemplate,
-    ContentAuditDetailTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
-    ContentKeyDetailTemplate, ContentKeyListTemplate, DiagnosticsTemplate, EnrDetailTemplate,
-    HtmlTemplate, IndexTemplate, NodeDetailTemplate, PaginatedCensusListTemplate,
-    SingleCensusViewTemplate,
-};
-use crate::{state::State, templates::AuditTuple};
-use entity::{
-    audit, audit_stats, census, census_node,
-    client_info::{Client, OperatingSystem, Version},
-    content, node, node_enr, ContentType, SubProtocol, TransferFailureType,
-};
 use glados_core::stats::{
     filter_audits, get_audit_stats, AuditFilters, ContentTypeFilter, Period, StrategyFilter,
     SuccessFilter,
+};
+use sea_orm::{
+    prelude::DateTimeUtc,
+    sea_query::{Alias, Expr, Query, SimpleExpr},
+    ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult,
+    Iterable, LoaderTrait, ModelTrait, Order, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
+    Statement,
+};
+use serde::Serialize;
+use tracing::{error, info, warn};
+
+use crate::{
+    state::State,
+    templates::AuditTuple,
+    templates::{
+        AuditDashboardTemplate, AuditTableTemplate, CensusExplorerTemplate, ClientsTemplate,
+        ContentAuditDetailTemplate, ContentIdDetailTemplate, ContentIdListTemplate,
+        ContentKeyDetailTemplate, ContentKeyListTemplate, DiagnosticsTemplate, EnrDetailTemplate,
+        HtmlTemplate, IndexTemplate, NodeDetailTemplate, PaginatedCensusListTemplate,
+        SingleCensusViewTemplate,
+    },
 };
 
 //
@@ -417,6 +418,7 @@ pub async fn contentaudit_detail(
         }
     };
 
+    let mut node_details = HashMap::new();
     let mut trace: Option<QueryTrace> = match &audit.trace {
         Some(trace) => match serde_json::from_str::<QueryTrace>(trace) {
             Ok(trace) => Some(trace),
@@ -451,18 +453,26 @@ pub async fn contentaudit_detail(
                 .collect::<Vec<String>>()
                 .join(",")
         );
-        let nodes_with_radius: HashMap<NodeId, B256> =
-            match NodeWithRadius::find_by_statement(Statement::from_sql_and_values(
+
+        #[derive(FromQueryResult, Debug)]
+        pub struct NodeCensusInfo {
+            pub node_id: Vec<u8>,
+            pub data_radius: Vec<u8>,
+            pub client: Client,
+        }
+        let node_infos: HashMap<NodeId, NodeCensusInfo> =
+            match NodeCensusInfo::find_by_statement(Statement::from_sql_and_values(
                 DbBackend::Postgres,
                 "
                 SELECT DISTINCT ON (node.node_id)
                     node.node_id,
-                    closest_census_node.data_radius
+                    closest_census_node.data_radius,
+                    closest_census_node.client
                 FROM
                     node
                     JOIN node_enr ON node_enr.node_id = node.id
                     CROSS JOIN LATERAL (
-                        SELECT census_node.data_radius, census_node.surveyed_at
+                        SELECT census_node.data_radius, census_node.client_name as client, census_node.surveyed_at
                         FROM census_node
                         WHERE census_node.node_enr_id = node_enr.id AND census_node.surveyed_at <= $2::timestamp + INTERVAL '15 minutes'
                         ORDER BY census_node.surveyed_at DESC
@@ -482,14 +492,11 @@ pub async fn contentaudit_detail(
                 Ok(data) => data
                     .into_iter()
                     // Transform SQL result into a hashmap.
-                    .map(|node_result| {
+                    .map(|node_census_info| {
                         let mut node_id = [0u8; 32];
-                        node_id.copy_from_slice(&node_result.node_id);
+                        node_id.copy_from_slice(&node_census_info.node_id);
                         let node_id = NodeId::new(&node_id);
-                        let mut radius = [0u8; 32];
-                        radius.copy_from_slice(&node_result.data_radius);
-                        let radius = B256::new(radius);
-                        (node_id, radius)
+                        (node_id, node_census_info)
                     })
                     .collect(),
                 Err(err) => {
@@ -500,10 +507,12 @@ pub async fn contentaudit_detail(
 
         // Add radius info to node metadata.
         trace.metadata.iter_mut().for_each(|(node_id, node_info)| {
-            if let Some(radius) = nodes_with_radius.get(node_id) {
-                node_info.radius = Some(*radius);
+            if let Some(node_census_info) = node_infos.get(node_id) {
+                node_info.radius = Some(B256::from_slice(&node_census_info.data_radius));
+                node_details.insert(*node_id, node_census_info.client.clone());
             }
         });
+
         // Update the trace with radius metadata.
         audit.trace =
             Some(serde_json::to_string(&trace).expect("Failed to serialize updated query trace."));
@@ -516,14 +525,12 @@ pub async fn contentaudit_detail(
         .unwrap()
         .expect("Failed to get audit content key");
 
-    let template = ContentAuditDetailTemplate { audit, content };
+    let template = ContentAuditDetailTemplate {
+        audit,
+        content,
+        node_details,
+    };
     Ok(HtmlTemplate(template))
-}
-
-#[derive(FromQueryResult, Debug)]
-pub struct NodeWithRadius {
-    pub node_id: Vec<u8>,
-    pub data_radius: Vec<u8>,
 }
 
 /// Takes an AuditFilter object generated from http query params
@@ -757,10 +764,14 @@ pub async fn census_explorer_list(
 
 #[derive(Debug, Clone, FromQueryResult)]
 pub struct NodeStatus {
-    enr_id: Option<i32>,
-    census_time: DateTimeUtc,
     census_id: i32,
+    census_time: DateTimeUtc,
     node_id: Option<Vec<u8>>,
+    node_enr_id: Option<i32>,
+    data_radius_high: i64,
+    client: Client,
+    client_version: Option<String>,
+    client_short_commit: Option<String>,
     present: bool,
 }
 
@@ -771,6 +782,7 @@ pub struct NodeEnrInfo {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CensusTimeSeriesData {
     node_ids_with_nicknames: Vec<(String, Option<String>)>,
     censuses: Vec<CensusStatuses>,
@@ -778,10 +790,21 @@ pub struct CensusTimeSeriesData {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CensusStatuses {
     census_id: i32,
-    time: DateTimeUtc,
-    enr_statuses: Vec<Option<i32>>,
+    census_time: DateTimeUtc,
+    nodes: Vec<Option<CensusNodeInfo>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CensusNodeInfo {
+    node_enr_id: i32,
+    radius_as_percentage: String,
+    client: Client,
+    client_version: Option<String>,
+    client_short_commit: Option<String>,
 }
 
 pub async fn census_timeseries(
@@ -801,10 +824,14 @@ pub async fn census_timeseries(
             DbBackend::Postgres,
             "
             SELECT
-                census.started_at AS census_time,
                 census.id AS census_id,
+                census.started_at AS census_time,
                 node.node_id,
-                node_enr.id as enr_id,
+                census_node.node_enr_id,
+                census_node.data_radius_high,
+                census_node.client_name as client,
+                census_node.client_version,
+                census_node.short_commit as client_short_commit,
                 CASE
                     WHEN node_enr.id IS NOT NULL THEN true
                     ELSE false
@@ -836,27 +863,13 @@ pub async fn census_timeseries(
     // Load all ENRs found in the census
     let node_enr_ids = node_statuses
         .iter()
-        .filter_map(|n| n.enr_id)
-        .collect::<HashSet<i32>>() // Collect into a HashSet to remove duplicates
-        .into_iter()
-        .collect::<Vec<i32>>();
-    let node_enr_ids_str = format!(
-        "{{{}}}",
-        node_enr_ids
-            .iter()
-            .map(|id| id.to_string())
-            .collect::<Vec<_>>()
-            .join(",")
-    );
-    let node_enrs: Vec<NodeEnrInfo> =
-        NodeEnrInfo::find_by_statement(Statement::from_sql_and_values(
-            DbBackend::Postgres,
-            "
-        SELECT id, raw
-        FROM node_enr
-        WHERE id = ANY($1::int[]);",
-            vec![node_enr_ids_str.into()],
-        ))
+        .filter_map(|n| n.node_enr_id)
+        .collect::<HashSet<_>>();
+    let node_enrs = node_enr::Entity::find()
+        .select_only()
+        .columns([node_enr::Column::Id, node_enr::Column::Raw])
+        .filter(node_enr::Column::Id.is_in(node_enr_ids))
+        .into_model::<NodeEnrInfo>()
         .all(&state.database_connection)
         .await
         .map_err(|e| {
@@ -873,12 +886,10 @@ pub async fn census_timeseries(
             }
             // Node nickname mappings including full node IDs and shortened node IDs
             let short_id = format!("{}..{}", &id[..6], &id[id.len() - 4..]);
-            let nickname: Option<String> =
-                if let Some(nickname) = node::NODE_NICKNAME_MAP.get(&short_id) {
-                    Some(nickname.clone())
-                } else {
-                    node::NODE_NICKNAME_MAP.get(id).cloned()
-                };
+            let nickname = node::NODE_NICKNAME_MAP
+                .get(id)
+                .or_else(|| node::NODE_NICKNAME_MAP.get(&short_id))
+                .cloned();
 
             (id.clone(), nickname)
         })
@@ -917,43 +928,53 @@ type NodeIdString = String;
 fn decouple_nodes_and_censuses(
     node_statuses: Vec<NodeStatus>,
 ) -> (Vec<NodeIdString>, Vec<CensusStatuses>) {
-    let mut node_set: HashSet<String> = HashSet::new();
+    let mut node_ids: HashSet<String> = HashSet::new();
 
-    type NodeEnrIdStatuses = HashMap<String, Option<i32>>;
+    type NodeEnrIdStatuses = HashMap<String, CensusNodeInfo>;
     let mut census_map: HashMap<i32, (DateTimeUtc, NodeEnrIdStatuses)> = HashMap::new();
 
     for status in node_statuses {
         let entry = census_map
             .entry(status.census_id)
-            .or_insert((status.census_time, HashMap::new()));
+            .or_insert((status.census_time, NodeEnrIdStatuses::new()));
 
-        if let (Some(node_id), Some(enr_id)) = (status.node_id, status.enr_id) {
-            let hex_id = hex_encode(node_id);
-            node_set.insert(hex_id.clone());
+        if let (Some(node_id), Some(node_enr_id)) = (status.node_id, status.node_enr_id) {
+            let node_id_hex = hex_encode(node_id);
+            node_ids.insert(node_id_hex.clone());
 
-            let enr_opt = if status.present { Some(enr_id) } else { None };
-
-            entry.1.insert(hex_id, enr_opt);
+            if status.present {
+                let radius_as_percentage = status.data_radius_high as f64 / i64::MAX as f64;
+                entry.1.insert(
+                    node_id_hex,
+                    CensusNodeInfo {
+                        node_enr_id,
+                        radius_as_percentage: format!("{:.2}%", 100.0 * radius_as_percentage),
+                        client: status.client,
+                        client_version: status.client_version,
+                        client_short_commit: status.client_short_commit,
+                    },
+                );
+            }
         }
     }
 
-    let node_ids: Vec<String> = node_set.into_iter().collect();
+    let node_ids: Vec<String> = node_ids.into_iter().collect();
     let mut censuses: Vec<CensusStatuses> = vec![];
 
-    for (census_id, (time, enr_statuses_map)) in census_map {
-        let enr_statuses = node_ids
+    for (census_id, (census_time, mut node_statuses)) in census_map {
+        let nodes = node_ids
             .iter()
-            .map(|node_id| enr_statuses_map.get(node_id).cloned().unwrap_or(None))
+            .map(|node_id| node_statuses.remove(node_id))
             .collect();
 
         censuses.push(CensusStatuses {
             census_id,
-            time,
-            enr_statuses,
+            census_time,
+            nodes,
         });
     }
 
-    censuses.sort_by_key(|c| c.time);
+    censuses.sort_by_key(|c| c.census_time);
 
     (node_ids, censuses)
 }
@@ -1525,26 +1546,26 @@ pub struct CensusCreatedAt {
 
 #[derive(FromQueryResult, Debug)]
 pub struct RadiusChartData {
-    pub raw: String,
     pub node_id: Vec<u8>,
+    pub client: Client,
     pub data_radius: Vec<u8>,
 }
 
 #[derive(Serialize, Debug)]
 pub struct CalculatedRadiusChartData {
+    pub node_id: u64,
+    pub node_id_string: String,
+    pub client: Client,
     pub data_radius: f64,
     /// Top byte of the advertised radius
     pub radius_top: u8,
     /// Percentage coverage, not including the top byte
     pub radius_lower_fraction: f64,
-    pub node_id: u64,
-    pub node_id_string: String,
-    pub raw_enr: String,
 }
 
 #[derive(FromQueryResult, Serialize)]
 pub struct ClientDiversityResult {
-    pub client_name: client_info::Client,
+    pub client: Client,
     pub client_count: i64,
 }
 
@@ -1576,8 +1597,8 @@ async fn generate_radius_graph_data(
             LIMIT 1
         )
         SELECT
-            node_enr.raw,
             node.node_id,
+            census_node.client_name as client,
             census_node.data_radius
         FROM
             census_node,
@@ -1596,46 +1617,46 @@ async fn generate_radius_graph_data(
     .unwrap();
 
     let mut radius_percentages: Vec<CalculatedRadiusChartData> = vec![];
-    for i in radius_chart_data {
+    for node in radius_chart_data {
         let radius_fraction = xor_distance_to_fraction([
-            i.data_radius[0],
-            i.data_radius[1],
-            i.data_radius[2],
-            i.data_radius[3],
+            node.data_radius[0],
+            node.data_radius[1],
+            node.data_radius[2],
+            node.data_radius[3],
         ]);
         let node_id_high_bytes: [u8; 8] = [
-            i.node_id[0],
-            i.node_id[1],
-            i.node_id[2],
-            i.node_id[3],
-            i.node_id[4],
-            i.node_id[5],
-            i.node_id[6],
-            i.node_id[7],
+            node.node_id[0],
+            node.node_id[1],
+            node.node_id[2],
+            node.node_id[3],
+            node.node_id[4],
+            node.node_id[5],
+            node.node_id[6],
+            node.node_id[7],
         ];
 
         let formatted_percentage = format!("{:.2}", radius_fraction * 100.0);
 
         let mut node_id_bytes: [u8; 32] = [0; 32];
-        if i.node_id.len() == 32 {
-            node_id_bytes.copy_from_slice(&i.node_id);
+        if node.node_id.len() == 32 {
+            node_id_bytes.copy_from_slice(&node.node_id);
         }
 
         let radius_lower_fraction = xor_distance_to_fraction([
-            i.data_radius[1],
-            i.data_radius[2],
-            i.data_radius[3],
-            i.data_radius[4],
+            node.data_radius[1],
+            node.data_radius[2],
+            node.data_radius[3],
+            node.data_radius[4],
         ]);
 
         let node_id_string = hex_encode(node_id_bytes);
         radius_percentages.push(CalculatedRadiusChartData {
-            data_radius: formatted_percentage.parse().unwrap(),
-            radius_top: i.data_radius[0],
-            radius_lower_fraction,
             node_id: u64::from_be_bytes(node_id_high_bytes),
             node_id_string,
-            raw_enr: i.raw,
+            client: node.client,
+            data_radius: formatted_percentage.parse().unwrap(),
+            radius_top: node.data_radius[0],
+            radius_lower_fraction,
         });
     }
 
@@ -1666,7 +1687,7 @@ async fn generate_client_diversity_data(
 ) -> Option<Vec<ClientDiversityResult>> {
     census_node::Entity::find()
         .select_only()
-        .column(census_node::Column::ClientName)
+        .column_as(census_node::Column::ClientName, "client")
         .column_as(census_node::Column::Id.count(), "client_count")
         .filter(census_node::Column::CensusId.eq(census_id))
         .group_by(census_node::Column::ClientName)

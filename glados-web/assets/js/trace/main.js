@@ -31,7 +31,7 @@ const colors = {
 // Converts json response to format expected by D3 ForceGraph:
 // { nodes: [{ id, group }], links: [{ source_id, target_id, group }] }
 // Group of nodes determines color, group of links determines thickness.
-function createGraphData(trace) {
+function createGraphData(trace, node_datails) {
     if (Object.keys(trace).length === 0) {
         return {
             nodes: [{ id: "local", group: colors.orange, durationMs: 0 }],
@@ -54,7 +54,7 @@ function createGraphData(trace) {
       let port = decodedEnr.udp;
       let distance = BigInt(meta.distance);
       let distanceLog2 = bigLog2(distance);
-      let client = decodedEnr.client;
+      let client = node_datails[nodeId]?.name;
       let radius = meta.radius;
 
       metadata[nodeId] = {

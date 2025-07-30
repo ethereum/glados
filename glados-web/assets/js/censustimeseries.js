@@ -5,42 +5,52 @@ let highlightedRowGroup = null;
 function createSquareChart(width, data) {
 
     // Incoming data takes the following form.
-    // node_ids and enr_statuses are arrays of the same length and order.
-    /*{
-         "node_ids": [
+    // nodeIdsWithNicknames and censuses.nodes are arrays of the same length and order.
+    /* {
+         "nodeIdsWithNicknames": [
            ["0x9891fe3fdfcec2707f877306fc6e5596b1405fedf70ad2911496c2ac40dfeda5", null],
-           ["0x08653f55f8120591717aae0426c10c25f0e6a7db078c2e1516b4f3059cefff35", "node-nickname"],
-           ["0xbefb246b22757267608a436d265018374592291f284c536f73c933b29a91e10a", null]
+           ["0x08653f55f8120591717aae0426c10c25f0e6a7db078c2e1516b4f3059cefff35", null],
+           ["0xbefb246b22757267608a436d265018374592291f284c536f73c933b29a91e10a", "node-nickname"]
          ],
          "censuses": [
            {
-             "time": "2023-12-13T02:03:38.389580Z",
-             "enr_statuses": [
-               345,
+             "censusId": 12345,
+             "censusTime": "2023-12-13T02:03:38.389580Z",
+             "nodes": [
                null,
+               {
+                 nodeEnrId: 345,
+                 radiusAsPercentage: "5.03%",
+                 client: {
+                   slug: "trin",
+                   name: "Trin",
+                   color: "#9B59B6",
+                 },
+                 clientVersion: "0.1.2",
+                 clientShortCommit: "0123abcd",
+               }
                null,
+               ...
              ]
            },
            ...
          ],
          "enrs" {
             345: "enr:-Jy4QOOcmr_MEnFj3-lNBg...ZiBcWbChOHq73nNxeu0ELYN1ZHCCIzE"
-        }
+         }
        }*/
 
-    // Create a combined array of node IDs and their ENRs during each census.
-    let nodesAndEnrStatuses = zipNodesAndCensusData(data.node_ids_with_nicknames, data.censuses, data.enrs);
+    // Create a combined array of node IDs and their info during each census.
+    let nodesAndCensusInfos = zipNodesAndCensusData(data.nodeIdsWithNicknames, data.censuses, data.enrs);
 
-    // Sort the combined array based on latestClientString and secondarily nodeId
-    nodesAndEnrStatuses.sort((a, b) => sortNodes(a, b));
-
-    console.log(`Number of nodes: ${nodesAndEnrStatuses.length}`);
+    // Sort the combined array based on clientString and secondarily nodeId
+    nodesAndCensusInfos.sort((a, b) => sortNodes(a, b));
 
     const x = d3.scaleTime()
-        .domain(d3.extent(data.censuses, d => new Date(d.time)))
+        .domain(d3.extent(data.censuses, d => new Date(d.censusTime)))
         .range([0, width]);
 
-    const nodes = nodesAndEnrStatuses.map(d => d.nodeId);
+    const nodes = nodesAndCensusInfos.map(d => d.nodeId);
 
     const cellHeight = 11;
     const height = cellHeight * nodes.length;
@@ -67,9 +77,9 @@ function createSquareChart(width, data) {
 
     const url = new URL(window.location);
     const subprotocol = url.searchParams.get('network');
-    let title = data.censuses.length > 0 ? `${nodes.length} ${subprotocol} nodes found during 24 hour period beginning at ${data.censuses[0].time}`
+    let title = data.censuses.length > 0 ? `${nodes.length} ${subprotocol} nodes found during 24 hour period beginning at ${data.censuses[0].censusTime}`
         : `No ${subprotocol} censuses found during this 24 hour period.`;
-    
+
     // Append the title
     svg.append("text")
         .attr("x", width / 2)
@@ -126,7 +136,7 @@ function createSquareChart(width, data) {
 
     // Create group for each row.
     const rowGroups = svg.selectAll(".row-group")
-        .data(nodesAndEnrStatuses)
+        .data(nodesAndCensusInfos)
         .enter()
         .append("g")
         .attr("class", "row-group")
@@ -135,12 +145,12 @@ function createSquareChart(width, data) {
     rowGroups.attr("transform", `translate(0, ${marginTop})`);
 
     data.censuses.forEach(census => {
-        census.parsedTime = new Date(census.time);
+        census.parsedTime = new Date(census.censusTime);
     });
 
     // Append squares to each row group.
     rowGroups.each(function (node, i) {
-        node.statuses.forEach((censusResult, j) => {
+        node.censusInfos.forEach((censusInfo, j) => {
 
             const row = d3.select(this);
             const rect = row.append("rect")
@@ -150,19 +160,19 @@ function createSquareChart(width, data) {
                 .attr("height", y.bandwidth() + "px")
                 .attr("stroke-width", 0.1)
                 .attr("stroke", "rgb(245, 245, 245)")
-                .attr("fill", censusResult ? "green" : "gray");
+                .attr("fill", censusInfo ? "green" : "gray");
 
             let title = "";
-            if (censusResult) {
-                title = createHoverOverInfoFromENR(censusResult, data.censuses[j].time);
+            if (censusInfo) {
+                title = createHoverOverInfo(censusInfo, data.censuses[j].censusTime);
             } else {
-                title = `Not found during the census beginning at ${data.censuses[j].time}.`;
+                title = `Census started at ${data.censuses[j].censusTime}.\nNot found!`;
             }
 
             rect.append("title").text(title);
 
             rect.on("click", function (_, _) {
-                window.open(`/census/?census-id=${data.censuses[j].census_id}`, '_blank');
+                window.open(`/census/?census-id=${data.censuses[j].censusId}`, '_blank');
             });
 
             rect.on("mouseenter", function (_) {
@@ -186,6 +196,7 @@ function createSquareChart(width, data) {
         .attr("y", d => y(d.nodeId) + y.bandwidth() / 2)
         .attr("dy", ".35em")
         .attr("text-anchor", "end")
+        .attr("fill", d => d.clientColor)
         .text(d => (d.nodeId.substring(0, 6) + '...' + d.nodeId.substring(d.nodeId.length - 4)));
 
     // Internal function to handle hover-over magnification effect.
@@ -226,28 +237,30 @@ function createSquareChart(width, data) {
 
             // Adjust the font size and position of the text
             group.selectAll("text")
-                .attr("y", y(nodesAndEnrStatuses[index].nodeId) + (originalHeight * scaleFactor) / 2);
+                .attr("y", y(nodesAndCensusInfos[index].nodeId) + (originalHeight * scaleFactor) / 2);
 
             // Shift rows below the hovered row downwards
             group.attr("transform", `translate(0, ${marginTop + (downwardShift - heightIncrease)})`);
 
             // Append metadata
             if (index === hoveredIndex) {
-                const yPos = y(nodesAndEnrStatuses[index].nodeId) + (originalHeight * scaleFactor) / 2;
+                const yPos = y(nodesAndCensusInfos[index].nodeId) + (originalHeight * scaleFactor) / 2;
 
-                // Append a new text element for latestClientString
-                group.append("text")
-                    .attr("class", "client-string-label")
-                    .attr("x", -200)
-                    .attr("y", yPos + 30)
-                    .attr("text-anchor", "start")
-                    .text(nodesAndEnrStatuses[index].latestClientString);
+                // Append a new text element for nickname and clientString
                 group.append("text")
                     .attr("class", "client-string-label")
                     .attr("x", -200)
                     .attr("y", yPos + -20)
                     .attr("text-anchor", "start")
-                    .text(nodesAndEnrStatuses[index].nodeNickName);
+                    .attr("fill", nodesAndCensusInfos[index].clientColor)
+                    .text(nodesAndCensusInfos[index].nodeNickName);
+                group.append("text")
+                    .attr("class", "client-string-label")
+                    .attr("x", -200)
+                    .attr("y", yPos + 30)
+                    .attr("text-anchor", "start")
+                    .attr("fill", nodesAndCensusInfos[index].clientColor)
+                    .text(nodesAndCensusInfos[index].clientString);
             }
 
         });
@@ -276,52 +289,32 @@ function createSquareChart(width, data) {
 
 
 // Combines decoupled node and census response from API
-function zipNodesAndCensusData(nodeIdsWithNickNames, censuses, records) {
+function zipNodesAndCensusData(nodeIdsWithNickNames, censuses, enrs) {
     return nodeIdsWithNickNames.map(([nodeId, nickname], index) => {
-        // Map enr_ids to their corresponding recordString
-        const statuses = censuses.map(census => {
-            const enrId = census.enr_statuses[index];
-            return records[enrId] || null;
+        // Map enr_ids to their corresponding census status
+        const censusInfos = censuses.map(census => {
+            let censusInfo = census.nodes[index];
+            if (censusInfo) {
+                censusInfo.enr = enrs[censusInfo.nodeEnrId];
+            }
+            return censusInfo;
         });
 
-        // Use the latest ENR for display & sorting. Iterate backwards if the node's isn't seen in the latest.
-        let enrString = null;
-        for (let i = statuses.length - 1; i > 0; i--) {
-            enrString = statuses[i];
-            if (enrString) {
-                break;
-            }
-        }
-
-        // Get the client name for sorting and display purposes.
-        let clientName = null;
-        if (enrString) {
-            let decodedEnr = decodeEnrCached(enrString);
-            let fullClientString = decodedEnr.client;
-            if (fullClientString !== null) {
-                if (fullClientString[0] === 'f' || fullClientString[0] === 'n') {
-                    clientName = "nimbus ";
-                } else if (fullClientString[0] === 'a') {
-                    clientName = "samba ";
-                } else if (fullClientString[0] === 's') {
-                    clientName = "shisui ";
-                } if (fullClientString[0] === 't') {
-                    clientName = "trin ";
-                    clientName += fullClientString.substring(2);
-                } else if (fullClientString[0] === 'u') {
-                    clientName = "ultralight";
-                } else {
-                    clientName = fullClientString;
-                }
-            }
-
+        // Use the latest census info for display & sorting.
+        const latestCensusInfo = censusInfos.findLast((censusInfo) => !!censusInfo);
+        let clientString = null;
+        let clientColor = null;
+        if (latestCensusInfo) {
+            clientString = `${latestCensusInfo.client.name} ${latestCensusInfo.clientVersion || ''}`;
+            clientColor = latestCensusInfo.client.color;
         }
 
         return {
             nodeId: nodeId,
             nodeNickName: nickname,
-            latestClientString: clientName,
-            statuses: statuses
+            censusInfos: censusInfos,
+            clientString: clientString,
+            clientColor: clientColor,
         };
     });
 }
@@ -335,7 +328,6 @@ function decodeEnrCached(enr) {
             ip: decodedEnr["ip"],
             port: decodedEnr["udp"],
             seq: seq,
-            client: getClientStringFromDecodedEnr(decodedEnr),
             shortened: enr.substring(0, 15) + '...' + enr.substring(enr.length - 10)
         }
         decodedEnrs[enr] = enrData;
@@ -345,25 +337,19 @@ function decodeEnrCached(enr) {
 
 
 // Helper function for creating hover-over text.
-function createHoverOverInfoFromENR(enr, time) {
+function createHoverOverInfo(censusInfo, time) {
+    let decodedEnr = decodeEnrCached(censusInfo.enr);
 
-    let decodedEnr = decodeEnrCached(enr);
-    let title = `Node found during census beginning at ${time}.\nENR: ${decodedEnr.shortened}\nIP: ${decodedEnr.ip}:${decodedEnr.port}\nSeq: ${decodedEnr.seq}\nClient String: ${decodedEnr.client}`;
+    let title = `Census started at ${time}.\n`;
+    title += `ENR: ${decodedEnr.shortened}\n`;
+    title += `IP: ${decodedEnr.ip}:${decodedEnr.port}\n`
+    title += `Seq: ${decodedEnr.seq}\n`
+    title += `Radius: ${censusInfo.radiusAsPercentage}\n`;
+    title += `Client: ${censusInfo.client.name}\n`;
+    title += `Client Version: ${censusInfo.clientVersion || "Unknown"}\n`;
+    title += `Client Short Commit: ${censusInfo.clientShortCommit || "Unknown"}\n`;
 
     return title;
-
-}
-
-function getClientStringFromDecodedEnr(decodedEnr) {
-    for (let [key, value] of decodedEnr.entries()) {
-
-        if (key === "c") {
-            return String.fromCharCode.apply(null, value);
-        } else {
-            return null;
-        }
-    }
-
 }
 
 // Fetch the census node records from the API.
@@ -401,7 +387,7 @@ async function censusTimeSeriesChart(daysAgo) {
     }
 }
 
-// Sort nodes by nickname, latestClientString, and nodeId
+// Sort nodes by nickname, clientString, and nodeId
 function sortNodes(a, b) {
 
     // Check for "bootnode" in nodeNickName
@@ -427,18 +413,19 @@ function sortNodes(a, b) {
         return Number(aNumberA) - Number(bNumberB);
     }
 
+    // If one has a nickname and the other doesn't, prioritize the one that has.
     if (a.nodeNickName && !b.nodeNickName) return -1;
     if (!a.nodeNickName && b.nodeNickName) return 1;
 
-    // Place nodes with latestClientString after nodes with nicknames
-    if (a.latestClientString && !b.latestClientString) return -1;
-    if (!a.latestClientString && b.latestClientString) return 1;
+    // Place nodes with clientInfo after nodes with nicknames
+    if (a.clientString && !b.clientString) return -1;
+    if (!a.clientString && b.clientString) return 1;
 
-    // If both nodes have latestClientString, sort by latestClientString
-    if (a.latestClientString && b.latestClientString) {
-        return a.latestClientString.localeCompare(b.latestClientString);
+    // If both nodes have clientString, sort by clientString
+    if (a.clientString && b.clientString) {
+        return a.clientString.localeCompare(b.clientString);
     }
 
-    // Place nodes without nicknames or latestClientString at the end, sorted by nodeId
+    // Place nodes without nicknames or clientString at the end, sorted by nodeId
     return a.nodeId.localeCompare(b.nodeId);
 }

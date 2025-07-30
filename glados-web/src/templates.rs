@@ -1,8 +1,11 @@
+use std::collections::HashMap;
+
 use askama::Template;
 use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Response},
 };
+use enr::NodeId;
 use entity::{
     audit, client,
     client_info::{Client, OperatingSystem},
@@ -87,6 +90,7 @@ pub struct ContentIdDetailTemplate {
 pub struct ContentAuditDetailTemplate {
     pub audit: audit::Model,
     pub content: content::Model,
+    pub node_details: HashMap<NodeId, Client>,
 }
 
 #[derive(Template)]

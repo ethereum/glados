@@ -100,32 +100,6 @@
                                 return undefined;
                             }
                         }
-                        get client() {
-                            const shorthand = this.get("c");
-                            if (shorthand) {
-                                switch (shorthand[0]) {
-                                    // ASCII 't'
-                                    case 0x74:
-                                        return 'trin';
-                                    // ASCII 'u'
-                                    case 0x75:
-                                        return 'ultralight';
-                                    // ASCII 'f'
-                                    case 0x66:
-                                    // ASCII 'n'
-                                    case 0x6E:                                        
-                                        return 'nimbus';
-                                    // ASCII 'a'
-                                    case 0x61:
-                                        return 'samba';                                    
-                                    // ASCII 's'
-                                    case 0x73:
-                                        return 'shisui';
-                                    default:
-                                        return undefined;
-                                }
-                            }
-                        }
                     }
                     exports.ENR = ENR;
                     function toNewUint8Array(buf) {

@@ -17,19 +17,19 @@
     <div class="row">
         <div class="col">
             {% match latest_enr %}
-                {% when Some with (enr) %}
-                    <div class="card shadow-sm enr-card">
-                        <div class="card-body">
-                            <h2>Latest ENR</h2>
-                            <ul>
-                                <li>Sequence Number: {{ enr.sequence_number }}</li>
-                            </ul>
-                            <pre>{{ enr.raw }}</pre>
-                            <div id="enr-data-box" class="form-group"></div>
-                        </div>
-                    </div>
-                {% when None %}
-                    <p>No latest ENR found</p>
+            {% when Some with (enr) %}
+            <div class="card shadow-sm enr-card">
+                <div class="card-body">
+                    <h2>Latest ENR</h2>
+                    <ul>
+                        <li>Sequence Number: {{ enr.sequence_number }}</li>
+                    </ul>
+                    <pre>{{ enr.raw }}</pre>
+                    <div id="enr-data-box" class="form-group"></div>
+                </div>
+            </div>
+            {% when None %}
+            <p>No latest ENR found</p>
             {% endmatch %}
         </div>
     </div>
@@ -133,13 +133,13 @@
                 throw new Error("Field not found.")
             }
             return field
+        } else if (key === "c") {
+            return value.toString()
         } else {
             // default to assuming binary data
             return toHexString(value)
         }
     }
-
-
 
     function decodedEnrData(key, displayValue) {
         let container = document.getElementById("enr-data-box");
