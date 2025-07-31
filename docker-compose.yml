@@ -53,7 +53,7 @@ services:
     restart: always
 
   glados_cartographer_history:
-    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --transport http --http-url http://host.docker.internal:8545 --concurrency 10 --sub-protocol history"
+    command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --transport http --http-url http://host.docker.internal:8545 --concurrency 10 --subprotocol history"
     image: portalnetwork/glados-cartographer:latest
     environment:
       RUST_LOG: warn,glados_cartographer=info

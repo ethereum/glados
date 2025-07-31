@@ -5,7 +5,7 @@ use chrono::{DateTime, Duration, Utc};
 use clap::Parser;
 use cli::Args;
 use enr::NodeId;
-use entity::SubProtocol;
+use entity::Subprotocol;
 use ethportal_api::Enr;
 use ethportal_api::{generate_random_remote_enr, jsonrpsee::http_client::HttpClientBuilder};
 use ethportal_api::{
@@ -47,7 +47,7 @@ pub struct CartographerConfig {
     /// Total number of concurrent requests to portal client
     pub concurrency: usize,
     /// Which portal sub-protocol to target
-    pub sub_protocol: SubProtocol,
+    pub subprotocol: Subprotocol,
 }
 
 impl CartographerConfig {
@@ -72,7 +72,7 @@ impl CartographerConfig {
             transport,
             census_interval: args.census_interval,
             concurrency: args.concurrency,
-            sub_protocol: args.sub_protocol,
+            subprotocol: args.subprotocol,
         })
     }
 }
@@ -266,8 +266,8 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
     );
 
     // Initialize our search with a random-ish set of ENRs
-    let find_nodes = match config.sub_protocol {
-        SubProtocol::History => HistoryNetworkApiClient::recursive_find_nodes(&client, target),
+    let find_nodes = match config.subprotocol {
+        Subprotocol::History => HistoryNetworkApiClient::recursive_find_nodes(&client, target),
     };
 
     let initial_enrs = match find_nodes.await {
@@ -359,7 +359,7 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
     let census_model = match census::create(
         census.started_at,
         census.duration(),
-        config.sub_protocol.into(),
+        config.subprotocol,
         &conn,
     )
     .await
@@ -471,8 +471,8 @@ async fn do_liveliness_check(
     // Perform liveliness check
     debug!(node_id=?B256::from(enr.node_id().raw()), "Liveliness check");
 
-    let ping = match config.sub_protocol {
-        SubProtocol::History => HistoryNetworkApiClient::ping(&client, enr.to_owned(), None, None),
+    let ping = match config.subprotocol {
+        Subprotocol::History => HistoryNetworkApiClient::ping(&client, enr.to_owned(), None, None),
     };
     match ping.await {
         Ok(pong_info) => {
@@ -571,8 +571,8 @@ async fn do_routing_table_enumeration(
     debug!(enr.node_id=?B256::from(enr.node_id().raw()), "Enumerating Routing Table");
 
     for distance in 245..257 {
-        let find_nodes = match config.sub_protocol {
-            SubProtocol::History => {
+        let find_nodes = match config.subprotocol {
+            Subprotocol::History => {
                 HistoryNetworkApiClient::find_nodes(&client, enr.to_owned(), vec![distance])
             }
         };

@@ -1,5 +1,5 @@
 use chrono::Utc;
-use entity::{audit_stats, SubProtocol};
+use entity::{audit_stats, Subprotocol};
 use glados_core::stats::{
     filter_audits, get_audit_stats, AuditFilters, ContentTypeFilter, Period, StrategyFilter,
     SuccessFilter,
@@ -53,47 +53,47 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
         history_random_receipts,
     ) = tokio::join!(
         get_stats(
-            SubProtocol::History,
+            Subprotocol::History,
             StrategyFilter::All,
             ContentTypeFilter::All,
         ),
         get_stats(
-            SubProtocol::History,
+            Subprotocol::History,
             StrategyFilter::Sync,
             ContentTypeFilter::All,
         ),
         get_stats(
-            SubProtocol::History,
+            Subprotocol::History,
             StrategyFilter::Random,
             ContentTypeFilter::All,
         ),
         get_stats(
-            SubProtocol::History,
+            Subprotocol::History,
             StrategyFilter::All,
             ContentTypeFilter::Bodies,
         ),
         get_stats(
-            SubProtocol::History,
+            Subprotocol::History,
             StrategyFilter::Sync,
             ContentTypeFilter::Bodies,
         ),
         get_stats(
-            SubProtocol::History,
+            Subprotocol::History,
             StrategyFilter::Random,
             ContentTypeFilter::Bodies,
         ),
         get_stats(
-            SubProtocol::History,
+            Subprotocol::History,
             StrategyFilter::All,
             ContentTypeFilter::Receipts,
         ),
         get_stats(
-            SubProtocol::History,
+            Subprotocol::History,
             StrategyFilter::Sync,
             ContentTypeFilter::Receipts,
         ),
         get_stats(
-            SubProtocol::History,
+            Subprotocol::History,
             StrategyFilter::Random,
             ContentTypeFilter::Receipts,
         ),

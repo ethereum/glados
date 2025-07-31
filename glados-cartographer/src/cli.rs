@@ -1,5 +1,5 @@
 use clap::{Parser, ValueEnum};
-use entity::SubProtocol;
+use entity::Subprotocol;
 use std::path::PathBuf;
 use url::Url;
 
@@ -25,7 +25,7 @@ pub struct Args {
     #[arg(short, long, default_value = DEFAULT_CONCURRENCY)]
     pub concurrency: usize,
     #[arg(short, long)]
-    pub sub_protocol: SubProtocol,
+    pub subprotocol: Subprotocol,
 }
 
 /// Used by a user to specify the intended form of transport

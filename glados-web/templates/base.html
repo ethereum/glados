@@ -66,7 +66,7 @@
                 window.location.href = url.toString();
             }
 
-            function appendNetworkToUrl(url) {
+            function appendSubprotocolToUrl(url) {
                 const subprotocol = subprotocolSelector.value;
                 const urlObj = new URL(url, window.location.origin);
                 urlObj.searchParams.set('subprotocol', subprotocol);
@@ -84,7 +84,7 @@
                 const target = e.target.closest('a');
                 if (target && target.href && target.host === window.location.host) {
                     e.preventDefault();
-                    window.location.href = appendNetworkToUrl(target.href);
+                    window.location.href = appendSubprotocolToUrl(target.href);
                 }
             });
         });

@@ -1,4 +1,4 @@
-use entity::{content, SubProtocol};
+use entity::{content, Subprotocol};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
 use sea_orm::DatabaseConnection;
 use tracing::error;
@@ -11,7 +11,7 @@ pub async fn store_history_content_key(
     block_number: u64,
     conn: &DatabaseConnection,
 ) -> Option<content::Model> {
-    content::get_or_create(SubProtocol::History, key, Some(block_number), conn)
+    content::get_or_create(Subprotocol::History, key, Some(block_number), conn)
         .await
         .inspect_err(|err| {
             error!(

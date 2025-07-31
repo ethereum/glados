@@ -7,7 +7,7 @@ use sea_orm::{
 };
 use strum::{Display, EnumString};
 
-use crate::SubProtocol;
+use crate::Subprotocol;
 
 #[derive(
     Debug, Clone, Hash, Eq, PartialEq, EnumIter, DeriveActiveEnum, ValueEnum, Display, EnumString,
@@ -27,15 +27,15 @@ pub enum SelectionStrategy {
 }
 
 impl SelectionStrategy {
-    pub fn sub_protocol(&self) -> SubProtocol {
+    pub fn subprotocol(&self) -> Subprotocol {
         match self {
-            Self::History(_) => SubProtocol::History,
+            Self::History(_) => Subprotocol::History,
         }
     }
 
-    pub fn try_from_str(sub_protocol: SubProtocol, s: &str) -> Result<Self, String> {
-        match sub_protocol {
-            SubProtocol::History => {
+    pub fn try_from_str(subprotocol: Subprotocol, s: &str) -> Result<Self, String> {
+        match subprotocol {
+            Subprotocol::History => {
                 HistorySelectionStrategy::from_str(s, /* ignore_case= */ true).map(Self::History)
             }
         }
@@ -57,17 +57,17 @@ impl ActiveEnum for SelectionStrategy {
     }
 
     fn to_value(&self) -> Self::Value {
-        let (sub_protocol_value, strategy_value) = match self {
-            Self::History(strategy) => (SubProtocol::History.into_value(), strategy.to_value()),
+        let (subprotocol_value, strategy_value) = match self {
+            Self::History(strategy) => (Subprotocol::History.into_value(), strategy.to_value()),
         };
-        (sub_protocol_value << 16) | strategy_value
+        (subprotocol_value << 16) | strategy_value
     }
 
     fn try_from_value(v: &Self::Value) -> std::prelude::v1::Result<Self, DbErr> {
         let sub_protocol_value = v >> 16;
         let strategy_value = v & 0xFFFF;
-        match SubProtocol::try_from_value(&sub_protocol_value)? {
-            SubProtocol::History => {
+        match Subprotocol::try_from_value(&sub_protocol_value)? {
+            Subprotocol::History => {
                 HistorySelectionStrategy::try_from_value(&strategy_value).map(Self::History)
             }
         }
@@ -190,11 +190,11 @@ mod tests {
     #[test]
     fn try_from_str() {
         assert_eq!(
-            SelectionStrategy::try_from_str(SubProtocol::History, "Sync").unwrap(),
+            SelectionStrategy::try_from_str(Subprotocol::History, "Sync").unwrap(),
             SelectionStrategy::History(HistorySelectionStrategy::Sync),
         );
         assert_eq!(
-            SelectionStrategy::try_from_str(SubProtocol::History, "Random").unwrap(),
+            SelectionStrategy::try_from_str(Subprotocol::History, "Random").unwrap(),
             SelectionStrategy::History(HistorySelectionStrategy::Random),
         );
     }
