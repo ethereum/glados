@@ -113,12 +113,12 @@ async function loadChart(graphConfig) {
     const spinner = new Spinner(spinnerOpts).spin(target);
 
     const url = new URL(window.location);
-    const network = url.searchParams.get("network")
-      ? url.searchParams.get("network").toLowerCase()
+    const subprotocol = url.searchParams.get("subprotocol")
+      ? url.searchParams.get("subprotocol").toLowerCase()
       : "history";
 
     const params = new URLSearchParams();
-    params.append("network", network);
+    params.append("subprotocol", subprotocol);
 
     const rawData = await d3.json(graphConfig.baseUrl + params);
 

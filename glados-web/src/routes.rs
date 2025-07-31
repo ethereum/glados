@@ -15,7 +15,7 @@ use enr::NodeId;
 use entity::{
     audit, audit_stats, census, census_node, client,
     client_info::{Client, OperatingSystem, Version},
-    content, node, node_enr, ContentType, SelectionStrategy, SubProtocol, TransferFailureType,
+    content, node, node_enr, ContentType, SelectionStrategy, Subprotocol, TransferFailureType,
 };
 use ethportal_api::{
     jsonrpsee::core::__reexports::serde_json,
@@ -60,30 +60,30 @@ pub async fn handle_error(_err: io::Error) -> impl IntoResponse {
 }
 
 // Get the subprotocol from the query parameters, defaulting to History
-pub fn get_subprotocol_from_params(params: &HashMap<String, String>) -> SubProtocol {
+pub fn get_subprotocol_from_params(params: &HashMap<String, String>) -> Subprotocol {
     params
-        .get("network")
-        .and_then(|network| SubProtocol::from_str(network, /* ignore_case= */ true).ok())
-        .unwrap_or(SubProtocol::History)
+        .get("subprotocol")
+        .and_then(|subprotocol| Subprotocol::from_str(subprotocol, /* ignore_case= */ true).ok())
+        .unwrap_or(Subprotocol::History)
 }
 
 pub async fn network_overview(
     params: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> impl IntoResponse {
-    let sub_protocol = get_subprotocol_from_params(&params);
+    let subprotocol = get_subprotocol_from_params(&params);
 
-    let client_diversity_data = match get_max_census_id(&state, sub_protocol).await {
+    let client_diversity_data = match get_max_census_id(&state, subprotocol).await {
         None => vec![],
         Some(max_census_id) => generate_client_diversity_data(&state, max_census_id)
             .await
             .unwrap_or_default(),
     };
 
-    let radius_percentages = generate_radius_graph_data(&state, sub_protocol).await;
+    let radius_percentages = generate_radius_graph_data(&state, subprotocol).await;
 
-    let strategy: StrategyFilter = match sub_protocol {
-        SubProtocol::History => StrategyFilter::Sync,
+    let strategy: StrategyFilter = match subprotocol {
+        Subprotocol::History => StrategyFilter::Sync,
     };
 
     // Run queries for content dashboard data concurrently
@@ -93,7 +93,7 @@ pub async fn network_overview(
                 strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
-                sub_protocol,
+                subprotocol,
             },),
             Period::Hour,
             &state.database_connection,
@@ -103,7 +103,7 @@ pub async fn network_overview(
                 strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
-                sub_protocol,
+                subprotocol,
             },),
             Period::Day,
             &state.database_connection,
@@ -113,7 +113,7 @@ pub async fn network_overview(
                 strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
-                sub_protocol,
+                subprotocol,
             },),
             Period::Week,
             &state.database_connection,
@@ -121,7 +121,7 @@ pub async fn network_overview(
     );
 
     let template = IndexTemplate {
-        subprotocol: sub_protocol,
+        subprotocol,
         strategy,
         client_diversity_data,
         average_radius_chart: radius_percentages,
@@ -589,10 +589,10 @@ pub async fn is_content_in_deadzone(
     Path(content_key): Path<String>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<Vec<String>>, StatusCode> {
-    let (sub_protocol, content_id) = if let Ok(content_key) =
+    let (subprotocol, content_id) = if let Ok(content_key) =
         serde_json::from_value::<HistoryContentKey>(serde_json::json!(content_key))
     {
-        (SubProtocol::History, content_key.content_id())
+        (Subprotocol::History, content_key.content_id())
     } else {
         return Err(StatusCode::BAD_REQUEST);
     };
@@ -610,10 +610,10 @@ pub async fn is_content_in_deadzone(
             WHERE census_node.census_id = (
                 SELECT MAX(id)
                 FROM census
-                WHERE sub_protocol = $1
+                WHERE subprotocol = $1
             )
         ",
-        vec![sub_protocol.into()],
+        vec![subprotocol.into()],
     ))
     .all(&state.database_connection)
     .await
@@ -657,17 +657,17 @@ pub async fn get_failed_keys_handler(
     http_args: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<Vec<String>>, StatusCode> {
-    let sub_protocol = get_subprotocol_from_params(&http_args);
+    let subprotocol = get_subprotocol_from_params(&http_args);
 
     let strategy: &str = match http_args.get("strategy") {
         // Set a default for each subprotocol
-        None => match sub_protocol {
-            SubProtocol::History => "Sync",
+        None => match subprotocol {
+            Subprotocol::History => "Sync",
         },
         Some(strategy) => &strategy.to_string(),
     };
-    let strategy = SelectionStrategy::try_from_str(sub_protocol, strategy).map_err(|err| {
-        error!(?sub_protocol, %strategy, %err, "Unkown strategy");
+    let strategy = SelectionStrategy::try_from_str(subprotocol, strategy).map_err(|err| {
+        error!(?subprotocol, %strategy, %err, "Unkown strategy");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -839,7 +839,7 @@ pub async fn census_timeseries(
             FROM
                 (
                     SELECT * FROM census
-                    WHERE sub_protocol = $2
+                    WHERE subprotocol = $2
                     AND started_at >= NOW() - INTERVAL '1 day' * ($1 + 1)
                     AND started_at < NOW() - INTERVAL '1 day' * $1
                 ) AS census
@@ -1008,7 +1008,7 @@ pub async fn weekly_census_history(
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
             WHERE
-                census.sub_protocol = $2 AND
+                census.subprotocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
@@ -1077,7 +1077,7 @@ pub async fn weekly_census_clients(
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
             WHERE
-                census.sub_protocol = $2 AND
+                census.subprotocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
@@ -1138,7 +1138,7 @@ pub async fn weekly_census_client_versions(
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
             WHERE
-                census.sub_protocol = $2 AND
+                census.subprotocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 census.started_at < NOW() - INTERVAL '1 week' * $1 AND
                 census_node.client_name = $3
@@ -1213,7 +1213,7 @@ pub async fn weekly_census_operating_systems(
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
             WHERE
-                census.sub_protocol = $2 AND
+                census.subprotocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
@@ -1298,7 +1298,7 @@ pub async fn weekly_census_protocol_versions(
             LEFT JOIN census_node ON census.id = census_node.census_id
             LEFT JOIN node_enr ON census_node.node_enr_id = node_enr.id
             WHERE
-                census.sub_protocol = $2 AND
+                census.subprotocol = $2 AND
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
@@ -1426,7 +1426,7 @@ pub async fn census_protocol_versions_clients(
                 census_node.census_id = (
                     SELECT MAX(id)
                     FROM census
-                    WHERE sub_protocol = $1
+                    WHERE subprotocol = $1
                 )
             GROUP BY
                 node_enr.protocol_versions,
@@ -1584,7 +1584,7 @@ impl NodeEnr {
 
 async fn generate_radius_graph_data(
     state: &Arc<State>,
-    subprotocol: SubProtocol,
+    subprotocol: Subprotocol,
 ) -> Vec<CalculatedRadiusChartData> {
     let radius_chart_data = RadiusChartData::find_by_statement(Statement::from_sql_and_values(
         DbBackend::Postgres,
@@ -1592,7 +1592,7 @@ async fn generate_radius_graph_data(
         WITH latest_census AS (
             SELECT id
             FROM census
-            WHERE sub_protocol = $1
+            WHERE subprotocol = $1
             ORDER BY id DESC
             LIMIT 1
         )
@@ -1668,11 +1668,11 @@ fn xor_distance_to_fraction(radius_high_bytes: [u8; 4]) -> f64 {
     radius_int as f64 / u32::MAX as f64
 }
 
-async fn get_max_census_id(state: &Arc<State>, subprotocol: SubProtocol) -> Option<i32> {
+async fn get_max_census_id(state: &Arc<State>, subprotocol: Subprotocol) -> Option<i32> {
     census::Entity::find()
         .select_only()
         .column_as(census::Column::Id.max(), "id")
-        .filter(census::Column::SubProtocol.eq(subprotocol))
+        .filter(census::Column::Subprotocol.eq(subprotocol))
         .into_tuple::<i32>()
         .one(&state.database_connection)
         .await
@@ -1710,7 +1710,7 @@ pub async fn diagnostics(
     params: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<HtmlTemplate<DiagnosticsTemplate>, StatusCode> {
-    let sub_protocol = get_subprotocol_from_params(&params);
+    let subprotocol = get_subprotocol_from_params(&params);
     // Query to get the 20 most recent internal failures joined with audits for timestamps
     let transfer_failures: Vec<TransferFailure> =
         TransferFailure::find_by_statement(Statement::from_sql_and_values(
@@ -1733,10 +1733,10 @@ pub async fn diagnostics(
                 ORDER BY census_node.surveyed_at DESC
                 LIMIT 1
             ) closest_census_node
-            WHERE content.sub_protocol = $1
+            WHERE content.subprotocol = $1
             ORDER BY audit.created_at DESC
             LIMIT 20;",
-            vec![sub_protocol.into()],
+            vec![subprotocol.into()],
         ))
         .all(&state.database_connection)
         .await

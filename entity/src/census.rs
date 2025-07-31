@@ -3,14 +3,14 @@
 use chrono::Duration;
 use sea_orm::{entity::prelude::*, NotSet, Set};
 
-use crate::SubProtocol;
+use crate::Subprotocol;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "census")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub sub_protocol: SubProtocol,
+    pub subprotocol: Subprotocol,
     #[sea_orm(unique)]
     pub started_at: DateTimeUtc,
     pub duration: i64,
@@ -35,13 +35,13 @@ impl ActiveModelBehavior for ActiveModel {}
 pub async fn create(
     started_at: DateTimeUtc,
     duration: Duration,
-    sub_protocol: SubProtocol,
+    subprotocol: Subprotocol,
     conn: &DatabaseConnection,
 ) -> Result<Model, DbErr> {
     // If no record exists, create one and return it
     let census = ActiveModel {
         id: NotSet,
-        sub_protocol: Set(sub_protocol),
+        subprotocol: Set(subprotocol),
         started_at: Set(started_at),
         duration: Set(duration.num_seconds()),
     };

@@ -20,6 +20,6 @@ pub use enums::{
     client_info,
     content_type::ContentType,
     strategy::{HistorySelectionStrategy, SelectionStrategy},
-    sub_protocol::SubProtocol,
+    subprotocol::Subprotocol,
     transfer_failure_type::TransferFailureType,
 };

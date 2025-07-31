@@ -9,7 +9,7 @@ use enr::NodeId;
 use entity::{
     audit, client,
     client_info::{Client, OperatingSystem},
-    content, node, node_enr, ContentType, SubProtocol,
+    content, node, node_enr, ContentType, Subprotocol,
 };
 use glados_core::stats::{AuditStats, StrategyFilter};
 use strum::EnumProperty;
@@ -22,7 +22,7 @@ use crate::routes::{
 #[derive(Template)]
 #[template(path = "index.html")]
 pub struct IndexTemplate {
-    pub subprotocol: SubProtocol,
+    pub subprotocol: Subprotocol,
     pub strategy: StrategyFilter,
     pub client_diversity_data: Vec<ClientDiversityResult>,
     pub average_radius_chart: Vec<CalculatedRadiusChartData>,
@@ -102,7 +102,7 @@ pub struct ContentKeyListTemplate {
 #[derive(Template)]
 #[template(path = "audit_dashboard.html")]
 pub struct AuditDashboardTemplate {
-    pub subprotocol: SubProtocol,
+    pub subprotocol: Subprotocol,
 }
 
 #[derive(Template)]
@@ -123,7 +123,7 @@ pub struct ContentKeyDetailTemplate {
 #[derive(Template)]
 #[template(path = "clients.html")]
 pub struct ClientsTemplate {
-    pub subprotocol: SubProtocol,
+    pub subprotocol: Subprotocol,
     pub clients: Vec<Client>,
     pub operating_systems: Vec<OperatingSystem>,
 }

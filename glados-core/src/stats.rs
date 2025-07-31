@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 use entity::{
     audit, content, AuditResult, ContentType, HistorySelectionStrategy, SelectionStrategy,
-    SubProtocol,
+    Subprotocol,
 };
 
 /// Generates a SeaORM select query for audits based on the provided filters.
@@ -24,8 +24,8 @@ pub fn filter_audits(filters: AuditFilters) -> Select<audit::Entity> {
         audit::Relation::Content
             .def()
             .on_condition(move |_left, _right| {
-                content::Column::SubProtocol
-                    .eq(filters.sub_protocol)
+                content::Column::Subprotocol
+                    .eq(filters.subprotocol)
                     .into_condition()
             }),
     );
@@ -154,7 +154,7 @@ pub struct AuditFilters {
     pub strategy: StrategyFilter,
     pub content_type: ContentTypeFilter,
     pub success: SuccessFilter,
-    pub sub_protocol: SubProtocol,
+    pub subprotocol: Subprotocol,
 }
 
 #[derive(Deserialize, Copy, Clone)]

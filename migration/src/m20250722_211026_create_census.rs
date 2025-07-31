@@ -1,6 +1,6 @@
 use sea_orm_migration::{prelude::*, schema::*};
 
-const IDX_SUB_PROTOCOL_STARTED_AT: &str = "IDX-census-sub_protocol-started_at";
+const IDX_SUBPROTOCOL_STARTED_AT: &str = "IDX-census-subprotocol-started_at";
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -14,7 +14,7 @@ impl MigrationTrait for Migration {
                     .table(Census::Table)
                     .if_not_exists()
                     .col(pk_auto(Census::Id))
-                    .col(unsigned(Census::SubProtocol))
+                    .col(unsigned(Census::Subprotocol))
                     .col(timestamp_with_time_zone_uniq(Census::StartedAt))
                     .col(big_unsigned(Census::Duration))
                     .to_owned(),
@@ -25,8 +25,8 @@ impl MigrationTrait for Migration {
             .create_index(
                 Index::create()
                     .table(Census::Table)
-                    .name(IDX_SUB_PROTOCOL_STARTED_AT)
-                    .col(Census::SubProtocol)
+                    .name(IDX_SUBPROTOCOL_STARTED_AT)
+                    .col(Census::Subprotocol)
                     .col(Census::StartedAt)
                     .to_owned(),
             )
@@ -48,5 +48,5 @@ enum Census {
     Id,
     StartedAt,
     Duration,
-    SubProtocol,
+    Subprotocol,
 }

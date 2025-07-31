@@ -60,7 +60,7 @@
                                     <td><span
                                             class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
                                             if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
-                                    <td>{{ content.sub_protocol.as_text() }}</td>
+                                    <td>{{ content.subprotocol.as_text() }}</td>
                                     <td>{{ audit.strategy.as_str() }}</td>
                                     <td>
                                         <a href="/content/key/{{content.key_as_hex()}}/">

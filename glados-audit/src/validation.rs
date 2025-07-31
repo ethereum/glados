@@ -1,4 +1,4 @@
-use entity::{content, AuditResult, SubProtocol};
+use entity::{content, AuditResult, Subprotocol};
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{ContentValue, HistoryContentValue};
 use ethportal_api::{HistoryContentKey, OverlayContentKey};
@@ -6,8 +6,8 @@ use tracing::error;
 
 /// Checks the validity of the content.
 pub fn content_is_valid(content: &content::Model, content_bytes: &[u8]) -> AuditResult {
-    match content.sub_protocol {
-        SubProtocol::History => {
+    match content.subprotocol {
+        Subprotocol::History => {
             let Ok(content_key) = HistoryContentKey::try_from_bytes(&content.content_key) else {
                 error!(
                     content.content_key = ?hex_encode(&content.content_key),

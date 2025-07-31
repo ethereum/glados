@@ -283,7 +283,7 @@ function getStatsRecords(statsUrl) {
   return fetch(statsUrl)
     .then((response) => {
       if (!response.ok) {
-        throw new Error("Network response was not ok");
+        throw new Error("Response was not ok");
       }
       return response.json();
     })
@@ -297,8 +297,8 @@ function getStatsRecords(statsUrl) {
 
 function getCurrentSubprotocol() {
   const url = new URL(window.location);
-  const subprotocolName = url.searchParams.get("network")
-    ? url.searchParams.get("network").toLowerCase()
+  const subprotocolName = url.searchParams.get("subprotocol")
+    ? url.searchParams.get("subprotocol").toLowerCase()
     : "history";
 
   subprotocols = {

@@ -1,7 +1,7 @@
 use std::{path::PathBuf, time::Duration};
 
 use alloy_primitives::hex::FromHexError;
-use entity::{client, content, node, SubProtocol};
+use entity::{client, content, node, Subprotocol};
 use ethportal_api::{
     types::query_trace::QueryTrace, utils::bytes::ByteUtilsError, ContentKeyError, Discv5ApiClient,
     HistoryContentKey, HistoryNetworkApiClient, NodeInfo, OverlayContentKey, RawContentValue,
@@ -195,8 +195,8 @@ impl PortalApi {
         &self,
         content: &content::Model,
     ) -> Result<RawContentValue, JsonRpcError> {
-        match content.sub_protocol {
-            SubProtocol::History => {
+        match content.subprotocol {
+            Subprotocol::History => {
                 let content_info = HistoryNetworkApiClient::get_content(
                     &self.client,
                     HistoryContentKey::try_from_bytes(&content.content_key)?,
@@ -211,8 +211,8 @@ impl PortalApi {
         &self,
         content: &content::Model,
     ) -> Result<(RawContentValue, QueryTrace), JsonRpcError> {
-        match content.sub_protocol {
-            SubProtocol::History => {
+        match content.subprotocol {
+            Subprotocol::History => {
                 let trace_content_info = HistoryNetworkApiClient::trace_get_content(
                     &self.client,
                     HistoryContentKey::try_from_bytes(&content.content_key)?,

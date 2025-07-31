@@ -5,9 +5,9 @@ pub struct Migration;
 
 const IDX_CONTENT_ID: &str = "IDX-content-content_id";
 const IDX_CONTENT_KEY: &str = "IDX-content-content_key";
-const IDX_SUB_PROTOCOL_CONTENT_KEY: &str = "IDX-content-sub_protocol-content_key";
-const IDX_SUB_PROTOCOL_BLOCK_NUMBER_CONTENT_TYPE: &str =
-    "IDX-content-sub_protocol-block_number-content_type-id";
+const IDX_SUBPROTOCOL_CONTENT_KEY: &str = "IDX-content-subprotocol-content_key";
+const IDX_SUBPROTOCOL_BLOCK_NUMBER_CONTENT_TYPE: &str =
+    "IDX-content-subprotocol-block_number-content_type-id";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -18,7 +18,7 @@ impl MigrationTrait for Migration {
                     .table(Content::Table)
                     .if_not_exists()
                     .col(pk_auto(Content::Id))
-                    .col(unsigned(Content::SubProtocol))
+                    .col(unsigned(Content::Subprotocol))
                     .col(binary_len(Content::ContentId, 32))
                     .col(blob(Content::ContentKey))
                     .col(unsigned(Content::ContentType))
@@ -50,8 +50,8 @@ impl MigrationTrait for Migration {
                 Index::create()
                     .unique()
                     .table(Content::Table)
-                    .name(IDX_SUB_PROTOCOL_CONTENT_KEY)
-                    .col(Content::SubProtocol)
+                    .name(IDX_SUBPROTOCOL_CONTENT_KEY)
+                    .col(Content::Subprotocol)
                     .col(Content::ContentKey)
                     .to_owned(),
             )
@@ -61,8 +61,8 @@ impl MigrationTrait for Migration {
                 Index::create()
                     .unique()
                     .table(Content::Table)
-                    .name(IDX_SUB_PROTOCOL_BLOCK_NUMBER_CONTENT_TYPE)
-                    .col(Content::SubProtocol)
+                    .name(IDX_SUBPROTOCOL_BLOCK_NUMBER_CONTENT_TYPE)
+                    .col(Content::Subprotocol)
                     .col(Content::BlockNumber)
                     .col(Content::ContentType)
                     .col(Content::Id)
@@ -85,7 +85,7 @@ impl MigrationTrait for Migration {
 enum Content {
     Table,
     Id,
-    SubProtocol,
+    Subprotocol,
     ContentId,
     ContentKey,
     ContentType,

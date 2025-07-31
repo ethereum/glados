@@ -8,14 +8,14 @@ use ethportal_api::{
 use num_format::{Locale, ToFormattedString};
 use sea_orm::{entity::prelude::*, NotSet, Set};
 
-use crate::{ContentType, SubProtocol};
+use crate::{ContentType, Subprotocol};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "content")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub sub_protocol: SubProtocol,
+    pub subprotocol: Subprotocol,
     #[sea_orm(column_type = "VarBinary(StringLen::N(32))")]
     pub content_id: Vec<u8>,
     #[sea_orm(column_type = "VarBinary(StringLen::None)")]
@@ -49,14 +49,14 @@ impl ActiveModelBehavior for ActiveModel {}
 // *** Custom additions ***
 
 pub async fn get_or_create<T: OverlayContentKey + AsRef<ContentType>>(
-    sub_protocol: SubProtocol,
+    subprotocol: Subprotocol,
     content_key: &T,
     block_number: Option<u64>,
     conn: &DatabaseConnection,
 ) -> Result<Model, DbErr> {
     // First try to lookup an existing entry.
     if let Some(content_key_model) = Entity::find()
-        .filter(Column::SubProtocol.eq(sub_protocol))
+        .filter(Column::Subprotocol.eq(subprotocol))
         .filter(Column::ContentKey.eq(content_key.to_bytes().as_ref()))
         .one(conn)
         .await?
@@ -68,7 +68,7 @@ pub async fn get_or_create<T: OverlayContentKey + AsRef<ContentType>>(
     // If no record exists, create one and return it
     let content = ActiveModel {
         id: NotSet,
-        sub_protocol: Set(sub_protocol),
+        subprotocol: Set(subprotocol),
         content_id: Set(content_key.content_id().to_vec()),
         content_key: Set(content_key.to_bytes().to_vec()),
         content_type: Set(*content_key.as_ref()),
@@ -148,7 +148,7 @@ mod tests {
     async fn content_id_as_hash() -> Result<(), DbErr> {
         let (conn, _db) = setup_database().await?;
         let (key, block_number) = history_content();
-        let content_model = get_or_create(SubProtocol::History, &key, Some(block_number), &conn)
+        let content_model = get_or_create(Subprotocol::History, &key, Some(block_number), &conn)
             .await
             .unwrap();
         assert_eq!(content_model.id_as_hash(), B256::from(key.content_id()));
@@ -162,7 +162,7 @@ mod tests {
         let (key, block_number) = history_content();
         let content_id_hash = B256::from(key.content_id());
 
-        let content_model = get_or_create(SubProtocol::History, &key, Some(block_number), &conn)
+        let content_model = get_or_create(Subprotocol::History, &key, Some(block_number), &conn)
             .await
             .unwrap();
         assert_eq!(content_model.id_as_hex(), content_id_hash.to_string());
@@ -174,7 +174,7 @@ mod tests {
     async fn content_key_as_hex() -> Result<(), DbErr> {
         let (conn, _db) = setup_database().await?;
         let (key, block_number) = history_content();
-        let content_model = get_or_create(SubProtocol::History, &key, Some(block_number), &conn)
+        let content_model = get_or_create(Subprotocol::History, &key, Some(block_number), &conn)
             .await
             .unwrap();
         assert_eq!(content_model.key_as_hex(), key.to_hex());
@@ -191,7 +191,7 @@ mod tests {
         // Ensure our database is empty
         assert_eq!(Entity::find().count(&conn).await?, 0);
 
-        let content_id_a = get_or_create(SubProtocol::History, &key, Some(block_number), &conn)
+        let content_id_a = get_or_create(Subprotocol::History, &key, Some(block_number), &conn)
             .await
             .unwrap();
 
@@ -199,7 +199,7 @@ mod tests {
         assert_eq!(Entity::find().count(&conn).await?, 1);
 
         // Retrieve the key
-        let content_id_b = get_or_create(SubProtocol::History, &key, Some(block_number), &conn)
+        let content_id_b = get_or_create(Subprotocol::History, &key, Some(block_number), &conn)
             .await
             .unwrap();
 
@@ -224,11 +224,11 @@ mod tests {
         let key_a = vec![3; 32];
         let key_b = vec![4; 32];
         let key_c = vec![5; 32];
-        let sub_protocol = SubProtocol::History;
+        let subprotocol = Subprotocol::History;
         // DB=0. Add one key (accepts). DB==1.
         let action_a = ActiveModel {
             id: NotSet,
-            sub_protocol: Set(sub_protocol),
+            subprotocol: Set(subprotocol),
             content_id: Set(id_a.clone()),
             content_key: Set(key_a.clone()),
             content_type: Set(ContentType::BlockBodies),
@@ -250,7 +250,7 @@ mod tests {
         // DB=1. Add different content_key, different content_id, same protocol (accepts). DB=2.
         let action_b = ActiveModel {
             id: NotSet,
-            sub_protocol: Set(sub_protocol),
+            subprotocol: Set(subprotocol),
             content_id: Set(id_b.clone()),
             content_key: Set(key_b.clone()),
             content_type: Set(ContentType::BlockBodies),
@@ -271,7 +271,7 @@ mod tests {
         // DB=2. Add different content_key, same content_id, same protocol (accepts). DB=3.
         let action_c = ActiveModel {
             id: NotSet,
-            sub_protocol: Set(sub_protocol),
+            subprotocol: Set(subprotocol),
             content_id: Set(id_a),
             content_key: Set(key_c),
             content_type: Set(ContentType::BlockBodies),

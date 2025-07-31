@@ -211,7 +211,7 @@ mod tests {
     use enr::NodeId;
     use ethportal_api::HistoryContentKey;
 
-    use crate::{client, node, test_utils::setup_database, HistorySelectionStrategy, SubProtocol};
+    use crate::{client, node, test_utils::setup_database, HistorySelectionStrategy, Subprotocol};
 
     use super::*;
 
@@ -223,7 +223,7 @@ mod tests {
         let key = HistoryContentKey::new_block_header_by_number(block_number);
 
         let content_model =
-            content::get_or_create(SubProtocol::History, &key, Some(block_number), &conn).await?;
+            content::get_or_create(Subprotocol::History, &key, Some(block_number), &conn).await?;
         assert_eq!(content_model.content_id, key.content_id());
         assert_eq!(content_model.content_key, key.to_bytes());
 
@@ -270,7 +270,7 @@ mod tests {
         let key = HistoryContentKey::new_block_header_by_number(block_number);
 
         let content =
-            content::get_or_create(SubProtocol::History, &key, Some(block_number), &conn).await?;
+            content::get_or_create(Subprotocol::History, &key, Some(block_number), &conn).await?;
         let client = client::get_or_create("trin v0.1.0".to_string(), &conn).await?;
         let node = node::get_or_create(NodeId::random(), &conn).await.unwrap();
 
