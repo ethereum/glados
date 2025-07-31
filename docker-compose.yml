@@ -7,8 +7,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${GLADOS_POSTGRES_PASSWORD?Glados Postgres Password Required}
       POSTGRES_DB: glados
-      PANDAOPS_ID: ${GLADOS_PANDAOPS_ID?Glados Pandaops ID Required}
-      PANDAOPS_SECRET: ${GLADOS_PANDAOPS_SECRET?Glados Pandaops Secret Required}
     volumes:
       - ${GLADOS_POSTGRES_DATA_DIR?Glados Postgres Data Directory Required}:/var/lib/postgresql/data
     ports:
