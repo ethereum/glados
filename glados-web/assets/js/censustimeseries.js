@@ -77,8 +77,8 @@ function createSquareChart(width, data) {
 
     const url = new URL(window.location);
     const subprotocol = url.searchParams.get('subprotocol');
-    let title = data.censuses.length > 0 ? `${nodes.length} ${subprotocol} nodes found during 24 hour period beginning at ${data.censuses[0].censusTime}`
-        : `No ${subprotocol} censuses found during this 24 hour period.`;
+    let title = data.censuses.length > 0 ? `${nodes.length} nodes found during 24 hour period beginning at ${data.censuses[0].censusTime}`
+        : `No nodes found during this 24 hour period.`;
 
     // Append the title
     svg.append("text")
