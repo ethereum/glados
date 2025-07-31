@@ -25,7 +25,7 @@ pub fn filter_audits(filters: AuditFilters) -> Select<audit::Entity> {
             .def()
             .on_condition(move |_left, _right| {
                 content::Column::SubProtocol
-                    .eq(filters.sub_protocol)
+                    .eq(filters.subprotocol)
                     .into_condition()
             }),
     );
@@ -154,7 +154,7 @@ pub struct AuditFilters {
     pub strategy: StrategyFilter,
     pub content_type: ContentTypeFilter,
     pub success: SuccessFilter,
-    pub sub_protocol: SubProtocol,
+    pub subprotocol: SubProtocol,
 }
 
 #[derive(Deserialize, Copy, Clone)]

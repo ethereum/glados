@@ -76,7 +76,7 @@ function createSquareChart(width, data) {
 
 
     const url = new URL(window.location);
-    const subprotocol = url.searchParams.get('network');
+    const subprotocol = url.searchParams.get('subprotocol');
     let title = data.censuses.length > 0 ? `${nodes.length} ${subprotocol} nodes found during 24 hour period beginning at ${data.censuses[0].censusTime}`
         : `No ${subprotocol} censuses found during this 24 hour period.`;
 
@@ -355,11 +355,11 @@ function createHoverOverInfo(censusInfo, time) {
 // Fetch the census node records from the API.
 async function getCensusTimeSeriesData(numDaysAgo, subprotocol) {
 
-    const baseUrl = `census-node-timeseries-data/?days-ago=${numDaysAgo}&network=${subprotocol}`;
+    const baseUrl = `census-node-timeseries-data/?days-ago=${numDaysAgo}&subprotocol=${subprotocol}`;
     return fetch(`${baseUrl}`)
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error('Response was not ok');
             }
             return response.json();
         })
@@ -375,7 +375,7 @@ async function censusTimeSeriesChart(daysAgo) {
     });
 
     const url = new URL(window.location);
-    subprotocol = url.searchParams.get('network');
+    subprotocol = url.searchParams.get('subprotocol');
 
     const data = await getCensusTimeSeriesData(daysAgo, subprotocol);
     console.log('Census data from glados API:');

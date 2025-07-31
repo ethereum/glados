@@ -122,9 +122,9 @@
 
         const baseUrl = "filter/";
         const url = new URL(window.location);
-        const sub_protocol = url.searchParams.get('sub_protocol') || document.getElementById('network-selector').value;
+        const subprotocol = url.searchParams.get('subprotocol') || document.getElementById('subprotocol-selector').value;
         const params = {
-            sub_protocol: sub_protocol,
+            subprotocol: subprotocol,
             strategy: strategy,
             content_type: content_type,
             success: success,

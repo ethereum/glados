@@ -62,8 +62,8 @@ pub async fn handle_error(_err: io::Error) -> impl IntoResponse {
 // Get the subprotocol from the query parameters, defaulting to History
 pub fn get_subprotocol_from_params(params: &HashMap<String, String>) -> SubProtocol {
     params
-        .get("network")
-        .and_then(|network| SubProtocol::from_str(network, /* ignore_case= */ true).ok())
+        .get("subprotocol")
+        .and_then(|subprotocol| SubProtocol::from_str(subprotocol, /* ignore_case= */ true).ok())
         .unwrap_or(SubProtocol::History)
 }
 
@@ -93,7 +93,7 @@ pub async fn network_overview(
                 strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
-                sub_protocol,
+                subprotocol,
             },),
             Period::Hour,
             &state.database_connection,
@@ -103,7 +103,7 @@ pub async fn network_overview(
                 strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
-                sub_protocol,
+                subprotocol,
             },),
             Period::Day,
             &state.database_connection,
@@ -113,7 +113,7 @@ pub async fn network_overview(
                 strategy,
                 content_type: ContentTypeFilter::All,
                 success: SuccessFilter::All,
-                sub_protocol,
+                subprotocol,
             },),
             Period::Week,
             &state.database_connection,

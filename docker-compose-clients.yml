@@ -1,6 +1,6 @@
 services:
   trin:
-    image: portalnetwork/trin:latest
+    image: portalnetwork/trin:stable
     environment:
       RUST_LOG: info
     command: "--web3-transport http --web3-http-address http://0.0.0.0:8545/ --mb 0 --portal-subnetworks history,beacon --no-upnp --disable-poke ${GLADOS_CLIENT_ARGUMENTS:-}"

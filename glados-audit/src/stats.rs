@@ -33,7 +33,7 @@ async fn record_current_stats(conn: &DatabaseConnection) -> Result<(), DbErr> {
                 strategy,
                 content_type,
                 success: SuccessFilter::All,
-                sub_protocol: subprotocol,
+                subprotocol,
             }),
             Period::Hour,
             conn,

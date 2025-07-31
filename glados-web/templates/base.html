@@ -40,36 +40,36 @@
                     <a class="nav-link active" aria-current="page" style="margin-left: 20px;" href="/diagnostics">Diagnostics</a>
                 </li>
             </ul>
-            <select name="network-selector" id="network-selector" class="form-select" style="width: auto;">
+            <select name="subprotocol-selector" id="subprotocol-selector" class="form-select" style="width: auto;">
                 <option value="History">History</option>
             </select>
         </div>
     </nav>
     <hr style="margin-top: 0;">
     <script>
-        // Logic for managing syncing network selector & URL parameter
+        // Logic for managing syncing subprotocol selector & URL parameter
         document.addEventListener('DOMContentLoaded', function() {
-            const networkSelector = document.getElementById('network-selector');
+            const subprotocolSelector = document.getElementById('subprotocol-selector');
 
             function syncSelectorWithUrl() {
                 const urlParams = new URLSearchParams(window.location.search);
-                const networkParam = urlParams.get('network');
-                if (networkParam && networkSelector.querySelector(`option[value="${networkParam}"]`)) {
-                    networkSelector.value = networkParam;
+                const subprotocol = urlParams.get('subprotocol');
+                if (subprotocol && subprotocolSelector.querySelector(`option[value="${subprotocol}"]`)) {
+                    subprotocolSelector.value = subprotocol;
                 }
             }
 
             function loadNewUrl() {
-                const selectedValue = networkSelector.value;
+                const selectedValue = subprotocolSelector.value;
                 const url = new URL(window.location);
-                url.searchParams.set('network', selectedValue);
+                url.searchParams.set('subprotocol', selectedValue);
                 window.location.href = url.toString();
             }
 
             function appendNetworkToUrl(url) {
-                const networkValue = networkSelector.value;
+                const subprotocol = subprotocolSelector.value;
                 const urlObj = new URL(url, window.location.origin);
-                urlObj.searchParams.set('network', networkValue);
+                urlObj.searchParams.set('subprotocol', subprotocol);
                 return urlObj.toString();
             }
 
@@ -77,9 +77,9 @@
             syncSelectorWithUrl();
 
             // Load new URL when selector changes.
-            networkSelector.addEventListener('change', loadNewUrl);
+            subprotocolSelector.addEventListener('change', loadNewUrl);
 
-            // Update link clicks to include network selector parameter.
+            // Update link clicks to include subprotocol selector parameter.
             document.body.addEventListener('click', function(e) {
                 const target = e.target.closest('a');
                 if (target && target.href && target.host === window.location.host) {
