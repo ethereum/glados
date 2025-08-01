@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use glados_audit::retention::{delete_old_audits, periodically_delete_old_audits};
 use glados_audit::stats::periodically_record_stats;
 use tracing::{debug, info};
 
@@ -24,7 +25,17 @@ async fn run_audit(args: Args) -> Result<()> {
 
     Migrator::up(&config.database_connection, None).await?;
 
+    if let Some(retention_period) = config.retention_period {
+        info!(
+            "Deleting audits older than {} days",
+            retention_period.num_days()
+        );
+        delete_old_audits(retention_period, &config.database_connection).await;
+    }
+
     tokio::spawn(periodically_record_stats(config.clone()));
+
+    tokio::spawn(periodically_delete_old_audits(config.clone()));
 
     run_glados_audit(config).await;
 

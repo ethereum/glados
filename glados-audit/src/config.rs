@@ -2,6 +2,7 @@ use std::{
     collections::HashMap, ops::RangeInclusive, thread::available_parallelism, time::Duration,
 };
 
+use chrono::TimeDelta;
 use entity::SelectionStrategy;
 use glados_core::jsonrpc::PortalClient;
 use sea_orm::{Database, DatabaseConnection};
@@ -26,6 +27,8 @@ pub struct AuditConfig {
     pub portal_clients: Vec<PortalClient>,
     /// The frequency of recording the current audit performance in audit_stats table.
     pub stats_recording_period: Duration,
+    /// How long to store audits. We periodically delete audits that are too old.
+    pub retention_period: Option<TimeDelta>,
 }
 
 impl AuditConfig {
@@ -70,6 +73,9 @@ impl AuditConfig {
             max_audit_rate: args.max_audit_rate,
             portal_clients,
             stats_recording_period: Duration::from_secs(args.stats_recording_period),
+            retention_period: args
+                .retention_period_days
+                .map(|retention_period_days| TimeDelta::days(retention_period_days as i64)),
         })
     }
 }

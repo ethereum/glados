@@ -1,6 +1,7 @@
 use alloy_primitives::B256;
 use alloy_primitives::U256;
 use anyhow::{bail, Result};
+use chrono::TimeDelta;
 use chrono::{DateTime, Duration, Utc};
 use clap::Parser;
 use cli::Args;
@@ -32,8 +33,10 @@ use entity::{census, census_node, node_enr};
 use glados_core::jsonrpc::TransportConfig;
 
 use crate::cli::TransportType;
+use crate::retention::periodically_delete_old_census;
 
 pub mod cli;
+mod retention;
 
 /// Configuration created from CLI arguments.
 #[derive(Clone, Debug)]
@@ -48,6 +51,8 @@ pub struct CartographerConfig {
     pub concurrency: usize,
     /// Which portal sub-protocol to target
     pub subprotocol: Subprotocol,
+    /// How long to keep census data in database.
+    pub retention_period: Option<TimeDelta>,
 }
 
 impl CartographerConfig {
@@ -73,11 +78,19 @@ impl CartographerConfig {
             census_interval: args.census_interval,
             concurrency: args.concurrency,
             subprotocol: args.subprotocol,
+            retention_period: args
+                .retention_period_days
+                .map(|retention_period_days| TimeDelta::days(retention_period_days as i64)),
         })
     }
 }
 
 pub async fn run_glados_cartographer(conn: DatabaseConnection, config: CartographerConfig) {
+    tokio::spawn(periodically_delete_old_census(
+        config.retention_period,
+        conn.clone(),
+    ));
+
     tokio::spawn(orchestrate_dht_census(config, conn));
 
     debug!("setting up CTRL+C listener");

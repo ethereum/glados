@@ -14,6 +14,7 @@ use crate::{config::AuditConfig, strategy::execute_audit_strategy, task::AuditTa
 
 pub mod cli;
 pub mod config;
+pub mod retention;
 pub mod stats;
 mod strategy;
 mod task;
