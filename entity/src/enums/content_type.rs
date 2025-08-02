@@ -1,28 +1,17 @@
 use ethportal_api::HistoryContentKey;
 use sea_orm::prelude::*;
 use serde::Deserialize;
-use strum::{EnumMessage, EnumString};
+use strum::Display;
 
 // Not using the constants in ethportal-api because seaorm does not support DeriveActiveEnum from a
 // variable
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    Eq,
-    PartialEq,
-    EnumIter,
-    DeriveActiveEnum,
-    Deserialize,
-    EnumMessage,
-    EnumString,
-)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumIter, DeriveActiveEnum, Deserialize, Display)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 #[strum(serialize_all = "snake_case")]
 pub enum ContentType {
-    #[strum(message = "Block bodies")]
+    #[strum(to_string = "Bodies")]
     BlockBodies = 0,
-    #[strum(message = "Block receipts")]
+    #[strum(to_string = "Receipts")]
     BlockReceipts = 1,
 }
 
@@ -31,7 +20,7 @@ impl AsRef<ContentType> for HistoryContentKey {
         match self {
             HistoryContentKey::BlockBody(_) => &ContentType::BlockBodies,
             HistoryContentKey::BlockReceipts(_) => &ContentType::BlockReceipts,
-            _ => &ContentType::BlockBodies,
+            _ => unimplemented!("Content type not supported: {self}"),
         }
     }
 }
