@@ -8,6 +8,9 @@ const DEFAULT_STATS_PERIOD: &str = "300";
 /// The first post-merge block number.
 const MAINNET_MERGE_BLOCK_HEIGHT: u64 = 15537394;
 
+/// How long to keep audits.
+const DEFAULT_RETENTION_PERIOD_DAYS: &str = "30";
+
 #[derive(Parser, Debug, Eq, PartialEq)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
@@ -47,6 +50,9 @@ pub struct Args {
 
     #[arg(long, default_value = DEFAULT_STATS_PERIOD, help = "stats recording period (seconds)")]
     pub stats_recording_period: u64,
+
+    #[arg(long, default_value = DEFAULT_RETENTION_PERIOD_DAYS, help = "how long to store audits (in days)")]
+    pub retention_period_days: Option<u32>,
 
     #[arg(long, action(ArgAction::Append))]
     pub portal_client: Vec<String>,
@@ -114,6 +120,7 @@ mod test {
                 start_block: 0,
                 end_block: MAINNET_MERGE_BLOCK_HEIGHT - 1,
                 stats_recording_period: 300,
+                retention_period_days: Some(30),
                 portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
             }
         }
