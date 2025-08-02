@@ -1,5 +1,8 @@
 use entity::{audit, content, HistorySelectionStrategy, SelectionStrategy};
-use ethportal_api::{HistoryContentKey, OverlayContentKey};
+use ethportal_api::{
+    jsonrpsee::http_client::HttpClient, types::portal::GetContentInfo, ContentValue,
+    HistoryContentKey, HistoryContentValue, HistoryNetworkApiClient, OverlayContentKey,
+};
 use glados_core::db::store_history_content_key;
 use sea_orm::{DatabaseConnection, EntityTrait};
 use tokio::sync::mpsc;
@@ -39,12 +42,14 @@ async fn execute_sync_strategy(tx: mpsc::Sender<AuditTask>, config: AuditConfig)
         None => 0,
     };
 
+    let client = &config.portal_clients[0].api.client;
+
     loop {
         if !block_range.contains(&block_number) {
             block_number = *block_range.start();
         }
 
-        audit_block_number(block_number, strategy.clone(), &tx, &conn).await;
+        audit_block_number(block_number, &strategy, client, &tx, &conn).await;
 
         block_number += 1;
     }
@@ -61,18 +66,78 @@ async fn execute_random_strategy(tx: mpsc::Sender<AuditTask>, config: AuditConfi
 
     loop {
         let block_number = rand::random_range(block_range.clone());
-        audit_block_number(block_number, strategy.clone(), &tx, &conn).await;
+        audit_block_number(
+            block_number,
+            &strategy,
+            &config.portal_clients[0].api.client,
+            &tx,
+            &conn,
+        )
+        .await;
     }
 }
 
 async fn audit_block_number(
     block_number: u64,
-    strategy: SelectionStrategy,
+    strategy: &SelectionStrategy,
+    client: &HttpClient,
     tx: &mpsc::Sender<AuditTask>,
     conn: &DatabaseConnection,
 ) {
-    let content_key = HistoryContentKey::new_block_header_by_number(block_number);
+    let header_content_key = HistoryContentKey::new_block_header_by_number(block_number);
 
+    let content = match client.get_content(header_content_key.clone()).await {
+        Ok(GetContentInfo { content, .. }) => content,
+        Err(err) => {
+            warn!(block_number, %err, "Enable to get header");
+            return;
+        }
+    };
+
+    let block_hash = match HistoryContentValue::decode(&header_content_key, &content) {
+        Ok(HistoryContentValue::BlockHeaderWithProof(header_with_proof)) => {
+            header_with_proof.header.hash_slow()
+        }
+        Ok(content_value) => {
+            warn!(
+                block_number,
+                ?content_value,
+                "Wrong content type, expected header"
+            );
+            return;
+        }
+        Err(err) => {
+            warn!(block_number, %err, "Enable to decode header");
+            return;
+        }
+    };
+
+    audit_content(
+        HistoryContentKey::new_block_body(block_hash),
+        block_number,
+        strategy,
+        tx,
+        conn,
+    )
+    .await;
+
+    audit_content(
+        HistoryContentKey::new_block_receipts(block_hash),
+        block_number,
+        strategy,
+        tx,
+        conn,
+    )
+    .await;
+}
+
+async fn audit_content(
+    content_key: HistoryContentKey,
+    block_number: u64,
+    strategy: &SelectionStrategy,
+    tx: &mpsc::Sender<AuditTask>,
+    conn: &DatabaseConnection,
+) {
     let Some(content) = store_history_content_key(&content_key, block_number, conn).await else {
         error!(
             ?strategy,
@@ -87,7 +152,10 @@ async fn audit_block_number(
         content.key = content_key.to_hex(),
         "Sending audit task"
     );
-    let audit_task = AuditTask { strategy, content };
+    let audit_task = AuditTask {
+        strategy: strategy.clone(),
+        content,
+    };
     if tx.send(audit_task).await.is_err() {
         panic!("Can't send audit task: Channel is closed");
     };
