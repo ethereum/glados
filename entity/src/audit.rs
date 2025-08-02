@@ -208,6 +208,7 @@ pub async fn get_failed_keys(
 
 #[cfg(test)]
 mod tests {
+    use alloy_primitives::B256;
     use enr::NodeId;
     use ethportal_api::HistoryContentKey;
 
@@ -220,7 +221,8 @@ mod tests {
         let (conn, _db) = setup_database().await?;
 
         let block_number = 12_345_678;
-        let key = HistoryContentKey::new_block_header_by_number(block_number);
+        let block_hash = B256::random();
+        let key = HistoryContentKey::new_block_body(block_hash);
 
         let content_model =
             content::get_or_create(Subprotocol::History, &key, Some(block_number), &conn).await?;
@@ -267,8 +269,9 @@ mod tests {
         let (conn, _db) = setup_database().await?;
 
         let block_number = 12_345_678;
-        let key = HistoryContentKey::new_block_header_by_number(block_number);
+        let block_hash = B256::random();
 
+        let key = HistoryContentKey::new_block_body(block_hash);
         let content =
             content::get_or_create(Subprotocol::History, &key, Some(block_number), &conn).await?;
         let client = client::get_or_create("trin v0.1.0".to_string(), &conn).await?;

@@ -40,7 +40,7 @@
                                 <tr>
                                     <th scope="col">Audit</th>
                                     <th scope="col">Result</th>
-                                    <th scope="col">Sub-protocol</th>
+                                    <th scope="col">Content Type</th>
                                     <th scope="col">Strategy</th>
                                     <th scope="col">Content Key</th>
                                     <th scope="col">Block number</th>
@@ -60,7 +60,7 @@
                                     <td><span
                                             class="badge text-bg-{% if audit.is_success() %}success{% else %}danger{% endif %}">{%
                                             if audit.is_success() %}Success{% else %}Fail{% endif %}</span></td>
-                                    <td>{{ content.subprotocol.as_text() }}</td>
+                                    <td>{{ content.content_type }}</td>
                                     <td>{{ audit.strategy.as_str() }}</td>
                                     <td>
                                         <a href="/content/key/{{content.key_as_hex()}}/">
