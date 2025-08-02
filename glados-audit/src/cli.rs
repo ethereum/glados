@@ -120,7 +120,7 @@ mod test {
                 start_block: 0,
                 end_block: MAINNET_MERGE_BLOCK_HEIGHT - 1,
                 stats_recording_period: 300,
-                retention_period_days: None,
+                retention_period_days: Some(30),
                 portal_client: vec!["ipc:////tmp/trin-jsonrpc.ipc".to_owned()],
             }
         }
