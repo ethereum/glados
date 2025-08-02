@@ -136,10 +136,9 @@ mod tests {
     /// Returns a history content key representing the header with proof
     /// for block hash `0x0001...1e1f`
     fn history_content() -> (HistoryContentKey, u64) {
-        let block_number = 12_345_678;
         (
-            HistoryContentKey::new_block_header_by_number(block_number),
-            block_number,
+            HistoryContentKey::new_block_body(B256::random()),
+            12_345_678,
         )
     }
 
