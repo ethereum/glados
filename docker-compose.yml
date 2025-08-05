@@ -50,7 +50,7 @@ services:
       - "host.docker.internal:host-gateway"
     restart: always
 
-  glados_cartographer_history:
+  glados_cartographer:
     command: "--database-url postgres://postgres:${GLADOS_POSTGRES_PASSWORD}@glados_postgres:5432/glados --transport http --http-url http://host.docker.internal:8545 --concurrency 10 --subprotocol history"
     image: portalnetwork/glados-cartographer:latest
     environment:
