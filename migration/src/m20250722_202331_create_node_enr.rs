@@ -20,7 +20,8 @@ impl MigrationTrait for Migration {
                     .col(integer(NodeEnr::NodeId))
                     .col(text(NodeEnr::Raw))
                     .col(big_unsigned(NodeEnr::SequenceNumber))
-                    .col(binary_len(NodeEnr::ProtocolVersions, 32))
+                    .col(tiny_unsigned_null(NodeEnr::MinProtocolVersion))
+                    .col(tiny_unsigned_null(NodeEnr::MaxProtocolVersion))
                     .foreign_key(
                         ForeignKey::create()
                             .name(FK_NODE_ID)
@@ -49,7 +50,8 @@ impl MigrationTrait for Migration {
                 Index::create()
                     .table(NodeEnr::Table)
                     .name(IDX_PROTOCOL_VERSION)
-                    .col(NodeEnr::ProtocolVersions)
+                    .col(NodeEnr::MaxProtocolVersion)
+                    .col(NodeEnr::MinProtocolVersion)
                     .to_owned(),
             )
             .await?;
@@ -71,7 +73,8 @@ enum NodeEnr {
     NodeId,
     Raw,
     SequenceNumber,
-    ProtocolVersions,
+    MinProtocolVersion,
+    MaxProtocolVersion,
 }
 
 #[derive(DeriveIden)]

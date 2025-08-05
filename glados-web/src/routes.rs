@@ -1236,48 +1236,20 @@ pub async fn weekly_census_operating_systems(
     Ok(Json(census_history_compact))
 }
 
-#[derive(FromQueryResult)]
+#[derive(Debug, Clone, FromQueryResult, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CensusHistoryProtocolVersionsData {
     census_id: i32,
     start: DateTimeUtc,
-    protocol_versions: Vec<u8>,
-    node_count: i64,
-}
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CensusHistoryProtocolVersionsDataCompact {
-    census_id: i32,
-    start: DateTimeUtc,
-    min_protocol_version: u8,
-    max_protocol_version: u8,
+    min_protocol_version: i16,
+    max_protocol_version: i16,
     node_count: i64,
 }
 
-impl From<CensusHistoryProtocolVersionsData> for CensusHistoryProtocolVersionsDataCompact {
-    fn from(value: CensusHistoryProtocolVersionsData) -> Self {
-        CensusHistoryProtocolVersionsDataCompact {
-            census_id: value.census_id,
-            start: value.start,
-            min_protocol_version: value
-                .protocol_versions
-                .iter()
-                .min()
-                .cloned()
-                .unwrap_or_default(),
-            max_protocol_version: value
-                .protocol_versions
-                .iter()
-                .max()
-                .cloned()
-                .unwrap_or_default(),
-            node_count: value.node_count,
-        }
-    }
-}
 pub async fn weekly_census_protocol_versions(
     http_args: HttpQuery<HashMap<String, String>>,
     Extension(state): Extension<Arc<State>>,
-) -> Result<Json<Vec<CensusHistoryProtocolVersionsDataCompact>>, StatusCode> {
+) -> Result<Json<Vec<CensusHistoryProtocolVersionsData>>, StatusCode> {
     let weeks_ago: i32 = match http_args.get("weeks-ago") {
         None => 0,
         Some(weeks_ago) => weeks_ago.parse::<i32>().unwrap_or(0),
@@ -1292,7 +1264,8 @@ pub async fn weekly_census_protocol_versions(
             SELECT
                 census.id AS census_id,
                 ANY_VALUE(DATE_TRUNC('second', census.started_at)) AS start,
-                node_enr.protocol_versions,
+                COALESCE(node_enr.min_protocol_version, '0') as min_protocol_version,
+                COALESCE(node_enr.max_protocol_version, '0') as max_protocol_version,
                 COUNT(1) AS node_count
             FROM census
             LEFT JOIN census_node ON census.id = census_node.census_id
@@ -1302,8 +1275,9 @@ pub async fn weekly_census_protocol_versions(
                 census.started_at >= NOW() - INTERVAL '1 week' * ($1 + 1) AND
                 census.started_at < NOW() - INTERVAL '1 week' * $1
             GROUP BY
-              census.id,
-              node_enr.protocol_versions
+                census.id,
+                node_enr.max_protocol_version,
+                node_enr.min_protocol_version
             ORDER BY census.started_at
         ",
             vec![weeks_ago.into(), subprotocol.into()],
@@ -1315,10 +1289,7 @@ pub async fn weekly_census_protocol_versions(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let census_history_compact: Vec<CensusHistoryProtocolVersionsDataCompact> =
-        census_history.into_iter().map(|c| c.into()).collect();
-
-    Ok(Json(census_history_compact))
+    Ok(Json(census_history))
 }
 
 #[derive(FromQueryResult, Debug, Clone, Serialize)]
@@ -1380,13 +1351,11 @@ fn nest_protocol_versions_clients(
     let mut nested = HashMap::<String, HashMap<String, i64>>::new();
 
     for row in census.into_iter() {
-        let protocol_versions = if row.protocol_versions.is_empty() {
-            vec!["Unknown".to_string()]
-        } else {
-            row.protocol_versions
-                .iter()
-                .map(|pv| format!("v{pv}"))
-                .collect()
+        let protocol_versions = match (row.min_protocol_version, row.max_protocol_version) {
+            (Some(min_pv), Some(max_pv)) => (min_pv..=max_pv)
+                .map(|protocol_version| format!("v{protocol_version}"))
+                .collect(),
+            _ => vec!["Unknown".to_string()],
         };
 
         for protocol_version in protocol_versions.iter() {
@@ -1402,8 +1371,9 @@ fn nest_protocol_versions_clients(
 
 #[derive(FromQueryResult, Debug)]
 pub struct CensusProtocolVersionsClientsData {
-    protocol_versions: Vec<u8>,
     client_name: Client,
+    min_protocol_version: Option<i16>,
+    max_protocol_version: Option<i16>,
     node_count: i64,
 }
 pub async fn census_protocol_versions_clients(
@@ -1417,8 +1387,9 @@ pub async fn census_protocol_versions_clients(
             state.database_connection.get_database_backend(),
             "
             SELECT
-                node_enr.protocol_versions,
                 census_node.client_name,
+                node_enr.min_protocol_version,
+                node_enr.max_protocol_version,
                 COUNT(*) AS node_count
             FROM census_node
             LEFT JOIN node_enr ON census_node.node_enr_id = node_enr.id
@@ -1429,8 +1400,9 @@ pub async fn census_protocol_versions_clients(
                     WHERE subprotocol = $1
                 )
             GROUP BY
-                node_enr.protocol_versions,
-                census_node.client_name
+                census_node.client_name,
+                node_enr.max_protocol_version,
+                node_enr.min_protocol_version
         ",
             vec![subprotocol.into()],
         ))
@@ -1762,37 +1734,44 @@ mod tests {
         let census = vec![
             CensusProtocolVersionsClientsData {
                 client_name: Client::from("shisui".to_string()),
-                protocol_versions: vec![0u8],
+                min_protocol_version: Some(0),
+                max_protocol_version: Some(0),
                 node_count: 1,
             },
             CensusProtocolVersionsClientsData {
                 client_name: Client::from("ultralight".to_string()),
-                protocol_versions: vec![0u8],
+                min_protocol_version: Some(0),
+                max_protocol_version: Some(0),
                 node_count: 7,
             },
             CensusProtocolVersionsClientsData {
                 client_name: Client::from("shisui".to_string()),
-                protocol_versions: vec![0u8, 1u8],
+                min_protocol_version: Some(0),
+                max_protocol_version: Some(1),
                 node_count: 8,
             },
             CensusProtocolVersionsClientsData {
                 client_name: Client::from("trin".to_string()),
-                protocol_versions: vec![0u8, 1u8],
+                min_protocol_version: Some(0),
+                max_protocol_version: Some(1),
                 node_count: 213,
             },
             CensusProtocolVersionsClientsData {
                 client_name: Client::from(None),
-                protocol_versions: vec![0u8, 1u8],
+                min_protocol_version: Some(0),
+                max_protocol_version: Some(1),
                 node_count: 191,
             },
             CensusProtocolVersionsClientsData {
                 client_name: Client::from("trin".to_string()),
-                protocol_versions: vec![],
+                min_protocol_version: None,
+                max_protocol_version: None,
                 node_count: 21,
             },
             CensusProtocolVersionsClientsData {
                 client_name: Client::from(None),
-                protocol_versions: vec![],
+                min_protocol_version: None,
+                max_protocol_version: None,
                 node_count: 1,
             },
         ];
