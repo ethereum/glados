@@ -6,4 +6,4 @@ services:
     command: "--web3-transport http --web3-http-address http://0.0.0.0:8545/ --mb 0 --portal-subnetworks history,beacon --no-upnp --disable-poke ${GLADOS_CLIENT_ARGUMENTS:-}"
   nimbus-portal:
     image: statusim/nimbus-portal-client:amd64-master-latest
-    command: "--rpc --rpc-address=0.0.0.0 --rpc-api:eth,portal,discovery --storage-capacity=0 --disable-poke ${GLADOS_CLIENT_ARGUMENTS:-}"
+    command: "--rpc --rpc-address=0.0.0.0 --rpc-api:portal,discovery --storage-capacity=0 --disable-poke ${GLADOS_CLIENT_ARGUMENTS:-}"
