@@ -32,6 +32,8 @@ pub struct PortalClient {
 }
 
 const CONTENT_NOT_FOUND_ERROR_CODE: i32 = -39001;
+const CONTENT_NOT_FOUND_WITH_TRACE_ERROR_CODE: i32 = -39002;
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Error, Debug)]
 pub enum JsonRpcError {
@@ -97,33 +99,31 @@ pub enum JsonRpcError {
     #[error("Query completed without finding content")]
     ContentNotFound { trace: Option<QueryTrace> },
 
-    #[error("Query trace was missing")]
-    MissingQueryTrace,
-
+    /// The string is the raw input that was expected to be a QueryTrace
     #[error("Invalid Query trace format")]
-    // The string is the raw input that was expected to be a QueryTrace
     InvalidQueryTrace(String),
 }
 
 impl From<jsonrpsee::core::client::Error> for JsonRpcError {
     fn from(e: jsonrpsee::core::client::Error) -> Self {
-        if let jsonrpsee::core::client::Error::Call(ref error) = e {
-            if error.code() == CONTENT_NOT_FOUND_ERROR_CODE {
-                return error
-                    .data()
-                    .map(|data| {
-                        let trace_str = data.to_string();
-                        serde_json::from_str(&trace_str)
-                            .map_or(JsonRpcError::InvalidQueryTrace(trace_str), |trace| {
-                                JsonRpcError::ContentNotFound { trace: Some(trace) }
-                            })
-                    })
-                    .unwrap_or(JsonRpcError::ContentNotFound { trace: None });
-            }
-        }
+        let jsonrpsee::core::client::Error::Call(error) = &e else {
+            // Fallback to the generic HttpClient error variant if no match
+            return JsonRpcError::HttpClient(e.to_string());
+        };
 
-        // Fallback to the generic HttpClient error variant if no match
-        JsonRpcError::HttpClient(e.to_string())
+        let trace_str = match error.code() {
+            CONTENT_NOT_FOUND_ERROR_CODE => None,
+            CONTENT_NOT_FOUND_WITH_TRACE_ERROR_CODE => error.data().map(ToString::to_string),
+            _ => return JsonRpcError::HttpClient(e.to_string()),
+        };
+
+        match trace_str {
+            Some(trace_str) => match serde_json::from_str(&trace_str) {
+                Ok(trace) => JsonRpcError::ContentNotFound { trace: Some(trace) },
+                Err(_) => JsonRpcError::InvalidQueryTrace(trace_str),
+            },
+            None => JsonRpcError::ContentNotFound { trace: None },
+        }
     }
 }
 
