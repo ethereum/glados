@@ -27,7 +27,7 @@ impl From<String> for Client {
     fn from(value: String) -> Self {
         match value.to_lowercase().as_str() {
             "trin" => Client::Trin,
-            "nimbus" => Client::Nimbus,
+            "nimbus" | "nimbus_portal_client" => Client::Nimbus,
             "samba" => Client::Samba,
             "shisui" => Client::Shisui,
             "ultralight" => Client::Ultralight,
