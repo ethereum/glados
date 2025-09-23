@@ -128,25 +128,27 @@ impl Model {
 #[cfg(test)]
 mod tests {
     use ethportal_api::HistoryContentKey;
+    use rstest::{fixture, rstest};
 
     use crate::test_utils::setup_database;
 
     use super::*;
 
-    /// Returns a history content key representing the header with proof
-    /// for block hash `0x0001...1e1f`
-    fn history_content() -> (HistoryContentKey, u64) {
-        (
-            HistoryContentKey::new_block_body(B256::random()),
-            12_345_678,
-        )
+    #[fixture]
+    fn block_number() -> u64 {
+        12_345_678
+    }
+
+    #[fixture]
+    fn key(#[from(block_number)] block_number: u64) -> HistoryContentKey {
+        HistoryContentKey::new_block_body(block_number)
     }
 
     /// Tests that the database helper method id_as_hash() works.
+    #[rstest]
     #[tokio::test]
-    async fn content_id_as_hash() -> Result<(), DbErr> {
+    async fn content_id_as_hash(block_number: u64, key: HistoryContentKey) -> Result<(), DbErr> {
         let (conn, _db) = setup_database().await?;
-        let (key, block_number) = history_content();
         let content_model = get_or_create(Subprotocol::History, &key, Some(block_number), &conn)
             .await
             .unwrap();
@@ -155,10 +157,10 @@ mod tests {
     }
 
     /// Tests that the database helper method id_as_hex() works.
+    #[rstest]
     #[tokio::test]
-    async fn content_id_as_hex() -> Result<(), DbErr> {
+    async fn content_id_as_hex(block_number: u64, key: HistoryContentKey) -> Result<(), DbErr> {
         let (conn, _db) = setup_database().await?;
-        let (key, block_number) = history_content();
         let content_id_hash = B256::from(key.content_id());
 
         let content_model = get_or_create(Subprotocol::History, &key, Some(block_number), &conn)
@@ -169,10 +171,10 @@ mod tests {
     }
 
     /// Tests that the database helper method key_as_hex() works.
+    #[rstest]
     #[tokio::test]
-    async fn content_key_as_hex() -> Result<(), DbErr> {
+    async fn content_key_as_hex(block_number: u64, key: HistoryContentKey) -> Result<(), DbErr> {
         let (conn, _db) = setup_database().await?;
-        let (key, block_number) = history_content();
         let content_model = get_or_create(Subprotocol::History, &key, Some(block_number), &conn)
             .await
             .unwrap();
@@ -182,10 +184,10 @@ mod tests {
 
     /// Tests that the get_or_create() function correctly handles the
     /// presence or absence of a key in the database.
+    #[rstest]
     #[tokio::test]
-    async fn content_get_or_create() -> Result<(), DbErr> {
+    async fn content_get_or_create(block_number: u64, key: HistoryContentKey) -> Result<(), DbErr> {
         let (conn, _db) = setup_database().await?;
-        let (key, block_number) = history_content();
 
         // Ensure our database is empty
         assert_eq!(Entity::find().count(&conn).await?, 0);

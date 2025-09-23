@@ -20,7 +20,6 @@ impl AsRef<ContentType> for HistoryContentKey {
         match self {
             HistoryContentKey::BlockBody(_) => &ContentType::BlockBodies,
             HistoryContentKey::BlockReceipts(_) => &ContentType::BlockReceipts,
-            _ => unimplemented!("Content type not supported: {self}"),
         }
     }
 }

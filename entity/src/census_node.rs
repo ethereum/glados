@@ -70,11 +70,19 @@ pub async fn create(
     node_enr_id: i32,
     surveyed_at: DateTimeUtc,
     data_radius: U256,
-    client_info: Option<&ClientInfo>,
+    client_info: &ClientInfo,
     conn: &DatabaseConnection,
 ) -> Result<Model, DbErr> {
     let data_radius_raw: [u8; 32] = data_radius.to_be_bytes();
     let data_radius_high: i64 = data_radius.wrapping_shr(193).to::<i64>();
+
+    let str_to_optional_fn = |s: &str| -> Option<String> {
+        if s.is_empty() {
+            None
+        } else {
+            Some(s.to_string())
+        }
+    };
 
     let census = ActiveModel {
         id: NotSet,
@@ -83,14 +91,14 @@ pub async fn create(
         surveyed_at: Set(surveyed_at),
         data_radius: Set(data_radius_raw.to_vec()),
         data_radius_high: Set(data_radius_high),
-        client_name: Set(client_info.map(|c| c.client_name.clone())),
-        client_version: Set(client_info.map(|c| c.client_version.clone())),
-        short_commit: Set(client_info.map(|c| c.short_commit.clone())),
-        operating_system: Set(client_info.map(|c| c.operating_system.clone())),
-        cpu_architecture: Set(client_info.map(|c| c.cpu_architecture.clone())),
-        programming_language_version: Set(
-            client_info.map(|c| c.programming_language_version.clone())
-        ),
+        client_name: Set(str_to_optional_fn(&client_info.client_name)),
+        client_version: Set(str_to_optional_fn(&client_info.client_version)),
+        short_commit: Set(str_to_optional_fn(&client_info.short_commit)),
+        operating_system: Set(str_to_optional_fn(&client_info.operating_system)),
+        cpu_architecture: Set(str_to_optional_fn(&client_info.cpu_architecture)),
+        programming_language_version: Set(str_to_optional_fn(
+            &client_info.programming_language_version,
+        )),
     };
 
     census.insert(conn).await
