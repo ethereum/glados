@@ -1,5 +1,5 @@
 # Prepare base image
-FROM rust:1.85 AS chef
+FROM rust:1.87 AS chef
 WORKDIR /glados
 
 ARG GIT_HASH=unknown

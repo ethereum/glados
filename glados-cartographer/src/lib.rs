@@ -115,7 +115,7 @@ struct DHTCensusRecord {
     enr: Enr,
     node_enr_id: i32,
     data_radius: U256,
-    client_info: Option<ClientInfo>,
+    client_info: ClientInfo,
     surveyed_at: DateTime<Utc>,
 }
 
@@ -217,7 +217,7 @@ impl DHTCensus {
             enr,
             node_enr_id,
             data_radius: *capabilities.data_radius,
-            client_info: capabilities.client_info,
+            client_info: capabilities.get_client_info(),
             surveyed_at: Utc::now(),
         };
         let mut alive = self.alive.write().await;
@@ -389,7 +389,7 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
             census_record.node_enr_id,
             census_record.surveyed_at,
             census_record.data_radius,
-            census_record.client_info.as_ref(),
+            &census_record.client_info,
             &conn,
         )
         .await

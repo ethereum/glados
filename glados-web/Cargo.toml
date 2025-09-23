@@ -3,14 +3,14 @@ name = "glados-web"
 version = "0.1.0"
 edition = "2021"
 publish = false
-rust-version = "1.85.0"
+rust-version = "1.87.0"
 authors = ["Piper Merriam <piper@pipermerriam.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 alloy-primitives.workspace = true
-alloy = "0.15"
+alloy = "1.0.35"
 anyhow.workspace = true
 askama = { version = "0.14.0", features = ["serde_json"] }
 axum = "0.6.11"
