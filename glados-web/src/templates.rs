@@ -7,7 +7,7 @@ use axum::{
 };
 use enr::NodeId;
 use entity::{
-    audit, client,
+    audit,
     client_info::{Client, OperatingSystem},
     content, node, node_enr, ContentType, Subprotocol,
 };
@@ -70,7 +70,7 @@ pub struct EnrDetailTemplate {
     pub enr: node_enr::Model,
 }
 
-pub type AuditTuple = (audit::Model, content::Model, client::Model);
+pub type AuditTuple = (audit::Model, content::Model, String);
 
 #[derive(Template)]
 #[template(path = "contentid_list.html")]

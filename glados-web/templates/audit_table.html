@@ -49,7 +49,7 @@
                                 </tr>
                                 </thead>
                                 <tbody>
-                                {% for (audit, content, client_info) in audits %}
+                                {% for (audit, content, client_name) in audits %}
                                 <tr>
                                     <td>{% if audit.trace.is_some() %}<a href="/audit/id/{{ audit.id }}">{{ audit.id
                                         }}</a>{%
@@ -70,7 +70,7 @@
                                     <td>{{ content.block_number_as_html() }}</td>
                                     <td title="{{ audit.created_at_local_time() }}">{{ audit.created_at_humanized() }}
                                     </td>
-                                    <td>{{ client_info.version_info }}</td>
+                                    <td>{{ client_name }}</td>
                                 </tr>
                                 {% endfor %}
                                 </tbody>

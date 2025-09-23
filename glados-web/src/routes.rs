@@ -243,9 +243,15 @@ pub async fn get_audit_tuples_from_audit_models(
         })?;
 
     // Zip up the audits with their corresponding content and client info.
-    // Filter out the (ideally zero) audits that do not have content or client info.
+    // Filter out the (ideally zero) audits that do not have content.
     let audit_tuples: Vec<AuditTuple> = itertools::izip!(audits, content, client)
-        .filter_map(|(audit, content, info)| content.map(|c| (audit, c, info.unwrap())))
+        .filter_map(|(audit, content, client)| {
+            let client_name_and_version = client
+                .as_ref()
+                .and_then(client::Model::client_name_and_version)
+                .unwrap_or_else(|| "Unknown".to_string());
+            content.map(|c| (audit, c, client_name_and_version))
+        })
         .collect();
 
     Ok(audit_tuples)
