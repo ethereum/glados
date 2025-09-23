@@ -196,11 +196,9 @@ impl DHTCensus {
         }
     }
 
-    async fn is_known(&self, node_id: NodeId) -> bool {
-        let known = self.known.read().await;
-        known.contains(&node_id.raw())
-    }
-
+    /// Adds node_id to collection of known peers.
+    ///
+    /// Returns whether node id was added (it would fail if peer is already known).
     async fn add_known(&self, node_id: NodeId) -> bool {
         let mut known = self.known.write().await;
         known.insert(node_id.raw())
@@ -268,10 +266,10 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
     let census = Arc::new(DHTCensus::new());
 
     // Initial un-processed ENRs to be pinged
-    let (to_ping_tx, to_ping_rx): (Sender<Enr>, Receiver<Enr>) = mpsc::channel(256);
+    let (to_ping_tx, to_ping_rx): (Sender<Enr>, Receiver<Enr>) = mpsc::channel(1024);
 
     // ENRs that have been pinged and now need to have their routing tables enumerated
-    let (to_enumerate_tx, to_enumerate_rx): (Sender<Enr>, Receiver<Enr>) = mpsc::channel(256);
+    let (to_enumerate_tx, to_enumerate_rx): (Sender<Enr>, Receiver<Enr>) = mpsc::channel(1024);
 
     info!(
         target.node_id=?B256::from(target.raw()),
@@ -292,14 +290,15 @@ async fn perform_dht_census(config: CartographerConfig, conn: DatabaseConnection
     };
 
     for enr in initial_enrs {
-        census.add_known(enr.node_id()).await;
-        match to_ping_tx.send(enr).await {
-            Ok(_) => (),
-            Err(err) => {
-                error!(err=?err, "Error during census initialization");
-                return;
+        if census.add_known(enr.node_id()).await {
+            match to_ping_tx.send(enr).await {
+                Ok(_) => (),
+                Err(err) => {
+                    error!(err=?err, "Error during census initialization");
+                    return;
+                }
             }
-        };
+        }
     }
 
     // Give each semaphore half of the concurrency to use, with a lower limit
@@ -596,16 +595,19 @@ async fn do_routing_table_enumeration(
                 continue;
             }
         };
-        debug!(enr.node_id=?B256::from(enr.node_id().raw()), distance=distance, count=enrs_at_distance.len(), "Routing Table Info");
+        debug!(
+            enr.node_id=?B256::from(enr.node_id().raw()),
+            distance=distance,
+            count=enrs_at_distance.len(),
+            "Routing Table Info",
+        );
         for found_enr in enrs_at_distance {
-            if census.is_known(found_enr.node_id()).await {
-                continue;
-            } else {
-                census.add_known(found_enr.node_id()).await;
-                to_ping_tx
-                    .send(found_enr)
-                    .await
-                    .expect("Error queuing liveliness check");
+            if census.add_known(found_enr.node_id()).await {
+                if let Err(err) = to_ping_tx.send(found_enr).await {
+                    error!(%err, "Error queuing liveliness check");
+                    census.add_errored(enr.node_id()).await;
+                    return;
+                }
             }
         }
     }

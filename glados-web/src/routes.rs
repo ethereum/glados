@@ -843,7 +843,7 @@ pub async fn census_timeseries(
                     AND started_at >= NOW() - INTERVAL '1 day' * ($1 + 1)
                     AND started_at < NOW() - INTERVAL '1 day' * $1
                 ) AS census
-            LEFT JOIN
+            JOIN
                 census_node ON census.id = census_node.census_id
             LEFT JOIN
                 node_enr ON node_enr.id = census_node.node_enr_id
