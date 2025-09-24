@@ -13,6 +13,7 @@ use tracing::info;
 use alloy_primitives::U256;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
+pub mod audit_trace;
 pub mod cli;
 pub mod routes;
 pub mod state;

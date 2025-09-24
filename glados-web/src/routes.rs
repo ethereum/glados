@@ -2,16 +2,14 @@ use std::collections::{HashMap, HashSet};
 use std::io;
 use std::sync::Arc;
 
-use alloy_primitives::{hex, B256, U256};
+use alloy_primitives::U256;
 use axum::{
     extract::{Extension, Path, Query as HttpQuery},
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
-use chrono::{TimeZone, Utc};
 use clap::ValueEnum;
-use enr::NodeId;
 use entity::{
     audit, audit_stats, census, census_node, client,
     client_info::{Client, OperatingSystem, Version},
@@ -40,6 +38,7 @@ use sea_orm::{
 use serde::Serialize;
 use tracing::{error, info, warn};
 
+use crate::audit_trace::{audit_trace_only_discovered_nodes, audit_trace_set_node_details};
 use crate::{
     state::State,
     templates::AuditTuple,
@@ -412,10 +411,10 @@ pub async fn contentaudit_detail(
 ) -> Result<HtmlTemplate<ContentAuditDetailTemplate>, StatusCode> {
     let audit_id = audit_id.parse::<i32>().unwrap();
     info!("Audit ID: {}", audit_id);
-    let mut audit = match audit::Entity::find_by_id(audit_id)
-        .one(&state.database_connection)
-        .await
-    {
+
+    let conn = &state.database_connection;
+
+    let mut audit = match audit::Entity::find_by_id(audit_id).one(conn).await {
         Ok(Some(audit)) => audit,
         Ok(None) => return Err(StatusCode::from_u16(404).unwrap()),
         Err(err) => {
@@ -436,88 +435,11 @@ pub async fn contentaudit_detail(
         None => None,
     };
 
-    // If we were able to deserialize the trace, we can look up & interpolate the radius for the nodes in the trace.
+    // If we are able to deserialize the trace, we can add node details at the time of audit.
+    // For clarity, we want to show only newly discovered nodes as part of each response.
     if let Some(trace) = &mut trace {
-        // Get the timestamp of the query
-        let timestamp: DateTimeUtc = Utc
-            .timestamp_millis_opt(trace.started_at_ms as i64)
-            .single()
-            .expect("Failed to convert timestamp to DateTime");
-
-        // Do a query to get, for each node, the radius recorded closest to the time at which the trace took place.
-        let node_ids: Vec<Vec<u8>> = trace
-            .metadata
-            .keys()
-            .cloned()
-            .map(|x| x.raw().to_vec())
-            .collect();
-        let node_ids_str = format!(
-            "{{{}}}",
-            node_ids
-                .iter()
-                .map(|id| format!("\\\\x{}", hex::encode(id)))
-                .collect::<Vec<String>>()
-                .join(",")
-        );
-
-        #[derive(FromQueryResult, Debug)]
-        pub struct NodeCensusInfo {
-            pub node_id: Vec<u8>,
-            pub data_radius: Vec<u8>,
-            pub client: Client,
-        }
-        let node_infos: HashMap<NodeId, NodeCensusInfo> =
-            match NodeCensusInfo::find_by_statement(Statement::from_sql_and_values(
-                DbBackend::Postgres,
-                "
-                SELECT DISTINCT ON (node.node_id)
-                    node.node_id,
-                    closest_census_node.data_radius,
-                    closest_census_node.client
-                FROM
-                    node
-                    JOIN node_enr ON node_enr.node_id = node.id
-                    CROSS JOIN LATERAL (
-                        SELECT census_node.data_radius, census_node.client_name as client, census_node.surveyed_at
-                        FROM census_node
-                        WHERE census_node.node_enr_id = node_enr.id AND census_node.surveyed_at <= $2::timestamp + INTERVAL '15 minutes'
-                        ORDER BY census_node.surveyed_at DESC
-                        LIMIT 1
-                    ) closest_census_node
-                WHERE
-                    node.node_id = ANY($1::bytea[])
-                ORDER BY
-                    node.node_id,
-                    closest_census_node.surveyed_at DESC
-                ",
-                vec![node_ids_str.into(), timestamp.into()],
-            ))
-            .all(&state.database_connection)
-            .await
-            {
-                Ok(data) => data
-                    .into_iter()
-                    // Transform SQL result into a hashmap.
-                    .map(|node_census_info| {
-                        let mut node_id = [0u8; 32];
-                        node_id.copy_from_slice(&node_census_info.node_id);
-                        let node_id = NodeId::new(&node_id);
-                        (node_id, node_census_info)
-                    })
-                    .collect(),
-                Err(err) => {
-                    error!(err=?err, "Failed to lookup radius for traced nodes");
-                    HashMap::new()
-                }
-            };
-
-        // Add radius info to node metadata.
-        trace.metadata.iter_mut().for_each(|(node_id, node_info)| {
-            if let Some(node_census_info) = node_infos.get(node_id) {
-                node_info.radius = Some(B256::from_slice(&node_census_info.data_radius));
-                node_details.insert(*node_id, node_census_info.client.clone());
-            }
-        });
+        node_details = audit_trace_set_node_details(trace, conn).await;
+        audit_trace_only_discovered_nodes(trace);
 
         // Update the trace with radius metadata.
         audit.trace =
